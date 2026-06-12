@@ -13,6 +13,7 @@
     <Product>WinPure</Product>
     <Description>Windows 11 debloater and optimizer with always-available restore.</Description>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <!-- Publish as a single standalone exe: dotnet publish -c Release -->
     <PublishSingleFile Condition="'$(Configuration)' == 'Release'">true</PublishSingleFile>

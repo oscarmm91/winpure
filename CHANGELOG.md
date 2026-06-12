@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.1.1 — 2026-06-12
+
+- **Fix:** toggling Dark Mode now broadcasts `WM_SETTINGCHANGE (ImmersiveColorSet)`, so File Explorer and the taskbar repaint instantly instead of staying half-dark until Explorer restarts. Restoring a backup with theme values triggers the same refresh.
+- App icon (blue shield + star) embedded in the executable.
+- Repair page icons fixed.
+- README overhauled: badges, real screenshots of every page, full tweak reference in `docs/tweaks.md`.
+
 ## v1.1.0 — 2026-06-11
 
 - New **Repair & Maintenance** page (inspired by Chris Titus WinUtil): create restore point, SFC + DISM system file repair, reset Windows Update components, reset network stack, clean temporary files.

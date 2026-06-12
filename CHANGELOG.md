@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.0 — 2026-06-11
+
+- New **Repair & Maintenance** page (inspired by Chris Titus WinUtil): create restore point, SFC + DISM system file repair, reset Windows Update components, reset network stack, clean temporary files.
+- 10 new tweaks ported from WinUtil: Consumer Features, Delivery Optimization, Background Apps, Windows AI & Recall, Fullscreen Optimizations, Mouse Acceleration, Long Paths, End Task on taskbar right-click.
+- **About** dialog with author info and social links (sidebar button).
+
 ## v1.0.0 — 2026-06-11
 
 Initial release.

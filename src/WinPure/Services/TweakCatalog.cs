@@ -224,6 +224,44 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
+            Id = "privacy-consumer-features", Category = TweakCategory.Privacy, Preset = PresetLevel.Safe,
+            Name = "Disable Consumer Features",
+            Description = "Stop Windows from auto-installing sponsored games and Store app links.",
+            Help = "Sets the DisableWindowsConsumerFeatures policy (from Chris Titus WinUtil). Note: some promo-driven apps like Phone Link suggestions disappear.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent", "DisableWindowsConsumerFeatures", 1, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "privacy-delivery-optimization", Category = TweakCategory.Privacy, Preset = PresetLevel.Balanced,
+            Name = "Disable Delivery Optimization",
+            Description = "Stop Windows from uploading updates to other PCs using your bandwidth.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization", "DODownloadMode", 0, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "privacy-background-apps", Category = TweakCategory.Privacy, Preset = PresetLevel.Balanced,
+            Name = "Disable Background Apps",
+            Description = "Stop Microsoft Store apps from running in the background.",
+            Help = "Sets the global background-access kill switch (from Chris Titus WinUtil) instead of toggling each app one by one.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications", "GlobalUserDisabled", 1, 0),
+            },
+        };
+
+        yield return new Tweak
+        {
             Id = "privacy-compat-telemetry-tasks", Category = TweakCategory.Privacy, Preset = PresetLevel.Aggressive,
             Name = "Disable Compatibility Telemetry Tasks",
             Description = "Disable the Microsoft Compatibility Appraiser scheduled tasks.",
@@ -328,6 +366,22 @@ public static class TweakCatalog
                 Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot", "TurnOffWindowsCopilot", 1, null),
                 Dword(@"HKCU\Software\Policies\Microsoft\Windows\WindowsCopilot", "TurnOffWindowsCopilot", 1, null),
                 Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "ShowCopilotButton", 0, 1),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "apps-windows-ai", Category = TweakCategory.Apps, Preset = PresetLevel.Aggressive,
+            Name = "Disable Windows AI & Recall",
+            Description = "Turn off Recall snapshots, Notepad AI and hide AI components from Settings.",
+            Help = "Applies the WindowsAI/Recall policies popularized by Chris Titus WinUtil: DisableAIDataAnalysis stops Recall screen captures, Notepad AI features are disabled and the AI components page is hidden.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis", 1, null),
+                Dword(@"HKCU\Software\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis", 1, null),
+                Dword(@"HKLM\SOFTWARE\Policies\WindowsNotepad", "DisableAIFeatures", 1, null),
+                Str(@"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer", "SettingsPageVisibility", "hide:aicomponents", null),
             },
         };
 
@@ -495,6 +549,46 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
+            Id = "perf-fullscreen-opt", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
+            Name = "Disable Fullscreen Optimizations",
+            Description = "Use true exclusive fullscreen in games for lower input latency.",
+            Help = "From Chris Titus WinUtil. Note: disables color management in exclusive fullscreen.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\System\GameConfigStore", "GameDVR_DXGIHonorFSEWindowsCompatible", 1, 0),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "perf-mouse-accel", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
+            Name = "Disable Mouse Acceleration",
+            Description = "Make cursor movement 1:1 with physical mouse movement.",
+            Help = "Sets MouseSpeed and both thresholds to 0 — preferred for gaming and precise work.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Str(@"HKCU\Control Panel\Mouse", "MouseSpeed", "0", "1"),
+                Str(@"HKCU\Control Panel\Mouse", "MouseThreshold1", "0", "6"),
+                Str(@"HKCU\Control Panel\Mouse", "MouseThreshold2", "0", "10"),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "perf-long-paths", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
+            Name = "Enable Long Paths",
+            Description = "Allow file paths longer than 260 characters.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKLM\SYSTEM\CurrentControlSet\Control\FileSystem", "LongPathsEnabled", 1, 0),
+            },
+        };
+
+        yield return new Tweak
+        {
             Id = "perf-remote-desktop", Category = TweakCategory.Performance, Preset = PresetLevel.Balanced,
             Name = "Disable Remote Desktop",
             Description = "Block inbound Remote Desktop connections if you don't use them.",
@@ -654,6 +748,19 @@ public static class TweakCatalog
             Actions = new TweakAction[]
             {
                 Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "TaskbarAl", 0, 1),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "ui-end-task", Category = TweakCategory.UI, Preset = PresetLevel.Safe,
+            Name = "End Task on Taskbar Right-Click",
+            Description = "Add an 'End task' option when right-clicking taskbar apps.",
+            Help = "Enables the hidden taskbar developer setting (from Chris Titus WinUtil) — kill hung apps without opening Task Manager.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings", "TaskbarEndTask", 1, null),
             },
         };
 

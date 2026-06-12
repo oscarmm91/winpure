@@ -32,6 +32,7 @@ WinPure lets you clean, optimize and take control of Windows 11 from a single Fl
 | **Performance** | App/shutdown timeouts, foreground priority, animations, hibernation, power plan, Remote Desktop |
 | **UI & Personalization** | Dark mode, Start suggestions, taskbar Widgets/Task View/Chat, file extensions, hidden files, taskbar alignment |
 | **Context Menu** | Classic Windows 10 menu, remove "Edit with Clipchamp/Notepad/Photos", "Ask Copilot", "Share", "Give access to" |
+| **Repair & Maintenance** | System restore point, SFC + DISM repair, Reset Windows Update, Reset Network, clean temp files |
 
 ## Building from source
 
@@ -41,9 +42,16 @@ dotnet build WinPure.sln                                  # debug build
 dotnet publish src/WinPure/WinPure.csproj -c Release      # portable single-file exe
 ```
 
+## Author
+
+Made with ❤ by **Oscar Medina** (@oscaremeh) — *free for everyone, forever.*
+
+[Instagram](https://www.instagram.com/oscar.emeh/) · [TikTok](https://www.tiktok.com/@oscar.emeh) · [YouTube](https://www.youtube.com/@oscar_emeh)
+
 ## Credits
 
 Tweak research builds on the excellent work of
+[Chris Titus WinUtil](https://github.com/ChrisTitusTech/winutil),
 [Win11Debloat](https://github.com/Raphire/Win11Debloat),
 [Sophia Script](https://github.com/farag2/Sophia-Script-for-Windows),
 [CrapFixer](https://github.com/builtbybel/Crapfixer) and

@@ -84,6 +84,16 @@ public sealed class MainViewModel : ObservableObject
             "Clean up the Start Menu, taskbar and File Explorer.");
         AddCategory("Context Menu", "", TweakCategory.ContextMenu, "Context Menu",
             "Remove clutter from the right-click menu or restore the classic one.");
+        NavItems.Add(new NavItem
+        {
+            Label = "Repair", Glyph = "",
+            Page = new RepairViewModel
+            {
+                Title = "Repair & Maintenance",
+                Subtitle = "One-click fixes for common Windows problems - system files, Windows Update, network and disk space.",
+                Main = this,
+            },
+        });
         NavItems.Add(new NavItem { Label = "Restore", Glyph = "", Page = _restore });
 
         foreach (var item in NavItems) item.Owner = this;

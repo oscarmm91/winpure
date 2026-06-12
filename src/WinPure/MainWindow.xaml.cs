@@ -21,4 +21,7 @@ public partial class MainWindow : Window
         WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 
     private void CloseClick(object sender, RoutedEventArgs e) => Close();
+
+    private void AboutClick(object sender, RoutedEventArgs e) =>
+        new Views.AboutWindow { Owner = this }.ShowDialog();
 }

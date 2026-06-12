@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -8,8 +8,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>WinPure</AssemblyName>
     <RootNamespace>WinPure</RootNamespace>
-    <Version>1.0.0</Version>
-    <Authors>WinPure Contributors</Authors>
+    <Version>1.1.0</Version>
+    <Authors>Oscar Medina (@oscaremeh)</Authors>
     <Product>WinPure</Product>
     <Description>Windows 11 debloater and optimizer with always-available restore.</Description>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -24,3 +24,5 @@
   </PropertyGroup>
 
 </Project>
+
+

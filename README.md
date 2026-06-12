@@ -1,38 +1,150 @@
+<div align="center">
+
+<img src="docs/icon.png" width="120" alt="WinPure icon"/>
+
 # WinPure
 
 **A modern, safe, open-source Windows 11 debloater and optimizer.**
 
-WinPure lets you clean, optimize and take control of Windows 11 from a single Fluent-Design app: privacy & telemetry, bloatware, services, performance, UI and context-menu tweaks — with presets for one-click use and an always-available **Restore** that snapshots every change before it is made.
+*Made with ❤ by [Oscar Medina](https://www.youtube.com/@oscar_emeh) (@oscaremeh) — free for everyone, forever.*
 
-![WinPure — Privacy & Telemetry page](docs/screenshots/privacy.png)
+[![Latest release](https://img.shields.io/github/v/release/oscarmm91/winpure?color=0078D4&label=release)](https://github.com/oscarmm91/winpure/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/oscarmm91/winpure/total?color=107C10)](https://github.com/oscarmm91/winpure/releases)
+[![Build](https://github.com/oscarmm91/winpure/actions/workflows/build.yml/badge.svg)](https://github.com/oscarmm91/winpure/actions)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D4)](#requirements)
 
-## Highlights
+<img src="docs/screenshots/privacy.png" width="850" alt="WinPure — Privacy & Telemetry"/>
 
-- 🛡 **Never breaks your system** — every change is captured in a registry/service snapshot *before* it is applied. Roll back any session from the Restore page.
-- ⚡ **Three presets** — *Safe* (recommended, fully reversible), *Balanced* (+ optional services & third-party bloatware) and *Aggressive* (+ OneDrive, Copilot/AI, Xbox, DiagTrack).
-- 🎛 **Tweak-by-tweak control** — every tweak is a card with a description, detailed help, its real current state (already optimized / not applied) and a toggle. Mix presets with manual selection freely.
-- 🔍 **State detection** — on launch WinPure scans the system and shows what is already optimized.
-- 📴 **Fully offline** — no servers, no telemetry of its own, single portable .exe (runs from a USB stick).
+</div>
 
-## Download & run
+---
 
-1. Grab `WinPure.exe` from [Releases](../../releases) — no installer, no .NET required (self-contained).
-2. Run it. Windows asks for administrator permission (needed for HKLM/services/tasks).
-3. Pick a preset or toggle individual tweaks → **Apply Changes**.
+## Why WinPure?
 
-> Backups land in `%AppData%\WinPure\Backups\`, session logs in `%AppData%\WinPure\Logs\`.
+- 🛡 **It never breaks your system.** Every registry value, service and scheduled task is snapshotted **before** it is touched. One click in the *Restore* page rolls anything back.
+- ⚡ **One-click presets** — *Safe*, *Balanced* and *Aggressive* — or full manual control, tweak by tweak. Mix both freely.
+- 🔍 **Honest state detection.** On launch WinPure scans your system and shows what is *already optimized* vs *not applied*. No fake "boost" buttons.
+- 🧰 **Repair toolbox built in** — SFC + DISM, Windows Update reset, network reset, restore points and temp cleanup.
+- 📴 **100 % offline & portable.** A single .exe — no installer, no .NET needed, no telemetry of its own, runs from a USB stick.
+- 🆓 **MIT licensed.** Free for everyone, forever.
 
-## Tweak categories
+## Download
 
-| Category | Examples |
-|---|---|
-| **Privacy & Telemetry** | AllowTelemetry → 0, DiagTrack service, telemetry firewall block, Bing in Start, Activity History, Advertising ID, CEIP/Compatibility-Appraiser tasks |
-| **Bloatware & Apps** | Candy Crush, TikTok/Facebook/Instagram, Netflix/Disney+/Prime/Spotify, Skype, Clipchamp, Zune apps, Xbox suite, OneDrive, Copilot |
-| **Services** | SysMain, Search Indexing, Print Spooler, Remote Registry, Error Reporting, CDP, Geolocation, Fax, Bluetooth |
-| **Performance** | App/shutdown timeouts, foreground priority, animations, hibernation, power plan, Remote Desktop |
-| **UI & Personalization** | Dark mode, Start suggestions, taskbar Widgets/Task View/Chat, file extensions, hidden files, taskbar alignment |
-| **Context Menu** | Classic Windows 10 menu, remove "Edit with Clipchamp/Notepad/Photos", "Ask Copilot", "Share", "Give access to" |
-| **Repair & Maintenance** | System restore point, SFC + DISM repair, Reset Windows Update, Reset Network, clean temp files |
+1. Download **`WinPure.exe`** from the [latest release](https://github.com/oscarmm91/winpure/releases/latest).
+2. Run it — Windows asks for administrator permission (needed for HKLM, services and scheduled tasks).
+3. Pick a preset or flip individual toggles → **Apply Changes**. A backup is created automatically first.
+
+> 📁 Backups: `%AppData%\WinPure\Backups\` · Logs: `%AppData%\WinPure\Logs\`
+
+## Presets
+
+| Preset | What it includes | Risk |
+|---|---|---|
+| 🟢 **Safe** | Basic telemetry off, no Bing/ads in Start, advertising ID off, cleaner context menu, dark mode, taskbar cleanup | None — fully reversible |
+| 🔵 **Balanced** | Safe + optional services off, third-party bloatware removed (TikTok, Netflix, Candy Crush…), Delivery Optimization off, faster shutdown | Low |
+| 🟠 **Aggressive** | Balanced + OneDrive removal, Copilot/AI & Recall off, Xbox components removed, DiagTrack disabled, telemetry firewall block | Power users |
+
+Selecting a preset only marks the toggles — **nothing changes until you click Apply Changes**.
+
+## What it can do
+
+> 📚 Full tweak reference with registry details: [docs/tweaks.md](docs/tweaks.md)
+
+<details>
+<summary>🔒 <b>Privacy & Telemetry</b> — 16 tweaks</summary>
+<br/>
+Telemetry (AllowTelemetry → 0), diagnostics data, DiagTrack service, outbound telemetry firewall block, Bing in Start Menu, silent app installs, Consumer Features, Delivery Optimization, background apps, Activity History, location tracking, app-launch tracking, Advertising ID, Windows Feedback, online speech recognition, inking/typing personalization, Compatibility-Appraiser & CEIP scheduled tasks.
+<br/><br/>
+<img src="docs/screenshots/privacy.png" width="800"/>
+</details>
+
+<details>
+<summary>📦 <b>Bloatware & Apps</b> — 17 tweaks</summary>
+<br/>
+Candy Crush, TikTok/Facebook/X/Instagram, Netflix/Disney+/Prime/Spotify, Skype, Clipchamp, Paint 3D & 3D Viewer, To Do, Groove/Movies & TV, Solitaire, Wallet, Whiteboard, Phone Link, Dev Home, Get Help & Tips, Xbox suite + Game DVR, Copilot, Windows AI & Recall, OneDrive.
+<br/><br/>
+<img src="docs/screenshots/apps.png" width="800"/>
+</details>
+
+<details>
+<summary>⚙️ <b>Services</b> — 9 tweaks</summary>
+<br/>
+SysMain (SuperFetch), Windows Search indexing, Print Spooler, Remote Registry, Error Reporting, Connected Devices Platform, Geolocation, Fax, Bluetooth — each disabled service is snapshotted with its original start mode.
+<br/><br/>
+<img src="docs/screenshots/services.png" width="800"/>
+</details>
+
+<details>
+<summary>🚀 <b>Performance</b> — 10 tweaks</summary>
+<br/>
+Faster app timeouts & shutdown, foreground-app priority, window animations, hibernation, High Performance power plan, fullscreen optimizations, mouse acceleration, long paths, Remote Desktop.
+<br/><br/>
+<img src="docs/screenshots/performance.png" width="800"/>
+</details>
+
+<details>
+<summary>🎨 <b>UI & Personalization</b> — 14 tweaks</summary>
+<br/>
+Dark mode, Snap Assist flyout, Start Menu suggestions/most-used/recently-added, "new app" badge, file extensions, hidden files, Widgets/Task View/Chat taskbar buttons, taskbar alignment, End Task on right-click, Aero Shake.
+<br/><br/>
+<img src="docs/screenshots/ui.png" width="800"/>
+</details>
+
+<details>
+<summary>🖱️ <b>Context Menu</b> — 7 tweaks</summary>
+<br/>
+Restore the classic Windows 10 right-click menu, remove "Edit with Clipchamp / Notepad / Photos", "Ask Copilot", "Share" and "Give access to".
+<br/><br/>
+<img src="docs/screenshots/contextmenu.png" width="800"/>
+</details>
+
+<details>
+<summary>🔧 <b>Repair & Maintenance</b> — 5 tools</summary>
+<br/>
+Create a system restore point, repair system files (SFC + DISM), reset Windows Update components, reset the network stack, clean temporary files.
+<br/><br/>
+<img src="docs/screenshots/repair.png" width="800"/>
+</details>
+
+<details>
+<summary>♻️ <b>Restore / Backup</b> — undo anything</summary>
+<br/>
+Every Apply creates a JSON snapshot of the exact registry values, service start modes and task states that are about to change. Restore any session — or a single one — at any time.
+<br/><br/>
+<img src="docs/screenshots/restore.png" width="800"/>
+</details>
+
+<details>
+<summary>🏠 <b>Dashboard & About</b></summary>
+<br/>
+<img src="docs/screenshots/dashboard.png" width="800"/>
+<br/><br/>
+<img src="docs/screenshots/about.png" width="320"/>
+</details>
+
+## FAQ
+
+**Is it safe?**
+Yes. WinPure only uses documented registry policies and standard Windows commands, never patches system files, and snapshots everything before changing it. The *Safe* preset is 100 % reversible by design.
+
+**Something broke / I changed my mind. How do I undo?**
+Open **Restore**, pick the snapshot from when you applied the change, click *Restore*. App removals are the only exception — reinstall those from the Microsoft Store.
+
+**Why does it need administrator rights?**
+Most tweaks live in `HKEY_LOCAL_MACHINE`, services and scheduled tasks — all of which require elevation. WinPure asks via the standard UAC prompt.
+
+**Does WinPure phone home?**
+No. Zero network calls except the ones *you* trigger (e.g. the telemetry firewall rule it *blocks*). No analytics, no auto-update.
+
+**Windows 10?**
+Windows 11 is the target; most tweaks also work on Windows 10 22H2+, but it is not actively tested there.
+
+## Requirements
+
+- Windows 11 (Windows 10 22H2+ mostly compatible)
+- Administrator account
+- Nothing else — the exe is self-contained
 
 ## Building from source
 
@@ -42,11 +154,21 @@ dotnet build WinPure.sln                                  # debug build
 dotnet publish src/WinPure/WinPure.csproj -c Release      # portable single-file exe
 ```
 
+Stack: WPF (.NET 8) · C# · MVVM · zero NuGet dependencies. Tweaks are plain data in [`TweakCatalog.cs`](src/WinPure/Services/TweakCatalog.cs) — adding one is a ~10-line PR.
+
 ## Author
 
-Made with ❤ by **Oscar Medina** (@oscaremeh) — *free for everyone, forever.*
+<img src="docs/screenshots/about.png" width="300" align="right"/>
 
-[Instagram](https://www.instagram.com/oscar.emeh/) · [TikTok](https://www.tiktok.com/@oscar.emeh) · [YouTube](https://www.youtube.com/@oscar_emeh)
+Made with ❤ by **Oscar Medina** — *@oscaremeh*
+
+- 📷 [Instagram](https://www.instagram.com/oscar.emeh/)
+- 🎵 [TikTok](https://www.tiktok.com/@oscar.emeh)
+- ▶️ [YouTube](https://www.youtube.com/@oscar_emeh)
+
+*Free for everyone, forever.*
+
+<br clear="right"/>
 
 ## Credits
 
@@ -59,4 +181,4 @@ Tweak research builds on the excellent work of
 
 ## License
 
-[MIT](LICENSE) — free and open source.
+[MIT](LICENSE)

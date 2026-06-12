@@ -1,0 +1,124 @@
+# WinPure — Tweak Reference
+
+Every tweak, what it touches, and which preset includes it. **Manual** = never auto-selected by a preset.
+All registry/service changes are snapshotted to `%AppData%\WinPure\Backups\` before being applied.
+
+## 🔒 Privacy & Telemetry
+
+| Tweak | Preset | What it does |
+|---|---|---|
+| Disable Telemetry | Safe | `HKLM …\Policies\DataCollection!AllowTelemetry = 0` (Security level) |
+| Disable Diagnostics Data | Safe | Tailored experiences off + feedback notifications hidden |
+| Disable DiagTrack Service | Aggressive | Stops & disables the Connected User Experiences and Telemetry service |
+| Block Telemetry Client (Firewall) | Aggressive | Outbound firewall rule blocking the DiagTrack service |
+| Disable Bing in Start Menu | Safe | `DisableSearchBoxSuggestions = 1` — local search only |
+| Disable Silent App Installs | Safe | `SilentInstalledAppsEnabled = 0` — no sponsored auto-installs |
+| Disable Consumer Features | Safe | `DisableWindowsConsumerFeatures = 1` (no Store games/links auto-install) |
+| Disable Delivery Optimization | Balanced | `DODownloadMode = 0` — stop uploading updates with your bandwidth |
+| Disable Background Apps | Balanced | `BackgroundAccessApplications!GlobalUserDisabled = 1` |
+| Disable Activity History | Safe | Activity feed off; no publishing/uploading user activities |
+| Disable Location Tracking | Balanced | `LocationAndSensors!DisableLocation = 1` |
+| Disable App Launch Tracking | Safe | `Start_TrackProgs = 0` |
+| Disable Advertising ID | Safe | `AdvertisingInfo!Enabled = 0` |
+| Disable Windows Feedback | Safe | `Siuf\Rules!NumberOfSIUFInPeriod = 0` |
+| Disable Online Speech Recognition | Balanced | `OnlineSpeechPrivacy!HasAccepted = 0` |
+| Disable Inking & Typing Personalization | Balanced | InputPersonalization restrictions + TIPC off |
+| Disable Compatibility Telemetry Tasks | Aggressive | Disables *Microsoft Compatibility Appraiser* & *ProgramDataUpdater* scheduled tasks |
+| Disable CEIP & Feedback Tasks | Aggressive | Disables *Consolidator*, *UsbCeip*, *DmClient* scheduled tasks |
+
+## 📦 Bloatware & Apps
+
+App removals use `Remove-AppxPackage -AllUsers` + de-provisioning. **Undo = reinstall from the Microsoft Store** (WinPure warns before applying).
+
+| Tweak | Preset | Packages / keys |
+|---|---|---|
+| Remove Candy Crush | Balanced | `king.com.*` |
+| Remove Social Media Apps | Balanced | TikTok, Facebook, Twitter/X, Instagram |
+| Remove Streaming Apps | Balanced | Netflix, Disney+, Prime Video, Spotify |
+| Remove Skype | Balanced | `Microsoft.SkypeApp` |
+| Remove Clipchamp | Balanced | `Clipchamp.Clipchamp` |
+| Remove Paint 3D & 3D Viewer | Balanced | `Microsoft.MSPaint`, `Microsoft.Microsoft3DViewer` |
+| Remove Microsoft To Do | Manual | `Microsoft.Todos` |
+| Remove Groove Music & Movies + TV | Balanced | `Microsoft.ZuneMusic`, `Microsoft.ZuneVideo` |
+| Remove Solitaire Collection | Balanced | `Microsoft.MicrosoftSolitaireCollection` |
+| Remove Wallet | Balanced | `Microsoft.Wallet` |
+| Remove Whiteboard | Manual | `Microsoft.Whiteboard` |
+| Remove Phone Link | Balanced | `Microsoft.YourPhone` |
+| Remove Dev Home | Balanced | `Microsoft.DevHome` |
+| Remove Get Help & Tips | Balanced | `Microsoft.GetHelp`, `Microsoft.Getstarted` |
+| Remove Xbox Apps & Overlay | Aggressive | Xbox app family + Game DVR off (`GameDVR_Enabled = 0`, `AllowGameDVR = 0`) |
+| Disable Copilot / Windows AI | Aggressive | `TurnOffWindowsCopilot = 1` (HKLM + HKCU) + taskbar button off |
+| Disable Windows AI & Recall | Aggressive | `WindowsAI!DisableAIDataAnalysis = 1`, Notepad AI off, AI Settings page hidden |
+| Remove OneDrive | Aggressive | `OneDriveSetup /uninstall` + `DisableFileSyncNGSC = 1` (files stay on disk) |
+
+## ⚙️ Services
+
+Disabling sets registry `Start = 4` and stops the service; the original start mode is captured in the backup.
+
+| Tweak | Preset | Service | Stock mode |
+|---|---|---|---|
+| Disable SysMain (SuperFetch) | Manual | `SysMain` | Automatic |
+| Disable Search Indexing | Manual | `WSearch` | Automatic |
+| Disable Print Spooler | Manual | `Spooler` | Automatic |
+| Disable Remote Registry | Balanced | `RemoteRegistry` | Disabled |
+| Disable Windows Error Reporting | Balanced | `WerSvc` | Manual |
+| Disable Connected Devices Platform | Balanced | `CDPSvc` | Automatic |
+| Disable Geolocation Service | Balanced | `lfsvc` | Manual |
+| Disable Fax Service | Balanced | `Fax` | Manual |
+| Disable Bluetooth Support | Manual | `bthserv` | Manual |
+
+## 🚀 Performance
+
+| Tweak | Preset | What it does |
+|---|---|---|
+| Faster App Timeouts | Safe | `WaitToKillAppTimeout 5000→2000`, `HungAppTimeout 5000→1000` |
+| Faster System Shutdown | Balanced | `WaitToKillServiceTimeout 5000→2000` |
+| Disable Window Animations | Manual | `MinAnimate = 0`, taskbar animations off |
+| Prioritize Foreground Apps | Balanced | `Win32PrioritySeparation = 38` |
+| Disable Hibernation | Manual | `powercfg /hibernate off` (frees hiberfil.sys) |
+| High Performance Power Plan | Manual | `powercfg /setactive` High Performance (not for laptops) |
+| Disable Fullscreen Optimizations | Manual | `GameDVR_DXGIHonorFSEWindowsCompatible = 1` |
+| Disable Mouse Acceleration | Manual | `MouseSpeed/Threshold1/Threshold2 = 0` |
+| Enable Long Paths | Manual | `FileSystem!LongPathsEnabled = 1` |
+| Disable Remote Desktop | Balanced | `fDenyTSConnections = 1` |
+
+## 🎨 UI & Personalization
+
+| Tweak | Preset | What it does |
+|---|---|---|
+| Enable Dark Mode | Safe | `AppsUseLightTheme = 0`, `SystemUsesLightTheme = 0` |
+| Disable Snap Assist Flyout | Manual | `EnableSnapAssistFlyout = 0` |
+| Hide Suggestions in Start | Safe | Subscribed content + `Start_IrisRecommendations = 0` |
+| Hide Most Used Apps in Start | Manual | `ShowOrHideMostUsedApps = 2` |
+| Hide Recently Added Apps in Start | Manual | `HideRecentlyAddedApps = 1` |
+| Hide 'New App Installed' Badge | Safe | `NoNewAppAlert = 1` |
+| Show File Extensions | Safe | `HideFileExt = 0` |
+| Show Hidden Files | Manual | `Hidden = 1` |
+| Remove Widgets Button | Safe | `TaskbarDa = 0` |
+| Remove Task View Button | Safe | `ShowTaskViewButton = 0` |
+| Remove Chat/Teams Button | Safe | `TaskbarMn = 0` |
+| Align Taskbar Left | Manual | `TaskbarAl = 0` |
+| End Task on Taskbar Right-Click | Safe | `TaskbarDeveloperSettings!TaskbarEndTask = 1` |
+| Disable Aero Shake | Safe | `DisallowShaking = 1` |
+
+## 🖱️ Context Menu
+
+| Tweak | Preset | Mechanism |
+|---|---|---|
+| Restore Classic Context Menu | Safe | Empty `InprocServer32` for CLSID `{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}` |
+| Remove 'Edit with Clipchamp' | Safe | Blocked shell extension `{8AB635F8-9A67-4698-AB99-784AD929F3B4}` |
+| Remove 'Edit with Notepad' | Manual | Blocked shell extension `{CA6CC9F1-867A-481E-951E-A28C5E4F01EA}` |
+| Remove 'Edit with Photos' | Manual | Blocked shell extension `{BFE0E2A4-C70C-4AD7-AC3D-10D1ECEBB5B4}` |
+| Remove 'Ask Copilot' | Safe | Blocked shell extension `{CB3B0003-8088-4EDE-8769-8B354AB2FF8C}` |
+| Remove 'Share' | Manual | Deletes `ModernSharing` context-menu handler (recreated on revert) |
+| Remove 'Give access to' | Safe | Deletes `Sharing` handlers on files, folders, background & drives |
+
+## 🔧 Repair & Maintenance (one-shot tools)
+
+| Tool | What it runs |
+|---|---|
+| Create System Restore Point | `Enable-ComputerRestore` + `Checkpoint-Computer` (frequency limit lifted) |
+| Repair System Files | `sfc /scannow` + `DISM /Online /Cleanup-Image /RestoreHealth` |
+| Reset Windows Update | Stops `wuauserv/BITS/cryptsvc`, clears download cache + qmgr, restarts services |
+| Reset Network | `netsh winsock reset`, `netsh int ip reset`, `ipconfig /flushdns` |
+| Clean Temporary Files | Empties `%TEMP%` and `C:\Windows\Temp`, reports MB freed |

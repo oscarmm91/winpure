@@ -1,0 +1,316 @@
+using System.Collections.ObjectModel;
+using System.Windows;
+using Microsoft.Win32;
+using WinPure.Models;
+using WinPure.Services;
+
+namespace WinPure.ViewModels;
+
+public sealed class NavItem : ObservableObject
+{
+    public required string Label { get; init; }
+    public required string Glyph { get; init; }
+    public required PageViewModel Page { get; init; }
+    internal MainViewModel? Owner { get; set; }
+
+    private bool _isCurrent;
+    public bool IsCurrent
+    {
+        get => _isCurrent;
+        set
+        {
+            if (Set(ref _isCurrent, value) && value && Owner is not null)
+                Owner.CurrentNav = this;
+        }
+    }
+
+    internal void SetCurrentSilently(bool value)
+    {
+        if (_isCurrent == value) return;
+        _isCurrent = value;
+        OnPropertyChanged(nameof(IsCurrent));
+    }
+}
+
+public sealed class MainViewModel : ObservableObject
+{
+    private readonly BackupManager _backupManager = new();
+    private readonly TweakEngine _engine;
+    private ScanContext _scanContext = new();
+
+    public ObservableCollection<NavItem> NavItems { get; } = new();
+    public List<TweakViewModel> AllTweaks { get; } = new();
+
+    private readonly DashboardViewModel _dashboard;
+    private readonly RestoreViewModel _restore;
+
+    public MainViewModel()
+    {
+        _engine = new TweakEngine(_backupManager);
+
+        foreach (var tweak in TweakCatalog.Build())
+        {
+            var vm = new TweakViewModel(tweak);
+            vm.SelectionChanged += UpdatePendingCount;
+            AllTweaks.Add(vm);
+        }
+
+        _dashboard = new DashboardViewModel
+        {
+            Title = "Dashboard",
+            Subtitle = "Overview of your system optimization state.",
+            Main = this,
+            OsInfo = GetOsInfo(),
+        };
+        _restore = new RestoreViewModel
+        {
+            Title = "Restore / Backup",
+            Subtitle = "Every change WinPure makes is snapshotted first. Roll back any session here.",
+            Main = this,
+        };
+        _restore.RestoreCommand = new RelayCommand(p => RestoreSession((BackupSessionViewModel)p!), _ => !IsBusy);
+        _restore.DeleteCommand = new RelayCommand(p => DeleteSession((BackupSessionViewModel)p!), _ => !IsBusy);
+
+        NavItems.Add(new NavItem { Label = "Home", Glyph = "", Page = _dashboard });
+        AddCategory("Privacy", "", TweakCategory.Privacy, "Privacy & Telemetry",
+            "Manage privacy settings and telemetry data collection to protect your privacy.");
+        AddCategory("Apps", "", TweakCategory.Apps, "Bloatware & Apps",
+            "Remove preinstalled apps and disable built-in features you don't use.");
+        AddCategory("Services", "", TweakCategory.Services, "Services",
+            "Disable optional Windows services to free memory and reduce background activity.");
+        AddCategory("Performance", "", TweakCategory.Performance, "Performance",
+            "Speed up shutdown, app handling and responsiveness.");
+        AddCategory("UI", "", TweakCategory.UI, "UI & Personalization",
+            "Clean up the Start Menu, taskbar and File Explorer.");
+        AddCategory("Context Menu", "", TweakCategory.ContextMenu, "Context Menu",
+            "Remove clutter from the right-click menu or restore the classic one.");
+        NavItems.Add(new NavItem { Label = "Restore", Glyph = "", Page = _restore });
+
+        foreach (var item in NavItems) item.Owner = this;
+        _currentNav = NavItems[0];
+        _currentNav.SetCurrentSilently(true);
+
+        ApplyCommand = new RelayCommand(_ => _ = ApplyChangesAsync(), _ => !IsBusy && PendingCount > 0);
+        RescanCommand = new RelayCommand(_ => _ = ScanAsync(), _ => !IsBusy);
+        SelectPresetCommand = new RelayCommand(p => SelectPreset((PresetLevel)p!), _ => !IsBusy);
+    }
+
+    private void AddCategory(string label, string glyph, TweakCategory category, string title, string subtitle)
+    {
+        var page = new CategoryPageViewModel { Title = title, Subtitle = subtitle, Category = category, Main = this };
+        foreach (var vm in AllTweaks.Where(t => t.Category == category))
+            page.Tweaks.Add(vm);
+        NavItems.Add(new NavItem { Label = label, Glyph = glyph, Page = page });
+    }
+
+    // ---------------------------------------------------------------- state
+
+    private NavItem _currentNav;
+    public NavItem CurrentNav
+    {
+        get => _currentNav;
+        set
+        {
+            if (value == _currentNav) return;
+            var old = _currentNav;
+            _currentNav = value;
+            old?.SetCurrentSilently(false);
+            value.SetCurrentSilently(true);
+            if (value.Page == _restore) LoadBackups();
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CurrentPage));
+        }
+    }
+
+    public string OsInfo { get; } = GetOsInfo();
+
+    public PageViewModel CurrentPage => CurrentNav.Page;
+
+    private bool _isBusy;
+    public bool IsBusy { get => _isBusy; set { if (Set(ref _isBusy, value)) OnPropertyChanged(nameof(IsIdle)); } }
+    public bool IsIdle => !IsBusy;
+
+    private string _statusText = "Ready.";
+    public string StatusText { get => _statusText; set => Set(ref _statusText, value); }
+
+    private int _pendingCount;
+    public int PendingCount { get => _pendingCount; set { if (Set(ref _pendingCount, value)) OnPropertyChanged(nameof(ApplyHint)); } }
+
+    public string ApplyHint => PendingCount == 0
+        ? "Changes will be applied after clicking Apply Changes."
+        : $"{PendingCount} pending change{(PendingCount == 1 ? "" : "s")} — a backup is created before applying.";
+
+    private PresetLevel? _activePreset;
+    public PresetLevel? ActivePreset { get => _activePreset; set => Set(ref _activePreset, value); }
+
+    public RelayCommand ApplyCommand { get; }
+    public RelayCommand RescanCommand { get; }
+    public RelayCommand SelectPresetCommand { get; }
+
+    private void UpdatePendingCount() => PendingCount = AllTweaks.Count(t => t.IsDirty);
+
+    // ---------------------------------------------------------------- scan
+
+    public async Task ScanAsync()
+    {
+        IsBusy = true;
+        StatusText = "Scanning system state…";
+        try
+        {
+            // Registry-backed tweaks resolve instantly; Appx/tasks/power need one PS pass.
+            var ctx = await Task.Run(ScanContext.Gather);
+            _scanContext = ctx;
+            foreach (var tweak in AllTweaks)
+                tweak.RefreshStatus(_engine, ctx);
+            UpdatePendingCount();
+            UpdateDashboard();
+            StatusText = ctx.Loaded
+                ? $"Scan complete. {_dashboard.OptimizedCount} of {_dashboard.TotalCount} tweaks already optimized."
+                : "Scan finished with warnings — some states are unknown.";
+            LogService.Log(StatusText);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void UpdateDashboard()
+    {
+        _dashboard.TotalCount = AllTweaks.Count;
+        _dashboard.OptimizedCount = AllTweaks.Count(t => t.Status == TweakStatus.Optimized);
+        _dashboard.PendingCount = AllTweaks.Count(t => t.Status == TweakStatus.Pending);
+        _dashboard.BackupCount = _backupManager.ListSessions().Count;
+    }
+
+    // ---------------------------------------------------------------- presets
+
+    public void SelectPreset(PresetLevel level)
+    {
+        ActivePreset = level;
+        foreach (var tweak in AllTweaks)
+        {
+            bool inPreset = tweak.Preset != PresetLevel.Manual && tweak.Preset <= level;
+            // a preset switches its tweaks on but never reverts something already optimized
+            tweak.IsSelected = inPreset || tweak.IsOptimized;
+        }
+        StatusText = $"{level} preset selected — review and click Apply Changes.";
+    }
+
+    // ---------------------------------------------------------------- apply
+
+    public async Task ApplyChangesAsync()
+    {
+        var changes = AllTweaks
+            .Where(t => t.IsDirty)
+            .Select(t => (t.Tweak, apply: t.IsSelected))
+            .ToList();
+        if (changes.Count == 0) return;
+
+        var irreversible = changes.Where(c => c.apply && !c.Tweak.FullyReversible).ToList();
+        if (irreversible.Count > 0)
+        {
+            var names = string.Join("\n  • ", irreversible.Select(c => c.Tweak.Name));
+            var answer = MessageBox.Show(
+                $"These changes remove apps and can only be undone by reinstalling from the Microsoft Store:\n\n  • {names}\n\nContinue?",
+                "WinPure — Confirm app removal", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (answer != MessageBoxResult.Yes) return;
+        }
+
+        IsBusy = true;
+        var progress = new Progress<string>(msg => StatusText = msg);
+        try
+        {
+            var results = await Task.Run(() => _engine.ApplyChanges(changes, progress));
+            int failed = results.Count(r => !r.Success);
+            bool needsExplorer = results.Any(r => r.Success && r.Tweak.RequiresExplorerRestart);
+            bool needsReboot = results.Any(r => r.Success && r.Tweak.RequiresRestart);
+
+            StatusText = failed == 0
+                ? $"Done — {results.Count} change{(results.Count == 1 ? "" : "s")} applied."
+                : $"Finished with {failed} error{(failed == 1 ? "" : "s")} — see the log in %AppData%\\WinPure\\Logs.";
+
+            if (needsExplorer)
+            {
+                var answer = MessageBox.Show(
+                    "Some changes need File Explorer to restart to take effect.\nRestart Explorer now?",
+                    "WinPure", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (answer == MessageBoxResult.Yes)
+                    await Task.Run(() => PowerShellRunner.Run("Stop-Process -Name explorer -Force"));
+            }
+            else if (needsReboot)
+            {
+                MessageBox.Show("Some changes will take full effect after a reboot.", "WinPure",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+        await ScanAsync();
+    }
+
+    // ---------------------------------------------------------------- restore
+
+    public void LoadBackups()
+    {
+        _restore.Sessions.Clear();
+        foreach (var session in _backupManager.ListSessions())
+            _restore.Sessions.Add(new BackupSessionViewModel { Session = session });
+        _restore.IsEmpty = _restore.Sessions.Count == 0;
+    }
+
+    private async void RestoreSession(BackupSessionViewModel vm)
+    {
+        var answer = MessageBox.Show(
+            $"Restore the snapshot from {vm.Title}?\nAll {vm.Session.Entries.Count} captured values will be written back.",
+            "WinPure — Restore backup", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (answer != MessageBoxResult.Yes) return;
+
+        IsBusy = true;
+        StatusText = "Restoring backup…";
+        try
+        {
+            int failures = await Task.Run(() => _backupManager.RestoreSession(vm.Session));
+            StatusText = failures == 0 ? "Backup restored." : $"Backup restored with {failures} errors (see log).";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+        await ScanAsync();
+    }
+
+    private void DeleteSession(BackupSessionViewModel vm)
+    {
+        var answer = MessageBox.Show(
+            $"Delete the backup from {vm.Title}? This cannot be undone.",
+            "WinPure — Delete backup", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (answer != MessageBoxResult.Yes) return;
+        _backupManager.DeleteSession(vm.Session);
+        LoadBackups();
+        UpdateDashboard();
+    }
+
+    // ---------------------------------------------------------------- misc
+
+    private static string GetOsInfo()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
+            string product = key?.GetValue("ProductName") as string ?? "Windows";
+            string display = key?.GetValue("DisplayVersion") as string ?? "";
+            string build = key?.GetValue("CurrentBuildNumber") as string ?? "";
+            // ProductName still says "Windows 10" on Win11; fix by build number
+            if (int.TryParse(build, out int b) && b >= 22000)
+                product = product.Replace("Windows 10", "Windows 11");
+            return $"{product}\n{display} {build}".Trim();
+        }
+        catch
+        {
+            return "Windows";
+        }
+    }
+}

@@ -232,6 +232,8 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             var results = await Task.Run(() => _engine.ApplyChanges(changes, progress));
+            if (results.Any(r => r.Success && r.Tweak.NotifiesThemeChange))
+                NativeMethods.BroadcastThemeChange();
             int failed = results.Count(r => !r.Success);
             bool needsExplorer = results.Any(r => r.Success && r.Tweak.RequiresExplorerRestart);
             bool needsReboot = results.Any(r => r.Success && r.Tweak.RequiresRestart);
@@ -283,6 +285,8 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             int failures = await Task.Run(() => _backupManager.RestoreSession(vm.Session));
+            // a snapshot may include theme values — make open apps repaint
+            NativeMethods.BroadcastThemeChange();
             StatusText = failures == 0 ? "Backup restored." : $"Backup restored with {failures} errors (see log).";
         }
         finally

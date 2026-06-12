@@ -37,6 +37,8 @@ public sealed class Tweak
     public string Icon { get; init; } = "";
     public bool RequiresRestart { get; init; }
     public bool RequiresExplorerRestart { get; init; }
+    /// <summary>Broadcast WM_SETTINGCHANGE("ImmersiveColorSet") after applying so open apps repaint.</summary>
+    public bool NotifiesThemeChange { get; init; }
     /// <summary>False for actions that cannot be undone in place (e.g. app removal → reinstall from Store).</summary>
     public bool FullyReversible { get; init; } = true;
     public required IReadOnlyList<TweakAction> Actions { get; init; }

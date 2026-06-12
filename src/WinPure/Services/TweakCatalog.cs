@@ -609,6 +609,7 @@ public static class TweakCatalog
             Id = "ui-dark-mode", Category = TweakCategory.UI, Preset = PresetLevel.Safe,
             Name = "Enable Dark Mode",
             Description = "Use dark mode for Windows and apps by default.",
+            NotifiesThemeChange = true,
             Icon = "",
             Actions = new TweakAction[]
             {

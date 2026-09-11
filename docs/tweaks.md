@@ -7,7 +7,7 @@ All registry/service changes are snapshotted to `%AppData%\WinPure\Backups\` bef
 
 | Tweak | Preset | What it does |
 |---|---|---|
-| Disable Telemetry | Safe | `HKLM …\Policies\DataCollection!AllowTelemetry = 0` (Security level) |
+| Disable Telemetry | Safe | `HKLM …\Policies\DataCollection!AllowTelemetry = 0`. Only Enterprise/Education honour level 0; Home and Pro clamp it to 1 (Required), their lowest |
 | Disable Diagnostics Data | Safe | Tailored experiences off + feedback notifications hidden |
 | Disable DiagTrack Service | Aggressive | Stops & disables the Connected User Experiences and Telemetry service |
 | Block Telemetry Client (Firewall) | Aggressive | Outbound firewall rule blocking the DiagTrack service |
@@ -15,7 +15,7 @@ All registry/service changes are snapshotted to `%AppData%\WinPure\Backups\` bef
 | Disable Silent App Installs | Safe | `SilentInstalledAppsEnabled = 0` — no sponsored auto-installs |
 | Disable Consumer Features | Safe | `DisableWindowsConsumerFeatures = 1` (no Store games/links auto-install) |
 | Disable Delivery Optimization | Balanced | `DODownloadMode = 0` — stop uploading updates with your bandwidth |
-| Disable Background Apps | Balanced | `BackgroundAccessApplications!GlobalUserDisabled = 1` |
+| Disable Background Apps | Balanced | `BackgroundAccessApplications!GlobalUserDisabled = 1`. Mail/Calendar stop fetching and notifying until opened; UWP push, live tiles and Photos sync stop |
 | Disable Activity History | Safe | Activity feed off; no publishing/uploading user activities |
 | Disable Location Tracking | Balanced | `LocationAndSensors!DisableLocation = 1` |
 | Disable App Launch Tracking | Safe | `Start_TrackProgs = 0` |
@@ -23,7 +23,7 @@ All registry/service changes are snapshotted to `%AppData%\WinPure\Backups\` bef
 | Disable Windows Feedback | Safe | `Siuf\Rules!NumberOfSIUFInPeriod = 0` |
 | Disable Online Speech Recognition | Balanced | `OnlineSpeechPrivacy!HasAccepted = 0` |
 | Disable Inking & Typing Personalization | Balanced | InputPersonalization restrictions + TIPC off |
-| Disable Compatibility Telemetry Tasks | Aggressive | Disables *Microsoft Compatibility Appraiser* & *ProgramDataUpdater* scheduled tasks |
+| Disable Compatibility Telemetry Tasks | Aggressive | Disables the *Microsoft Compatibility Appraiser*, *Appraiser Exp* (its 24H2/25H2 successor) & *ProgramDataUpdater* scheduled tasks |
 | Disable CEIP & Feedback Tasks | Aggressive | Disables *Consolidator*, *UsbCeip*, *DmClient* scheduled tasks |
 
 ## 📦 Bloatware & Apps
@@ -44,8 +44,8 @@ App removals use `Remove-AppxPackage -AllUsers` + de-provisioning. **Undo = rein
 | Remove Wallet | Balanced | `Microsoft.Wallet` |
 | Remove Whiteboard | Manual | `Microsoft.Whiteboard` |
 | Remove Phone Link | Balanced | `Microsoft.YourPhone` |
-| Remove Dev Home | Balanced | `Microsoft.DevHome` |
-| Remove Get Help & Tips | Balanced | `Microsoft.GetHelp`, `Microsoft.Getstarted` |
+| Remove Dev Home | Balanced | `Microsoft.Windows.DevHome` |
+| Remove Get Help & Tips | Balanced | `Microsoft.GetHelp`, `Microsoft.Getstarted`, `Microsoft.StartExperiencesApp` (Tips on 24H2/25H2) |
 | Remove Xbox Apps & Overlay | Aggressive | Xbox app family + Game DVR off (`GameDVR_Enabled = 0`, `AllowGameDVR = 0`) |
 | Disable Copilot / Windows AI | Aggressive | `TurnOffWindowsCopilot = 1` (HKLM + HKCU) + taskbar button off |
 | Disable Windows AI & Recall | Aggressive | `WindowsAI!DisableAIDataAnalysis = 1`, Notepad AI off, AI Settings page hidden |
@@ -62,7 +62,7 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Disable Print Spooler | Manual | `Spooler` | Automatic |
 | Disable Remote Registry | Balanced | `RemoteRegistry` | Disabled |
 | Disable Windows Error Reporting | Balanced | `WerSvc` | Manual |
-| Disable Connected Devices Platform | Balanced | `CDPSvc` | Automatic |
+| Disable Connected Devices Platform | Manual | `CDPSvc` - also breaks Night Light | Automatic |
 | Disable Geolocation Service | Balanced | `lfsvc` | Manual |
 | Disable Fax Service | Balanced | `Fax` | Manual |
 | Disable Bluetooth Support | Manual | `bthserv` | Manual |
@@ -80,7 +80,7 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Disable Fullscreen Optimizations | Manual | `GameDVR_DXGIHonorFSEWindowsCompatible = 1` |
 | Disable Mouse Acceleration | Manual | `MouseSpeed/Threshold1/Threshold2 = 0` |
 | Enable Long Paths | Manual | `FileSystem!LongPathsEnabled = 1` |
-| Disable Remote Desktop | Balanced | `fDenyTSConnections = 1` |
+| Disable Remote Desktop | Manual | `fDenyTSConnections = 1` — on Pro this disables a feature that works |
 
 ## 🎨 UI & Personalization
 
@@ -110,8 +110,8 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Remove 'Edit with Notepad' | Manual | Blocked shell extension `{CA6CC9F1-867A-481E-951E-A28C5E4F01EA}` |
 | Remove 'Edit with Photos' | Manual | Blocked shell extension `{BFE0E2A4-C70C-4AD7-AC3D-10D1ECEBB5B4}` |
 | Remove 'Ask Copilot' | Safe | Blocked shell extension `{CB3B0003-8088-4EDE-8769-8B354AB2FF8C}` |
-| Remove 'Share' | Manual | Deletes `ModernSharing` context-menu handler (recreated on revert) |
-| Remove 'Give access to' | Safe | Deletes `Sharing` handlers on files, folders, background & drives |
+| Remove 'Share' | Manual | Deletes the `ModernSharing` handler under `AllFileSystemObjects` (recreated on revert) |
+| Remove 'Give access to' | Safe | Deletes the 6 `Sharing` handlers: files, folders, background, drives & both library folders |
 
 ## 🔧 Repair & Maintenance (one-shot tools)
 

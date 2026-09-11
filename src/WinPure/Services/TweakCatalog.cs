@@ -50,7 +50,7 @@ public static class TweakCatalog
             Id = "privacy-telemetry", Category = TweakCategory.Privacy, Preset = PresetLevel.Safe,
             Name = "Disable Telemetry",
             Description = "Prevent Windows from sending telemetry data to Microsoft.",
-            Help = "Sets AllowTelemetry to 0 (Security level) via policy so Windows only sends the minimum diagnostic data the edition allows.",
+            Help = "Sets AllowTelemetry to 0 (Security level) via policy. Only Enterprise, Education and IoT honour level 0; on Home and Pro Windows clamps it to 1 (Required diagnostic data), which is the lowest those editions allow.",
             Icon = "",
             Actions = new TweakAction[]
             {
@@ -252,7 +252,7 @@ public static class TweakCatalog
             Id = "privacy-background-apps", Category = TweakCategory.Privacy, Preset = PresetLevel.Balanced,
             Name = "Disable Background Apps",
             Description = "Stop Microsoft Store apps from running in the background.",
-            Help = "Sets the global background-access kill switch (from Chris Titus WinUtil) instead of toggling each app one by one.",
+            Help = "Global background-access kill switch (from Chris Titus WinUtil). Store apps stop working in the background: Mail and Calendar will not fetch or notify until you open them, and UWP push notifications, live tiles and Photos sync stop.",
             Icon = "",
             Actions = new TweakAction[]
             {
@@ -271,6 +271,10 @@ public static class TweakCatalog
             {
                 new ScheduledTaskAction { TaskPath = @"\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser" },
                 new ScheduledTaskAction { TaskPath = @"\Microsoft\Windows\Application Experience\ProgramDataUpdater" },
+                // On 24H2/25H2 the two tasks above are gone and this one does the work
+                // (verified on 2026-09-11: it is the only Appraiser task present, and Ready).
+                // The old paths stay for machines upgraded from Windows 10 / 23H2.
+                new ScheduledTaskAction { TaskPath = @"\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser Exp" },
             },
         };
 
@@ -331,9 +335,9 @@ public static class TweakCatalog
         yield return AppRemoval("apps-phonelink", PresetLevel.Balanced, "Remove Phone Link",
             "Uninstall the YourPhone / Phone Link app.", "", "Microsoft.YourPhone");
         yield return AppRemoval("apps-devhome", PresetLevel.Balanced, "Remove Dev Home",
-            "Uninstall the Dev Home app.", "", "Microsoft.DevHome");
+            "Uninstall the Dev Home app.", "", "Microsoft.Windows.DevHome");
         yield return AppRemoval("apps-gethelp", PresetLevel.Balanced, "Remove Get Help & Tips",
-            "Uninstall the Get Help and Get Started apps.", "", "Microsoft.GetHelp", "Microsoft.Getstarted");
+            "Uninstall the Get Help and Get Started apps.", "", "Microsoft.GetHelp", "Microsoft.Getstarted", "Microsoft.StartExperiencesApp");
 
         yield return new Tweak
         {
@@ -442,9 +446,12 @@ public static class TweakCatalog
             "Prevent remote computers from modifying your registry.", "RemoteRegistry", 4);
         yield return Service("svc-wer", PresetLevel.Balanced, "Disable Windows Error Reporting",
             "Stop Windows from uploading crash reports to Microsoft.", "WerSvc", 3);
-        yield return Service("svc-cdp", PresetLevel.Balanced, "Disable Connected Devices Platform",
+        // Manual, not Balanced: Sophia Script dropped this same tweak because disabling CDPSvc
+        // stops Night Light from starting — a symptom nobody would trace back to
+        // "Connected Devices Platform".
+        yield return Service("svc-cdp", PresetLevel.Manual, "Disable Connected Devices Platform",
             "Disable the cross-device sync service (CDPSvc).", "CDPSvc", 2,
-            "Used by 'shared experiences' / device handoff. Safe to disable if you do not link devices.");
+            "Used by 'shared experiences' / device handoff. WARNING: it also breaks Night Light — the blue-light filter will no longer turn on.");
         yield return Service("svc-geolocation", PresetLevel.Balanced, "Disable Geolocation Service",
             "Stop the location service (lfsvc).", "lfsvc", 3);
         yield return Service("svc-fax", PresetLevel.Balanced, "Disable Fax Service",
@@ -589,9 +596,10 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
-            Id = "perf-remote-desktop", Category = TweakCategory.Performance, Preset = PresetLevel.Balanced,
+            Id = "perf-remote-desktop", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
             Name = "Disable Remote Desktop",
             Description = "Block inbound Remote Desktop connections if you don't use them.",
+            Help = "On Windows 11 Pro this turns off a feature that works: you will no longer be able to connect to this PC with Remote Desktop.",
             Icon = "",
             Actions = new TweakAction[]
             {
@@ -857,7 +865,7 @@ public static class TweakCatalog
             {
                 new RegistryKeyAction
                 {
-                    KeyPath = @"HKCR\*\shellex\ContextMenuHandlers\ModernSharing",
+                    KeyPath = @"HKCR\AllFileSystemObjects\ShellEx\ContextMenuHandlers\ModernSharing",
                     DeleteOnApply = true,
                     KeyDefaultValue = "{e2bf9676-5f8f-435c-97eb-11607a5bedf7}",
                 },
@@ -876,6 +884,10 @@ public static class TweakCatalog
                 new RegistryKeyAction { KeyPath = @"HKCR\Directory\shellex\ContextMenuHandlers\Sharing", DeleteOnApply = true, KeyDefaultValue = "{f81e9010-6ea4-11ce-a7ff-00aa003ca9f6}" },
                 new RegistryKeyAction { KeyPath = @"HKCR\Directory\Background\shellex\ContextMenuHandlers\Sharing", DeleteOnApply = true, KeyDefaultValue = "{f81e9010-6ea4-11ce-a7ff-00aa003ca9f6}" },
                 new RegistryKeyAction { KeyPath = @"HKCR\Drive\shellex\ContextMenuHandlers\Sharing", DeleteOnApply = true, KeyDefaultValue = "{f81e9010-6ea4-11ce-a7ff-00aa003ca9f6}" },
+                // Library folders (Documents, Pictures…) keep their own copy of the handler,
+                // so without these two the entry still shows up on right-click there.
+                new RegistryKeyAction { KeyPath = @"HKCR\LibraryFolder\background\shellex\ContextMenuHandlers\Sharing", DeleteOnApply = true, KeyDefaultValue = "{f81e9010-6ea4-11ce-a7ff-00aa003ca9f6}" },
+                new RegistryKeyAction { KeyPath = @"HKCR\UserLibraryFolder\shellex\ContextMenuHandlers\Sharing", DeleteOnApply = true, KeyDefaultValue = "{f81e9010-6ea4-11ce-a7ff-00aa003ca9f6}" },
             },
         };
     }

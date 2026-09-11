@@ -9,10 +9,21 @@ public abstract class TweakAction
     /// <summary>True if the system already matches the tweaked state. Null = cannot tell.</summary>
     public abstract bool? IsApplied(ScanContext ctx);
 
-    /// <summary>Captures current state for the backup, then applies the change.</summary>
-    public abstract void Apply(Tweak tweak, List<BackupEntry> backup);
+    /// <summary>
+    /// Records the current state into the backup list. MUST NOT change anything: the engine
+    /// calls this first and flushes the snapshot to disk before calling <see cref="Apply"/>,
+    /// so that a crash mid-batch still leaves a usable backup on disk.
+    /// </summary>
+    public abstract void Capture(Tweak tweak, List<BackupEntry> backup);
 
-    /// <summary>Reverts to the stock Windows default (used by the toggle-off path).</summary>
+    /// <summary>Applies the change. Always preceded by <see cref="Capture"/>.</summary>
+    public abstract void Apply();
+
+    /// <summary>
+    /// Stock Windows default. Only a FALLBACK for the toggle-off path when no backup of
+    /// this tweak exists — the engine prefers the real captured value whenever it has one,
+    /// because these defaults are hand-written in the catalog and may not match this machine.
+    /// </summary>
     public abstract void RevertToDefault();
 
     // ---------- shared registry helpers ----------
@@ -109,7 +120,7 @@ public sealed class RegistryValueAction : TweakAction
         catch { return null; }
     }
 
-    public override void Apply(Tweak tweak, List<BackupEntry> backup)
+    public override void Capture(Tweak tweak, List<BackupEntry> backup)
     {
         var current = ReadValue(KeyPath, ValueName, out var currentKind);
         backup.Add(new BackupEntry
@@ -123,8 +134,9 @@ public sealed class RegistryValueAction : TweakAction
             Kind = current is null ? Kind.ToString() : currentKind.ToString(),
             Value = current is null ? null : SerializeValue(current),
         });
-        WriteValue(KeyPath, ValueName, ApplyValue, Kind);
     }
+
+    public override void Apply() => WriteValue(KeyPath, ValueName, ApplyValue, Kind);
 
     public override void RevertToDefault()
     {
@@ -157,7 +169,7 @@ public sealed class RegistryKeyAction : TweakAction
         catch { return null; }
     }
 
-    public override void Apply(Tweak tweak, List<BackupEntry> backup)
+    public override void Capture(Tweak tweak, List<BackupEntry> backup)
     {
         bool existed = KeyExists(KeyPath);
         string? originalDefault = null;
@@ -176,7 +188,10 @@ public sealed class RegistryKeyAction : TweakAction
             Existed = existed,
             Value = originalDefault,
         });
+    }
 
+    public override void Apply()
+    {
         if (DeleteOnApply)
         {
             DeleteKeyTree(KeyPath);
@@ -226,10 +241,10 @@ public sealed class ServiceAction : TweakAction
         catch { return null; }
     }
 
-    public override void Apply(Tweak tweak, List<BackupEntry> backup)
+    public override void Capture(Tweak tweak, List<BackupEntry> backup)
     {
         var start = ReadValue(ServiceKey, "Start", out _);
-        if (start is null) return; // not installed
+        if (start is null) return; // not installed on this edition → nothing to back up
         backup.Add(new BackupEntry
         {
             Type = "service",
@@ -239,8 +254,18 @@ public sealed class ServiceAction : TweakAction
             StartMode = (int)start,
             Existed = true,
         });
+    }
+
+    public override void Apply()
+    {
+        if (ReadValue(ServiceKey, "Start", out _) is null) return; // not installed
         WriteValue(ServiceKey, "Start", 4, Microsoft.Win32.RegistryValueKind.DWord);
-        PowerShellRunner.Run($"Stop-Service -Name '{ServiceName}' -Force -ErrorAction SilentlyContinue");
+        // The start mode above is what actually sticks across reboots. Stopping it now is
+        // best-effort: a busy service with dependents may refuse, and that is not a failure
+        // of the tweak — but it must not be swallowed either.
+        var stop = PowerShellRunner.Run($"Stop-Service -Name '{ServiceName}' -Force -ErrorAction Stop", 60_000);
+        if (!stop.Success)
+            LogService.Log($"Service {ServiceName} set to Disabled but could not be stopped now (takes effect on reboot): {stop.Error}");
     }
 
     public override void RevertToDefault() => SetStartMode(ServiceName, DefaultStartMode);
@@ -249,8 +274,13 @@ public sealed class ServiceAction : TweakAction
     {
         WriteValue($@"HKLM\SYSTEM\CurrentControlSet\Services\{serviceName}", "Start",
             startMode, Microsoft.Win32.RegistryValueKind.DWord);
+        // Only Automatic (2) gets started back up; Manual (3) is on-demand by definition.
         if (startMode == 2)
-            PowerShellRunner.Run($"Start-Service -Name '{serviceName}' -ErrorAction SilentlyContinue");
+        {
+            var start = PowerShellRunner.Run($"Start-Service -Name '{serviceName}' -ErrorAction Stop", 60_000);
+            if (!start.Success)
+                LogService.Log($"Service {serviceName} restored to start mode {startMode} but could not be started now: {start.Error}");
+        }
     }
 }
 
@@ -262,32 +292,65 @@ public sealed class ScheduledTaskAction : TweakAction
 
     public override bool? IsApplied(ScanContext ctx)
     {
-        if (!ctx.Loaded) return null;
+        // Unknown unless the task query actually worked — otherwise a failed lookup would
+        // read as "already disabled" and the tweak would claim to be applied.
+        if (!ctx.Loaded || !ctx.TasksQueryOk) return null;
         return !ctx.TaskEnabled.TryGetValue(TaskPath, out bool enabled) || !enabled;
     }
 
-    public override void Apply(Tweak tweak, List<BackupEntry> backup)
+    public override void Capture(Tweak tweak, List<BackupEntry> backup)
     {
+        // Measure the real state instead of assuming it was enabled: several of these tasks
+        // ship disabled (or missing) on 24H2/25H2, and "restoring" them to enabled would
+        // turn ON telemetry the user never had running.
+        var (exists, enabled) = ReadState(TaskPath);
         backup.Add(new BackupEntry
         {
             Type = "scheduled-task",
             TweakId = tweak.Id,
             TweakName = tweak.Name,
             TaskPath = TaskPath,
-            TaskWasEnabled = true,
-            Existed = true,
+            TaskWasEnabled = enabled,
+            Existed = exists,
         });
-        SetEnabled(TaskPath, false);
     }
+
+    public override void Apply() => SetEnabled(TaskPath, false);
 
     public override void RevertToDefault() => SetEnabled(TaskPath, true);
 
+    /// <summary>(exists, enabled) for a task path. A missing task reports (false, false).</summary>
+    internal static (bool exists, bool enabled) ReadState(string taskPath)
+    {
+        var (dir, name) = Split(taskPath);
+        // $$ raw string: {{x}} interpolates, single braces stay literal for PowerShell.
+        var result = PowerShellRunner.Run($$"""
+            $t = Get-ScheduledTask -TaskPath '{{dir}}' -TaskName '{{name}}' -ErrorAction SilentlyContinue
+            if (-not $t) { 'missing' } else { $t.State.ToString() }
+            """, 30_000);
+        string state = result.Output.Trim();
+        if (!result.Success || state.Length == 0 || state == "missing") return (false, false);
+        return (true, !state.Equals("Disabled", StringComparison.OrdinalIgnoreCase));
+    }
+
     internal static void SetEnabled(string taskPath, bool enabled)
     {
-        string dir = taskPath[..taskPath.LastIndexOf('\\')] + "\\";
-        string name = taskPath[(taskPath.LastIndexOf('\\') + 1)..];
+        var (dir, name) = Split(taskPath);
         string verb = enabled ? "Enable-ScheduledTask" : "Disable-ScheduledTask";
-        PowerShellRunner.Run($"{verb} -TaskPath '{dir}' -TaskName '{name}' -ErrorAction SilentlyContinue | Out-Null");
+        // A task that does not exist is not an error (Windows drops these between builds);
+        // a task that exists and refuses to change IS one, and must not be reported as success.
+        PowerShellRunner.RunOrThrow($$"""
+            $ErrorActionPreference = 'Stop'
+            $t = Get-ScheduledTask -TaskPath '{{dir}}' -TaskName '{{name}}' -ErrorAction SilentlyContinue
+            if (-not $t) { exit 0 }
+            {{verb}} -TaskPath '{{dir}}' -TaskName '{{name}}' | Out-Null
+            """, $"{(enabled ? "Enabling" : "Disabling")} task {taskPath}", 60_000);
+    }
+
+    private static (string dir, string name) Split(string taskPath)
+    {
+        int idx = taskPath.LastIndexOf('\\');
+        return (taskPath[..idx] + "\\", taskPath[(idx + 1)..]);
     }
 }
 
@@ -299,22 +362,53 @@ public sealed class AppxRemoveAction : TweakAction
 
     public override bool? IsApplied(ScanContext ctx)
     {
-        if (!ctx.Loaded) return null;
+        // An app listing that failed produces an empty set, which would otherwise mean
+        // "no bloatware here" — the single likeliest source of a false "Already optimized".
+        if (!ctx.Loaded || !ctx.AppsQueryOk) return null;
         return !ctx.AnyPackageInstalled(PackagePatterns);
     }
 
-    public override void Apply(Tweak tweak, List<BackupEntry> backup)
+    /// <summary>
+    /// Nothing to back up: a removed Store app is reinstalled from the Store, not from a
+    /// snapshot. The catalog marks these tweaks as not fully reversible.
+    /// </summary>
+    public override void Capture(Tweak tweak, List<BackupEntry> backup) { }
+
+    public override void Apply()
     {
-        // App removal is restored via the Microsoft Store, not via snapshot — nothing to back up.
+        var problems = new List<string>();
         foreach (var pattern in PackagePatterns)
         {
-            PowerShellRunner.Run($"""
-                $ErrorActionPreference = 'SilentlyContinue'
-                Get-AppxPackage -AllUsers -Name '*{pattern}*' | Remove-AppxPackage -AllUsers
-                Get-AppxProvisionedPackage -Online | Where-Object DisplayName -like '*{pattern}*' |
-                    Remove-AppxProvisionedPackage -Online | Out-Null
+            // Report what actually happened instead of assuming success: a package that is
+            // not installed is fine, one that refuses to uninstall is not.
+            var result = PowerShellRunner.Run($$"""
+                $ErrorActionPreference = 'Stop'
+                $found = $false
+                Get-AppxPackage -AllUsers -Name '*{{pattern}}*' | ForEach-Object {
+                    $found = $true
+                    try { Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction Stop }
+                    catch { Write-Error "$($_.Exception.Message)" }
+                }
+                Get-AppxProvisionedPackage -Online | Where-Object DisplayName -like '*{{pattern}}*' | ForEach-Object {
+                    $found = $true
+                    try { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction Stop | Out-Null }
+                    catch { Write-Error "$($_.Exception.Message)" }
+                }
+                if (-not $found) { Write-Output 'not-installed' }
                 """, 180_000);
+
+            if (!result.Success)
+                problems.Add($"{pattern}: {(result.TimedOut ? "timed out" : FirstLineOf(result.Error))}");
         }
+        if (problems.Count > 0)
+            throw new InvalidOperationException("Could not remove: " + string.Join("; ", problems));
+    }
+
+    private static string FirstLineOf(string text)
+    {
+        string s = text.Trim();
+        int nl = s.IndexOf('\n');
+        return (nl < 0 ? s : s[..nl]).Trim();
     }
 
     public override void RevertToDefault() =>
@@ -331,17 +425,10 @@ public sealed class CommandAction : TweakAction
 
     public override bool? IsApplied(ScanContext ctx) => ctx.Loaded ? Detect(ctx) : null;
 
-    public override void Apply(Tweak tweak, List<BackupEntry> backup)
-    {
-        var result = PowerShellRunner.Run(ApplyScript, TimeoutMs);
-        if (!result.Success)
-            throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.Error) ? "Command failed" : result.Error);
-    }
+    /// <summary>Script-driven tweaks carry their own revert script; nothing to snapshot.</summary>
+    public override void Capture(Tweak tweak, List<BackupEntry> backup) { }
 
-    public override void RevertToDefault()
-    {
-        var result = PowerShellRunner.Run(RevertScript, TimeoutMs);
-        if (!result.Success)
-            throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.Error) ? "Command failed" : result.Error);
-    }
+    public override void Apply() => PowerShellRunner.RunOrThrow(ApplyScript, "Command", TimeoutMs);
+
+    public override void RevertToDefault() => PowerShellRunner.RunOrThrow(RevertScript, "Command", TimeoutMs);
 }

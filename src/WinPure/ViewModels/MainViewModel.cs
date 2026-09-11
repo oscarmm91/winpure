@@ -174,9 +174,12 @@ public sealed class MainViewModel : ObservableObject
                 tweak.RefreshStatus(_engine, ctx);
             UpdatePendingCount();
             UpdateDashboard();
-            StatusText = ctx.Loaded
+            int undetected = AllTweaks.Count(t => t.Status == TweakStatus.Unknown);
+            StatusText = ctx.Warnings.Count == 0
                 ? $"Scan complete. {_dashboard.OptimizedCount} of {_dashboard.TotalCount} tweaks already optimized."
-                : "Scan finished with warnings — some states are unknown.";
+                // Name what could not be checked. "Some states are unknown" told the user
+                // nothing, and an undetected tweak used to look exactly like an optimized one.
+                : $"Scan incomplete — {string.Join("; ", ctx.Warnings)}. {undetected} tweak(s) could not be checked.";
             LogService.Log(StatusText);
         }
         finally

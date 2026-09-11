@@ -11,7 +11,11 @@ namespace WinPure.Services;
 /// </summary>
 public sealed class BackupManager
 {
-    public static string BackupDirectory =>
+    /// <summary>
+    /// Where snapshots live. Settable so a test harness can point it at a scratch folder
+    /// instead of the user's real backups; the app never changes it.
+    /// </summary>
+    public static string BackupDirectory { get; set; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "WinPure", "Backups");
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
@@ -22,31 +26,81 @@ public sealed class BackupManager
         CreatedUtc = DateTime.UtcNow,
     };
 
+    /// <summary>
+    /// Writes the snapshot to disk atomically (temp file + replace), so a crash or a power
+    /// cut mid-write can never leave a truncated .json where a good backup used to be.
+    /// Throws if it cannot write: the caller must not touch the system without a backup.
+    /// </summary>
     public void SaveSession(BackupSession session)
     {
         if (session.Entries.Count == 0 && session.TweakNames.Count == 0) return;
         Directory.CreateDirectory(BackupDirectory);
         string path = Path.Combine(BackupDirectory, session.Id + ".json");
-        File.WriteAllText(path, JsonSerializer.Serialize(session, JsonOptions));
+        string tmp = path + ".tmp";
+        File.WriteAllText(tmp, JsonSerializer.Serialize(session, JsonOptions));
+        File.Move(tmp, path, overwrite: true);
+        bool isNew = session.FilePath is null;
         session.FilePath = path;
-        LogService.Log($"Backup saved: {path} ({session.Entries.Count} entries)");
+        if (isNew) LogService.Log($"Backup opened: {path}");
+    }
+
+    /// <summary>
+    /// The entries of the most recent snapshot that touched <paramref name="tweakId"/> —
+    /// what that tweak found on this machine before it was ever applied. Empty when the
+    /// tweak was never applied through WinPure.
+    /// </summary>
+    public static List<BackupEntry> FindLatestEntriesFor(string tweakId, IEnumerable<BackupSession> sessions)
+    {
+        foreach (var session in sessions) // already newest-first
+        {
+            var entries = session.Entries.Where(e => e.TweakId == tweakId).ToList();
+            if (entries.Count > 0) return entries;
+        }
+        return new List<BackupEntry>();
+    }
+
+    /// <summary>Restores a set of entries (newest write undone first). Returns failures.</summary>
+    public int RestoreEntries(IReadOnlyList<BackupEntry> entries)
+    {
+        int failures = 0;
+        for (int i = entries.Count - 1; i >= 0; i--)
+        {
+            try
+            {
+                RestoreEntry(entries[i]);
+            }
+            catch (Exception ex)
+            {
+                failures++;
+                LogService.Log($"Restore failed for {Describe(entries[i])}: {ex.Message}");
+            }
+        }
+        return failures;
     }
 
     public List<BackupSession> ListSessions()
     {
         var sessions = new List<BackupSession>();
         if (!Directory.Exists(BackupDirectory)) return sessions;
+        int unreadable = 0;
         foreach (var file in Directory.EnumerateFiles(BackupDirectory, "backup_*.json"))
         {
             try
             {
                 var session = JsonSerializer.Deserialize<BackupSession>(File.ReadAllText(file));
-                if (session is null) continue;
+                if (session is null) { unreadable++; continue; }
                 session.FilePath = file;
                 sessions.Add(session);
             }
-            catch { /* skip corrupt file */ }
+            catch (Exception ex)
+            {
+                // Never silently: a backup that vanishes from the Restore page without a
+                // trace is worse than one that shows up broken.
+                unreadable++;
+                LogService.Log($"Unreadable backup {Path.GetFileName(file)}: {ex.Message}");
+            }
         }
+        if (unreadable > 0) LogService.Log($"{unreadable} backup file(s) could not be read and are not listed.");
         return sessions.OrderByDescending(s => s.CreatedUtc).ToList();
     }
 
@@ -59,20 +113,7 @@ public sealed class BackupManager
     /// <summary>Restores every entry of a snapshot. Returns the number of failures.</summary>
     public int RestoreSession(BackupSession session)
     {
-        int failures = 0;
-        // restore in reverse order so later writes are undone first
-        for (int i = session.Entries.Count - 1; i >= 0; i--)
-        {
-            try
-            {
-                RestoreEntry(session.Entries[i]);
-            }
-            catch (Exception ex)
-            {
-                failures++;
-                LogService.Log($"Restore failed for {Describe(session.Entries[i])}: {ex.Message}");
-            }
-        }
+        int failures = RestoreEntries(session.Entries);
         LogService.Log($"Backup restored: {session.Id} ({session.Entries.Count - failures}/{session.Entries.Count} entries)");
         return failures;
     }
@@ -114,6 +155,9 @@ public sealed class BackupManager
             case "scheduled-task":
             {
                 if (entry.TaskPath is null) return;
+                // A task that did not exist when we looked must not be conjured into
+                // existence — and one that was already disabled stays disabled.
+                if (!entry.Existed) return;
                 ScheduledTaskAction.SetEnabled(entry.TaskPath, entry.TaskWasEnabled ?? true);
                 break;
             }

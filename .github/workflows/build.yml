@@ -10,6 +10,10 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    # Needed by the "Attach to release" step below: the default GITHUB_TOKEN is read-only,
+    # which is why every tag build used to go red at that last step.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -19,6 +23,9 @@ jobs:
 
       - name: Build (Debug)
         run: dotnet build WinPure.sln -c Debug
+
+      - name: Engine tests (backup / revert)
+        run: dotnet run --project tests/WinPure.EngineTests --no-build
 
       - name: Publish portable exe
         run: dotnet publish src/WinPure/WinPure.csproj -c Release -o publish

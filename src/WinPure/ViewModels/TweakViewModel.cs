@@ -36,7 +36,9 @@ public sealed class TweakViewModel : ObservableObject
     {
         TweakStatus.Optimized => "Optimized",
         TweakStatus.Pending => "Not applied",
-        _ => "Scanning…",
+        // Before the scan it really is still scanning; afterwards, Unknown means the check
+        // failed — saying "Scanning…" forever hid that from the user.
+        _ => _scanned ? "Couldn't detect" : "Scanning…",
     };
 
     private bool _isSelected;
@@ -54,15 +56,23 @@ public sealed class TweakViewModel : ObservableObject
         }
     }
 
-    /// <summary>True when the toggle differs from the real system state.</summary>
-    public bool IsDirty => Status != TweakStatus.Unknown && IsSelected != IsOptimized;
+    /// <summary>
+    /// True when the toggle differs from the real system state. An undetectable tweak counts
+    /// as dirty once the user switches it on: applying is idempotent and always snapshots,
+    /// so "we could not check" must not mean "you cannot apply this".
+    /// </summary>
+    public bool IsDirty => IsSelected != IsOptimized;
 
     public event Action? SelectionChanged;
 
+    private bool _scanned;
+
     public void RefreshStatus(TweakEngine engine, ScanContext ctx)
     {
+        _scanned = true;
         Status = engine.GetStatus(Tweak, ctx);
         _isSelected = IsOptimized;
+        OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(IsSelected));
         OnPropertyChanged(nameof(IsDirty));
     }

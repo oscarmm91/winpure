@@ -24,6 +24,11 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Lets tests/WinPure.EngineTests build a ScanContext that simulates a failed scan. -->
+    <InternalsVisibleTo Include="WinPure.EngineTests" />
+  </ItemGroup>
+
 </Project>
 
 

@@ -151,6 +151,7 @@ Windows 11 is the target; most tweaks also work on Windows 10 22H2+, but it is n
 ```powershell
 # requires .NET 8 SDK
 dotnet build WinPure.sln                                  # debug build
+dotnet run --project tests/WinPure.EngineTests            # backup / revert engine tests
 dotnet publish src/WinPure/WinPure.csproj -c Release      # portable single-file exe
 ```
 

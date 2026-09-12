@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text.RegularExpressions;
 using Microsoft.Win32;
 using WinPure.Models;
 using WinPure.Services;
@@ -42,6 +43,11 @@ failures += FailedAppScanIsUnknownNotOptimized() ? 0 : 1;
 failures += FailedTaskScanIsUnknownNotOptimized() ? 0 : 1;
 failures += RealScanOfThisMachineWorks() ? 0 : 1;
 failures += CatalogIsInternallyConsistent() ? 0 : 1;
+failures += ATimeoutReallyStopsAHungCommand() ? 0 : 1;
+failures += CancellingReallyKillsTheProcess() ? 0 : 1;
+failures += OnlySafeRepairsOfferCancel() ? 0 : 1;
+failures += PresetKeepsManualSelections() ? 0 : 1;
+failures += EveryStaticResourceAndBindingPathExists() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 
 Cleanup();
@@ -180,6 +186,133 @@ bool RealScanOfThisMachineWorks()
         ctx.Loaded,
         $"loaded={ctx.Loaded} apps={ctx.InstalledPackages.Count} (ok={ctx.AppsQueryOk}) " +
         $"watchedTasks={ctx.TaskEnabled.Count} (ok={ctx.TasksQueryOk}) warnings: {warnings}");
+}
+
+// The old runner drained stdout with ReadToEnd() before waiting on the timeout, so a command
+// that never finished blocked the reader forever and the timeout was never reached — the app
+// hung for as long as the child did. A 60-second sleep with a 2-second timeout must come back
+// in about two seconds, not sixty.
+bool ATimeoutReallyStopsAHungCommand()
+{
+    var clock = Stopwatch.StartNew();
+    var result = PowerShellRunner.Run("Start-Sleep -Seconds 60", timeoutMs: 2_000);
+    clock.Stop();
+
+    bool ok = result.TimedOut && clock.Elapsed < TimeSpan.FromSeconds(20);
+    return Report("a timeout really stops a hung command",
+        ok,
+        $"asked for 2s, returned after {clock.Elapsed.TotalSeconds:0.0}s, timedOut={result.TimedOut} " +
+        "(the old runner waited the full 60s because ReadToEnd blocked first)");
+}
+
+// The Cancel button on the Repair page has to actually reach the process.
+bool CancellingReallyKillsTheProcess()
+{
+    using var cts = new CancellationTokenSource();
+    var clock = Stopwatch.StartNew();
+    var task = Task.Run(() => PowerShellRunner.Run("Start-Sleep -Seconds 60", timeoutMs: 120_000, cts.Token));
+    Thread.Sleep(1_000);
+    cts.Cancel();
+    var result = task.GetAwaiter().GetResult();
+    clock.Stop();
+
+    bool ok = result.Cancelled && clock.Elapsed < TimeSpan.FromSeconds(20);
+    return Report("cancelling a repair really kills the process",
+        ok,
+        $"cancelled after 1s, returned after {clock.Elapsed.TotalSeconds:0.0}s, cancelled={result.Cancelled}");
+}
+
+// Killing SFC/DISM midway can leave the component store inconsistent, so those must not
+// offer a Cancel button at all — the elapsed-time readout is what reassures the user there.
+bool OnlySafeRepairsOfferCancel()
+{
+    var tools = RepairCatalog.Build();
+    var systemFiles = tools.FirstOrDefault(t => t.Id == "repair-system-files");
+    var others = tools.Where(t => t.Id != "repair-system-files").ToList();
+
+    bool ok = systemFiles is { Cancellable: false } && others.Count > 0 && others.All(t => t.Cancellable);
+    return Report("only repairs that are safe to kill offer Cancel",
+        ok,
+        $"repair-system-files cancellable={systemFiles?.Cancellable.ToString() ?? "(missing)"}, " +
+        $"the other {others.Count} tools cancellable={others.All(t => t.Cancellable)}");
+}
+
+// Clicking a preset used to silently untick every Manual tweak the user had chosen by hand,
+// with nothing on screen to say so: the click felt like it undid your work.
+bool PresetKeepsManualSelections()
+{
+    var main = new WinPure.ViewModels.MainViewModel();
+    var manual = main.AllTweaks.First(t => t.Preset == PresetLevel.Manual && !t.IsOptimized);
+    manual.IsSelected = true;
+
+    main.SelectPreset(PresetLevel.Safe);
+
+    bool kept = manual.IsSelected;
+    bool announced = main.StatusText.Contains("manual selection", StringComparison.OrdinalIgnoreCase);
+    bool presetRecorded = main.ActivePreset == PresetLevel.Safe;
+
+    return Report("choosing a preset keeps what you ticked by hand",
+        kept && announced && presetRecorded,
+        $"'{manual.Name}' still selected={kept}, status mentions it={announced}, " +
+        $"ActivePreset={main.ActivePreset} (the old code cleared it without a word)");
+}
+
+// A WPF binding with a typo fails silently at runtime: no crash, no message, the control just
+// sits there empty. These two checks catch the two ways that happens in this project —
+// a {StaticResource} key that nobody defines, and a binding to a property that does not exist.
+bool EveryStaticResourceAndBindingPathExists()
+{
+    string srcDir = FindSourceDir();
+    if (srcDir.Length == 0)
+        return Report("every StaticResource key and binding path exists", true,
+            "skipped: the source tree is not next to the test binary (packaged run)");
+
+    var xamlFiles = Directory.GetFiles(srcDir, "*.xaml", SearchOption.AllDirectories)
+        .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+                 && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+        .ToList();
+
+    var defined = new HashSet<string>(StringComparer.Ordinal);
+    foreach (var file in xamlFiles)
+        foreach (Match m in Regex.Matches(File.ReadAllText(file), @"x:Key=""([^""]+)"""))
+            defined.Add(m.Groups[1].Value);
+
+    var problems = new List<string>();
+    foreach (var file in xamlFiles)
+    {
+        string text = File.ReadAllText(file);
+        string name = Path.GetFileName(file);
+
+        foreach (Match m in Regex.Matches(text, @"\{StaticResource\s+([^}\s,]+)\s*\}"))
+            if (!defined.Contains(m.Groups[1].Value))
+                problems.Add($"{name}: undefined resource '{m.Groups[1].Value}'");
+
+        // Binding paths that go through the page's Main view-model.
+        foreach (Match m in Regex.Matches(text, @"Binding\s+(?:Path=)?Main\.([A-Za-z_][A-Za-z0-9_]*)"))
+        {
+            string member = m.Groups[1].Value;
+            if (typeof(WinPure.ViewModels.MainViewModel).GetProperty(member) is null)
+                problems.Add($"{name}: MainViewModel has no '{member}'");
+        }
+    }
+
+    return Report("every StaticResource key and binding path exists",
+        problems.Count == 0,
+        problems.Count == 0
+            ? $"{xamlFiles.Count} XAML files, {defined.Count} resource keys, all references resolve"
+            : string.Join(" | ", problems));
+}
+
+static string FindSourceDir()
+{
+    var dir = new DirectoryInfo(AppContext.BaseDirectory);
+    while (dir is not null)
+    {
+        string candidate = Path.Combine(dir.FullName, "src", "WinPure");
+        if (Directory.Exists(candidate)) return candidate;
+        dir = dir.Parent;
+    }
+    return "";
 }
 
 // Catalog sanity that does not depend on which machine this runs on: duplicate ids, registry

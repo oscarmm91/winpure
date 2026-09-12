@@ -137,7 +137,19 @@ public sealed class MainViewModel : ObservableObject
     public PageViewModel CurrentPage => CurrentNav.Page;
 
     private bool _isBusy;
-    public bool IsBusy { get => _isBusy; set { if (Set(ref _isBusy, value)) OnPropertyChanged(nameof(IsIdle)); } }
+    public bool IsBusy
+    {
+        get => _isBusy;
+        set
+        {
+            if (!Set(ref _isBusy, value)) return;
+            OnPropertyChanged(nameof(IsIdle));
+            // Every command's CanExecute depends on this. WPF only re-queries on input
+            // events, so after a long operation ends the buttons would stay greyed out
+            // until the user moved the mouse.
+            System.Windows.Input.CommandManager.InvalidateRequerySuggested();
+        }
+    }
     public bool IsIdle => !IsBusy;
 
     private string _statusText = "Ready.";
@@ -201,13 +213,25 @@ public sealed class MainViewModel : ObservableObject
     public void SelectPreset(PresetLevel level)
     {
         ActivePreset = level;
+
+        // Manual tweaks the user ticked by hand belong to the user, not to the preset:
+        // wiping them silently makes a preset click feel like it undid your work.
+        int keptManual = 0;
         foreach (var tweak in AllTweaks)
         {
+            if (tweak.Preset == PresetLevel.Manual && tweak.IsSelected && !tweak.IsOptimized)
+            {
+                keptManual++;
+                continue;
+            }
             bool inPreset = tweak.Preset != PresetLevel.Manual && tweak.Preset <= level;
             // a preset switches its tweaks on but never reverts something already optimized
             tweak.IsSelected = inPreset || tweak.IsOptimized;
         }
-        StatusText = $"{level} preset selected — review and click Apply Changes.";
+
+        StatusText = keptManual == 0
+            ? $"{level} preset selected — review and click Apply Changes."
+            : $"{level} preset selected, keeping {keptManual} manual selection{(keptManual == 1 ? "" : "s")} — review and click Apply Changes.";
     }
 
     // ---------------------------------------------------------------- apply

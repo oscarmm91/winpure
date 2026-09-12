@@ -23,6 +23,7 @@
         <UniformGrid Grid.Row="1" Columns="3" Margin="0,20,0,0">
             <RadioButton Style="{StaticResource PresetButton}" GroupName="Preset" Margin="0,0,8,0"
                          Background="{StaticResource Brush.GreenSoft}" BorderBrush="{StaticResource Brush.Green}"
+                         IsChecked="{Binding Main.ActivePreset, Mode=OneWay, Converter={StaticResource EnumEquals}, ConverterParameter=Safe}"
                          Command="{Binding Main.SelectPresetCommand}"
                          CommandParameter="{x:Static models:PresetLevel.Safe}">
                 <StackPanel Orientation="Horizontal">
@@ -36,6 +37,7 @@
             </RadioButton>
             <RadioButton Style="{StaticResource PresetButton}" GroupName="Preset" Margin="4,0,4,0"
                          Background="{StaticResource Brush.AccentSoft}" BorderBrush="{StaticResource Brush.Accent}"
+                         IsChecked="{Binding Main.ActivePreset, Mode=OneWay, Converter={StaticResource EnumEquals}, ConverterParameter=Balanced}"
                          Command="{Binding Main.SelectPresetCommand}"
                          CommandParameter="{x:Static models:PresetLevel.Balanced}">
                 <StackPanel Orientation="Horizontal">
@@ -49,6 +51,7 @@
             </RadioButton>
             <RadioButton Style="{StaticResource PresetButton}" GroupName="Preset" Margin="8,0,0,0"
                          Background="{StaticResource Brush.OrangeSoft}" BorderBrush="{StaticResource Brush.Orange}"
+                         IsChecked="{Binding Main.ActivePreset, Mode=OneWay, Converter={StaticResource EnumEquals}, ConverterParameter=Aggressive}"
                          Command="{Binding Main.SelectPresetCommand}"
                          CommandParameter="{x:Static models:PresetLevel.Aggressive}">
                 <StackPanel Orientation="Horizontal">

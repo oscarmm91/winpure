@@ -10,6 +10,8 @@ public static class PowerShellRunner
         public bool Success => ExitCode == 0;
         /// <summary>True when the child process had to be killed after the timeout.</summary>
         public bool TimedOut { get; init; }
+        /// <summary>True when the caller cancelled and the child process was killed.</summary>
+        public bool Cancelled { get; init; }
     }
 
     /// <summary>
@@ -17,7 +19,7 @@ public static class PowerShellRunner
     /// Output is drained asynchronously so a chatty or hung child can neither fill the
     /// pipe buffers nor outlive the timeout.
     /// </summary>
-    public static PsResult Run(string script, int timeoutMs = 120_000)
+    public static PsResult Run(string script, int timeoutMs = 120_000, CancellationToken cancel = default)
     {
         try
         {
@@ -56,12 +58,22 @@ public static class PowerShellRunner
             p.BeginOutputReadLine();
             p.BeginErrorReadLine();
 
-            if (!p.WaitForExit(timeoutMs))
+            // Poll instead of one long wait so a cancel from the UI is noticed promptly.
+            var clock = Stopwatch.StartNew();
+            while (!p.WaitForExit(200))
             {
-                try { p.Kill(entireProcessTree: true); } catch { }
-                try { p.WaitForExit(5_000); } catch { }
-                LogService.Log($"PowerShell timed out after {timeoutMs} ms: {FirstLine(script)}");
-                return new PsResult(-1, stdout.ToString().Trim(), "Timed out") { TimedOut = true };
+                if (cancel.IsCancellationRequested)
+                {
+                    Kill(p);
+                    LogService.Log($"PowerShell cancelled by the user: {FirstLine(script)}");
+                    return new PsResult(-1, stdout.ToString().Trim(), "Cancelled") { Cancelled = true };
+                }
+                if (clock.ElapsedMilliseconds > timeoutMs)
+                {
+                    Kill(p);
+                    LogService.Log($"PowerShell timed out after {timeoutMs} ms: {FirstLine(script)}");
+                    return new PsResult(-1, stdout.ToString().Trim(), "Timed out") { TimedOut = true };
+                }
             }
 
             // The process exited; give the readers a moment to flush what is still buffered.
@@ -85,6 +97,12 @@ public static class PowerShellRunner
             : !string.IsNullOrWhiteSpace(result.Output) ? result.Output
             : $"exit code {result.ExitCode}";
         throw new InvalidOperationException($"{what} failed: {detail}");
+    }
+
+    private static void Kill(Process p)
+    {
+        try { p.Kill(entireProcessTree: true); } catch { }
+        try { p.WaitForExit(5_000); } catch { }
     }
 
     private static string FirstLine(string script)

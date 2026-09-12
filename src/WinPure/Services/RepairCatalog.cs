@@ -12,6 +12,12 @@ public sealed class RepairTool
     /// <summary>Shown in a confirmation dialog before running. Null = run without confirmation.</summary>
     public string? ConfirmText { get; init; }
     public bool RequiresRestart { get; init; }
+    /// <summary>
+    /// Whether killing this mid-run is safe. False for anything that repairs Windows itself:
+    /// a half-finished DISM leaves the component store inconsistent, so the answer there is
+    /// to show the user it is still alive, not to offer a button that can make it worse.
+    /// </summary>
+    public bool Cancellable { get; init; } = true;
 }
 
 public static class RepairCatalog
@@ -39,8 +45,9 @@ public static class RepairCatalog
             Name = "Repair System Files (SFC + DISM)",
             Description = "Scan and repair corrupted Windows system files. Can take 15–30 minutes.",
             Icon = "",
-            ConfirmText = "This runs 'sfc /scannow' followed by 'DISM /RestoreHealth'. It can take 15–30 minutes and cannot be cancelled midway. Continue?",
+            ConfirmText = "This runs 'sfc /scannow' followed by 'DISM /RestoreHealth'. It can take 15–30 minutes and cannot be cancelled midway — WinPure will show you the elapsed time so you can tell it is still working. Continue?",
             TimeoutMs = 3_600_000,
+            Cancellable = false,
             Script = """
                 sfc /scannow
                 Dism /Online /Cleanup-Image /RestoreHealth

@@ -13,6 +13,7 @@
 
             <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
             <views:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility"/>
+            <views:EnumEqualsConverter x:Key="EnumEquals"/>
 
             <DataTemplate DataType="{x:Type vm:DashboardViewModel}">
                 <views:DashboardView/>

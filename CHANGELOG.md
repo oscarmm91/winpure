@@ -10,7 +10,14 @@
 - **Fix:** a hung PowerShell call could freeze the app forever; output is now drained in the background and the timeout really kills the process. Output is read as UTF-8, so accented names no longer come back mangled.
 - **Fix:** service, scheduled-task and Store-app operations no longer report success when the underlying command failed.
 - Backups are written atomically, and unreadable backup files are logged instead of quietly disappearing from the Restore page.
-- New `tests/WinPure.EngineTests` project covering the backup/revert engine and the scan, run on every CI build.
+- New `tests/WinPure.EngineTests` project covering the backup/revert engine, the scan, the catalog and the repair tools, run on every CI build.
+
+### Interface
+
+- Long repairs now show **elapsed time**, so a 25-minute SFC no longer looks like a frozen app, and the ones that are safe to interrupt gained a **Cancel** button. SFC + DISM deliberately has none: killing it midway can leave Windows' component store inconsistent.
+- Choosing a preset no longer silently clears tweaks you ticked by hand — they are kept, and the status bar says how many.
+- The preset buttons now show which preset is active, and keep showing it when you move between pages.
+- Buttons no longer stay greyed out after a long operation finishes until you move the mouse.
 
 ### Tweaks fixed (verified against Windows 11 24H2/25H2, build 26200)
 

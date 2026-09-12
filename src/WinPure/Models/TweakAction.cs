@@ -197,6 +197,7 @@ public sealed class RegistryKeyAction : TweakAction
             TweakName = tweak.Name,
             KeyPath = KeyPath,
             Existed = existed,
+            Optional = Optional,
             Value = originalDefault,
         });
     }
@@ -264,6 +265,7 @@ public sealed class ServiceAction : TweakAction
             ServiceName = ServiceName,
             StartMode = (int)start,
             Existed = true,
+            Optional = Optional,
         });
     }
 
@@ -323,6 +325,7 @@ public sealed class ScheduledTaskAction : TweakAction
             TaskPath = TaskPath,
             TaskWasEnabled = enabled,
             Existed = exists,
+            Optional = Optional,
         });
     }
 
@@ -462,6 +465,7 @@ public sealed class StartupEntryAction : TweakAction
             KeyPath = ApprovedKeyPath,
             ValueName = EntryName,
             Existed = original is not null,
+            Optional = Optional,
             Kind = RegistryValueKind.Binary.ToString(),
             Value = original is null ? null : Convert.ToHexString(original),
         });

@@ -33,7 +33,10 @@ A page that lists everything that starts with Windows and lets you switch any of
 ### Tweaks fixed (verified against Windows 11 24H2/25H2, build 26200)
 
 - **Remove Widgets Button did nothing on current Windows — and it is in the Safe preset.** It only wrote `TaskbarDa`, which Microsoft's UCPD driver now blocks for every known executable (measured on build 26200: the write is refused outright). It now applies the `Dsh!AllowNewsAndInterests` policy, which current Windows honours, and keeps `TaskbarDa` as an optional fallback for builds before 24H2.
-- **Windows AI & Recall was only half blocked.** Added `AllowRecallEnablement = 0` and `TurnOffSavingSnapshots = 1` — without them Recall can be switched back on and keeps saving snapshots.
+- **Windows AI & Recall was only half blocked.** Added `AllowRecallEnablement = 0` and `AllowRecallExport = 0`, both verified against Windows' own `WindowsCopilot.admx` on build 26200 — without the first, Recall can simply be switched back on. The tweak now also warns that snapshots Recall already saved are deleted on the next restart, which is what Microsoft's own policy text says.
+- **Two new AI tweaks, taken from that same ADMX rather than from a reference repo:** Click to Do (the overlay that appears when you select text or an image on 24H2+) and Paint's Cocreator, Image Creator and generative fill.
+- **Disable Copilot no longer writes a machine-wide value Windows never reads** — `TurnOffWindowsCopilot` is declared as a per-user policy, so the HKLM copy that other debloaters also write did nothing.
+- Every policy write is now checked against the machine's ADMX definitions as part of the test run — matching the path and the user/machine scope, not just the value name.
 - Actions can now be marked optional: a legacy value the OS refuses to write is logged and skipped instead of failing the whole tweak or pinning it to "Not applied" forever.
 
 - **Remove Dev Home** never removed anything: the package is `Microsoft.Windows.DevHome`, and the old pattern did not match it — so it also reported itself as already done.

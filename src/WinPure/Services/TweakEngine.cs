@@ -72,12 +72,24 @@ public sealed class TweakEngine
     {
         foreach (var action in tweak.Actions)
         {
+            // Three steps, and only two of them are forgiving. A value Windows will not let us
+            // write is often one it will not let us read either, so capturing an optional action
+            // may fail — but the snapshot reaching disk is this class's whole promise and is
+            // never excused: a failed backup must not be mistaken for a rejected legacy value.
             try
             {
-                // Capture is inside the guard too: a value Windows will not let us write is
-                // often one it will not let us read either, and that must not fail the tweak.
                 action.Capture(tweak, session.Entries);
-                FlushSnapshot(session);
+            }
+            catch (Exception ex) when (action.Optional)
+            {
+                LogService.Log($"{tweak.Id}: optional action could not be captured, skipping it — {ex.Message}");
+                continue;
+            }
+
+            FlushSnapshot(session);
+
+            try
+            {
                 action.Apply();
             }
             catch (Exception ex) when (action.Optional)

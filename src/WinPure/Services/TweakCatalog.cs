@@ -54,6 +54,9 @@ public static class TweakCatalog
             Icon = "",
             Actions = new TweakAction[]
             {
+                // The first path is the one Windows declares in DataCollection.admx. The second
+                // is the Windows 10 location, kept for machines upgraded from it — the policy
+                // audit in tests/ flags it on purpose, and this is the reason it is expected.
                 Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection", "AllowTelemetry", 0, null),
                 Dword(@"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection", "AllowTelemetry", 0, null),
             },
@@ -363,11 +366,10 @@ public static class TweakCatalog
             Id = "apps-copilot", Category = TweakCategory.Apps, Preset = PresetLevel.Aggressive,
             Name = "Disable Copilot / Windows AI",
             Description = "Turn off Windows Copilot and remove its taskbar button.",
-            Help = "Applies the TurnOffWindowsCopilot policy for the machine and current user and hides the taskbar button.",
+            Help = "Applies the TurnOffWindowsCopilot policy for the current user and hides the taskbar button. The policy is declared class=\"User\" in Windows' own WindowsCopilot.admx, so the machine-wide copy other debloaters also write is simply never read.",
             Icon = "", RequiresExplorerRestart = true,
             Actions = new TweakAction[]
             {
-                Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot", "TurnOffWindowsCopilot", 1, null),
                 Dword(@"HKCU\Software\Policies\Microsoft\Windows\WindowsCopilot", "TurnOffWindowsCopilot", 1, null),
                 Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "ShowCopilotButton", 0, 1),
             },
@@ -378,7 +380,8 @@ public static class TweakCatalog
             Id = "apps-windows-ai", Category = TweakCategory.Apps, Preset = PresetLevel.Aggressive,
             Name = "Disable Windows AI & Recall",
             Description = "Turn off Recall snapshots, Notepad AI and hide AI components from Settings.",
-            Help = "Applies the WindowsAI/Recall policies popularized by Chris Titus WinUtil: DisableAIDataAnalysis stops Recall screen captures, Notepad AI features are disabled and the AI components page is hidden.",
+            Help = "DisableAIDataAnalysis stops Recall from saving screen captures, AllowRecallEnablement keeps it from being switched back on, Notepad AI is disabled and the AI components page is hidden. Snapshots Recall already saved are only deleted on the next restart — Microsoft's own policy description says so.",
+            RequiresRestart = true,
             Icon = "",
             Actions = new TweakAction[]
             {

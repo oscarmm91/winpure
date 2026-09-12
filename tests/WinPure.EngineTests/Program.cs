@@ -53,6 +53,7 @@ failures += DisablingAnUntouchedEntryIsUndoneByDeleting() ? 0 : 1;
 failures += TheStartupScannerFindsWhatWindowsHas() ? 0 : 1;
 failures += AnOptionalActionCannotFailTheWholeTweak() ? 0 : 1;
 failures += TheDocsAgreeWithTheCatalog() ? 0 : 1;
+failures += AFailedBackupIsNeverExcusedAsAnOptionalAction() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
 
@@ -241,6 +242,52 @@ bool OnlySafeRepairsOfferCancel()
         ok,
         $"repair-system-files cancellable={systemFiles?.Cancellable.ToString() ?? "(missing)"}, " +
         $"the other {others.Count} tools cancellable={others.All(t => t.Cancellable)}");
+}
+
+// The forgiveness granted to an optional action must never extend to the backup itself.
+// Both failures arrive as an exception on the same action, and the first version of this
+// feature could not tell them apart: with the snapshot flush inside the guard, a full disk
+// or a locked backup folder read as "Windows rejected this legacy value", and the tweak
+// reported success having written nothing and saved nothing.
+bool AFailedBackupIsNeverExcusedAsAnOptionalAction()
+{
+    Reset();
+    string goodDir = BackupManager.BackupDirectory;
+
+    // Point the backup directory at a path that cannot be created: an existing FILE.
+    string blocker = Path.Combine(Path.GetTempPath(), "winpure-backup-blocker");
+    File.WriteAllText(blocker, "not a directory");
+    BackupManager.BackupDirectory = Path.Combine(blocker, "backups");
+
+    var tweak = new Tweak
+    {
+        Id = "test-backup-fails",
+        Category = TweakCategory.UI,
+        Name = "Tweak whose backup cannot be written",
+        Description = "toy",
+        Icon = "",
+        Actions = new TweakAction[]
+        {
+            new RegistryValueAction
+            {
+                KeyPath = @"HKCU\Software\WinPureTests", ValueName = "ShouldNotBeWritten",
+                Kind = RegistryValueKind.DWord, ApplyValue = 1, DefaultValue = null,
+                Optional = true,
+            },
+        },
+    };
+
+    var result = new TweakEngine(new BackupManager()).ApplyChanges(new[] { (tweak, true) })[0];
+    int? written = ReadToy("ShouldNotBeWritten");
+
+    BackupManager.BackupDirectory = goodDir;
+    try { File.Delete(blocker); } catch { }
+    Reset();
+
+    return Report("a failed backup is never excused as an optional action",
+        !result.Success && written is null,
+        $"reported success={result.Success} (expected False), value written anyway={written is not null} " +
+        $"(expected False). Message: '{result.Message}'");
 }
 
 // A tweak lives in three places: the catalog, the table in docs/tweaks.md and the per-category
@@ -563,6 +610,12 @@ bool CatalogIsInternallyConsistent()
     foreach (var group in tweaks.GroupBy(t => t.Id).Where(g => g.Count() > 1))
         problems.Add($"duplicate id '{group.Key}'");
 
+    // A tweak whose every action is optional can report success while doing nothing at all,
+    // and then read as Pending on the next scan. Optional is for a fallback beside something
+    // that really works, never for the whole tweak.
+    foreach (var t in tweaks.Where(t => t.Actions.Count > 0 && t.Actions.All(a => a.Optional)))
+        problems.Add($"{t.Id}: every action is optional, so it can succeed without doing anything");
+
     var writes = new Dictionary<string, (string tweakId, string value)>(StringComparer.OrdinalIgnoreCase);
     foreach (var tweak in tweaks)
         foreach (var action in tweak.Actions)
@@ -660,24 +713,60 @@ void ReportPolicyWritesNotBackedByAnAdmx()
         return;
     }
 
-    string admx = string.Concat(Directory.EnumerateFiles(admxDir, "*.admx")
-        .Select(f => { try { return File.ReadAllText(f); } catch { return ""; } }));
+    // Every <policy> declares the key it lives under, the value name, and whether it is a
+    // Machine or User setting. Matching the value name alone is not enough: the dead Widgets
+    // tweak wrote a real value name under a path Windows does not read.
+    var declared = new List<(string Key, string Value, string Class)>();
+    foreach (var file in Directory.EnumerateFiles(admxDir, "*.admx"))
+    {
+        string text;
+        try { text = File.ReadAllText(file); } catch { continue; }
+        foreach (Match p in Regex.Matches(text, @"<policy\b(?<head>[^>]*)>(?<body>.*?)</policy>", RegexOptions.Singleline))
+        {
+            string head = p.Groups["head"].Value;
+            string key = Regex.Match(head, @"key=""([^""]+)""").Groups[1].Value;
+            string cls = Regex.Match(head, @"class=""([^""]+)""").Groups[1].Value;
+            if (key.Length == 0) continue;
+            foreach (Match v in Regex.Matches(head + p.Groups["body"].Value, @"valueName=""([^""]+)"""))
+                declared.Add((key, v.Groups[1].Value, cls));
+        }
+    }
 
-    var undeclared = new List<string>();
+    var problems = new List<string>();
     int checkedCount = 0;
     foreach (var tweak in TweakCatalog.Build())
         foreach (var action in tweak.Actions.OfType<RegistryValueAction>())
         {
             if (!action.KeyPath.Contains(@"\Policies\", StringComparison.OrdinalIgnoreCase)) continue;
             checkedCount++;
-            if (!admx.Contains($"valueName=\"{action.ValueName}\"", StringComparison.OrdinalIgnoreCase))
-                undeclared.Add($"  {tweak.Id}: {action.ValueName}  ({action.KeyPath})");
+
+            int slash = action.KeyPath.IndexOf('\\');
+            string hive = action.KeyPath[..slash];
+            string sub = action.KeyPath[(slash + 1)..];
+
+            var sameName = declared.Where(d => d.Value.Equals(action.ValueName, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (sameName.Count == 0)
+            {
+                problems.Add($"  {tweak.Id}: '{action.ValueName}' is declared by no ADMX at all  ({action.KeyPath})");
+                continue;
+            }
+
+            if (!sameName.Any(d => d.Key.Equals(sub, StringComparison.OrdinalIgnoreCase)))
+                problems.Add($"  {tweak.Id}: '{action.ValueName}' exists, but under {string.Join(" / ", sameName.Select(d => d.Key).Distinct())} — we write it to {sub}");
+
+            // A Machine-scoped policy written to HKCU (or the reverse) is simply ignored.
+            bool hkcu = hive.Equals("HKCU", StringComparison.OrdinalIgnoreCase);
+            var scopes = sameName.Select(d => d.Class).Distinct().ToList();
+            if (hkcu && scopes.All(s => s.Equals("Machine", StringComparison.OrdinalIgnoreCase)))
+                problems.Add($"  {tweak.Id}: '{action.ValueName}' is Machine-scoped but written to HKCU");
+            if (!hkcu && scopes.All(s => s.Equals("User", StringComparison.OrdinalIgnoreCase)))
+                problems.Add($"  {tweak.Id}: '{action.ValueName}' is User-scoped but written to {hive}");
         }
 
     Console.WriteLine();
-    Console.WriteLine($"Policy values not declared by any ADMX on this machine "
-                    + $"({checkedCount} policy writes checked, informational):");
-    Console.WriteLine(undeclared.Count == 0 ? "  none" : string.Join(Environment.NewLine, undeclared));
+    Console.WriteLine($"Policy writes that do not match this machine's ADMX definitions "
+                    + $"({checkedCount} checked against {declared.Count} declared values, informational):");
+    Console.WriteLine(problems.Count == 0 ? "  none" : string.Join(Environment.NewLine, problems));
 }
 
 static bool RegistryKeyExists(string keyPath)

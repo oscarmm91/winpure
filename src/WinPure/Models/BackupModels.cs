@@ -20,6 +20,12 @@ public sealed class BackupEntry
     /// <summary>Whether the value (or key) existed before the change.</summary>
     public bool Existed { get; set; }
 
+    /// <summary>
+    /// Came from a best-effort action (see TweakAction.Optional). Windows may refuse to write
+    /// it back — that is expected and must not be reported as a failed restore.
+    /// </summary>
+    public bool Optional { get; set; }
+
     // service
     public string? ServiceName { get; set; }
     public int? StartMode { get; set; }

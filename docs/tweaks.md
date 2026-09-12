@@ -48,7 +48,7 @@ App removals use `Remove-AppxPackage -AllUsers` + de-provisioning. **Undo = rein
 | Remove Get Help & Tips | Balanced | `Microsoft.GetHelp`, `Microsoft.Getstarted`, `Microsoft.StartExperiencesApp` (Tips on 24H2/25H2) |
 | Remove Xbox Apps & Overlay | Aggressive | Xbox app family + Game DVR off (`GameDVR_Enabled = 0`, `AllowGameDVR = 0`) |
 | Disable Copilot / Windows AI | Aggressive | `TurnOffWindowsCopilot = 1` (HKLM + HKCU) + taskbar button off |
-| Disable Windows AI & Recall | Aggressive | `WindowsAI!DisableAIDataAnalysis = 1`, Notepad AI off, AI Settings page hidden |
+| Disable Windows AI & Recall | Aggressive | `WindowsAI!DisableAIDataAnalysis = 1` (HKLM + HKCU), `AllowRecallEnablement = 0`, `TurnOffSavingSnapshots = 1`, Notepad AI off, AI Settings page hidden |
 | Remove OneDrive | Aggressive | `OneDriveSetup /uninstall` + `DisableFileSyncNGSC = 1` (files stay on disk) |
 
 ## ⚙️ Services
@@ -94,7 +94,7 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Hide 'New App Installed' Badge | Safe | `NoNewAppAlert = 1` |
 | Show File Extensions | Safe | `HideFileExt = 0` |
 | Show Hidden Files | Manual | `Hidden = 1` |
-| Remove Widgets Button | Safe | `TaskbarDa = 0` |
+| Remove Widgets Button | Safe | `Dsh!AllowNewsAndInterests = 0` (the policy current Windows honours). `TaskbarDa = 0` is still written for pre-24H2 builds, but newer ones block it - it is optional and cannot fail the tweak |
 | Remove Task View Button | Safe | `ShowTaskViewButton = 0` |
 | Remove Chat/Teams Button | Safe | `TaskbarMn = 0` |
 | Align Taskbar Left | Manual | `TaskbarAl = 0` |

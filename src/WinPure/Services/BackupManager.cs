@@ -69,6 +69,11 @@ public sealed class BackupManager
             {
                 RestoreEntry(entries[i]);
             }
+            catch (Exception ex) when (entries[i].Optional)
+            {
+                // Windows refusing to write back a legacy value is expected, not a failure.
+                LogService.Log($"Restore skipped optional {Describe(entries[i])}: {ex.Message}");
+            }
             catch (Exception ex)
             {
                 failures++;

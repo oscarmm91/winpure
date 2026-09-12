@@ -11,8 +11,13 @@ public sealed class TweakEngine
 
     public TweakStatus GetStatus(Tweak tweak, ScanContext ctx)
     {
+        // Optional actions are legacy fallbacks Windows may refuse to write; letting them
+        // decide would pin a tweak to "Not applied" forever even though it did its job.
+        var deciding = tweak.Actions.Where(a => !a.Optional).ToList();
+        if (deciding.Count == 0) deciding = tweak.Actions.ToList();
+
         bool sawUnknown = false;
-        foreach (var action in tweak.Actions)
+        foreach (var action in deciding)
         {
             bool? applied = action.IsApplied(ctx);
             if (applied is null) { sawUnknown = true; continue; }
@@ -67,9 +72,18 @@ public sealed class TweakEngine
     {
         foreach (var action in tweak.Actions)
         {
-            action.Capture(tweak, session.Entries);
-            FlushSnapshot(session);
-            action.Apply();
+            try
+            {
+                // Capture is inside the guard too: a value Windows will not let us write is
+                // often one it will not let us read either, and that must not fail the tweak.
+                action.Capture(tweak, session.Entries);
+                FlushSnapshot(session);
+                action.Apply();
+            }
+            catch (Exception ex) when (action.Optional)
+            {
+                LogService.Log($"{tweak.Id}: optional action skipped — {ex.Message}");
+            }
         }
     }
 
@@ -77,7 +91,16 @@ public sealed class TweakEngine
     {
         // Undoing is a change too: snapshot the current state first so this can be undone.
         foreach (var action in tweak.Actions)
-            action.Capture(tweak, session.Entries);
+        {
+            try
+            {
+                action.Capture(tweak, session.Entries);
+            }
+            catch (Exception ex) when (action.Optional)
+            {
+                LogService.Log($"{tweak.Id}: optional action could not be captured — {ex.Message}");
+            }
+        }
         FlushSnapshot(session);
 
         var recorded = BackupManager.FindLatestEntriesFor(tweak.Id, history);
@@ -93,7 +116,16 @@ public sealed class TweakEngine
             // all we have. It is a guess about a stock system, not about this one.
             LogService.Log($"No backup found for {tweak.Id}; falling back to the catalog default.");
             foreach (var action in tweak.Actions)
-                action.RevertToDefault();
+            {
+                try
+                {
+                    action.RevertToDefault();
+                }
+                catch (Exception ex) when (action.Optional)
+                {
+                    LogService.Log($"{tweak.Id}: optional action skipped on revert — {ex.Message}");
+                }
+            }
         }
     }
 

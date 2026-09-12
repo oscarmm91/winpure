@@ -6,6 +6,16 @@ namespace WinPure.Models;
 /// <summary>A single reversible operation. A tweak bundles one or more actions.</summary>
 public abstract class TweakAction
 {
+    /// <summary>
+    /// Best-effort action: if it fails, the tweak still counts as applied and the failure only
+    /// reaches the log. It is also ignored when deciding whether the tweak is already applied.
+    ///
+    /// This exists for legacy fallbacks — a value that works on older builds and that newer
+    /// Windows refuses to write. Use it ONLY where the tweak achieves its goal without this
+    /// action; anything else would be hiding a real failure from the user.
+    /// </summary>
+    public bool Optional { get; init; }
+
     /// <summary>True if the system already matches the tweaked state. Null = cannot tell.</summary>
     public abstract bool? IsApplied(ScanContext ctx);
 
@@ -131,6 +141,7 @@ public sealed class RegistryValueAction : TweakAction
             KeyPath = KeyPath,
             ValueName = ValueName,
             Existed = current is not null,
+            Optional = Optional,
             Kind = current is null ? Kind.ToString() : currentKind.ToString(),
             Value = current is null ? null : SerializeValue(current),
         });

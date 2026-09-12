@@ -384,6 +384,10 @@ public static class TweakCatalog
             {
                 Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis", 1, null),
                 Dword(@"HKCU\Software\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis", 1, null),
+                // The two policies Microsoft added after Recall shipped: without them, Recall
+                // can still be switched back on and keeps saving snapshots.
+                Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "AllowRecallEnablement", 0, null),
+                Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "TurnOffSavingSnapshots", 1, null),
                 Dword(@"HKLM\SOFTWARE\Policies\WindowsNotepad", "DisableAIFeatures", 1, null),
                 Str(@"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer", "SettingsPageVisibility", "hide:aicomponents", null),
             },
@@ -718,9 +722,21 @@ public static class TweakCatalog
             Name = "Remove Widgets Button",
             Description = "Remove the Widgets button from the taskbar.",
             Icon = "", RequiresExplorerRestart = true,
+            Help = "Uses the Dsh policy, which is what current Windows 11 honours. The old TaskbarDa value is still written for Windows 11 builds before 24H2, but newer builds refuse it: the UCPD driver blocks that value for every known executable, and the tweak works without it.",
             Actions = new TweakAction[]
             {
-                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "TaskbarDa", 0, 1),
+                Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Dsh", "AllowNewsAndInterests", 0, null),
+                // Legacy path. Verified on 2026-09-12 on build 26200: Windows rejects this write
+                // with "invalid operation" (UCPD). Optional so it cannot fail the whole tweak.
+                new RegistryValueAction
+                {
+                    KeyPath = @"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                    ValueName = "TaskbarDa",
+                    Kind = RegistryValueKind.DWord,
+                    ApplyValue = 0,
+                    DefaultValue = 1,
+                    Optional = true,
+                },
             },
         };
 

@@ -51,6 +51,7 @@ failures += EveryStaticResourceAndBindingPathExists() ? 0 : 1;
 failures += TogglingAStartupEntryIsByteExact() ? 0 : 1;
 failures += DisablingAnUntouchedEntryIsUndoneByDeleting() ? 0 : 1;
 failures += TheStartupScannerFindsWhatWindowsHas() ? 0 : 1;
+failures += AnOptionalActionCannotFailTheWholeTweak() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 
 Cleanup();
@@ -238,6 +239,53 @@ bool OnlySafeRepairsOfferCancel()
         ok,
         $"repair-system-files cancellable={systemFiles?.Cancellable.ToString() ?? "(missing)"}, " +
         $"the other {others.Count} tools cancellable={others.All(t => t.Cancellable)}");
+}
+
+// Some tweaks carry a legacy fallback that current Windows refuses to write — the Widgets
+// button is the real case: the UCPD driver blocks TaskbarDa on 24H2+, while the Dsh policy
+// still works. A blocked legacy value must not fail the tweak, and must not keep it pinned
+// to "Not applied" once the part that matters has been applied.
+bool AnOptionalActionCannotFailTheWholeTweak()
+{
+    Reset();
+    const string toyKey = @"HKCU\Software\WinPureTests";
+
+    var tweak = new Tweak
+    {
+        Id = "test-optional",
+        Category = TweakCategory.UI,
+        Name = "Tweak with a legacy fallback",
+        Description = "toy",
+        Icon = "",
+        Actions = new TweakAction[]
+        {
+            // The one that matters — a normal, writable value.
+            new RegistryValueAction
+            {
+                KeyPath = toyKey, ValueName = "Real",
+                Kind = RegistryValueKind.DWord, ApplyValue = 1, DefaultValue = null,
+            },
+            // The legacy one: HKLM\SECURITY is unwritable even elevated, standing in for
+            // a value Windows refuses. Marked Optional, so it must be survivable.
+            new RegistryValueAction
+            {
+                KeyPath = @"HKLM\SECURITY\WinPureTests", ValueName = "Blocked",
+                Kind = RegistryValueKind.DWord, ApplyValue = 1, DefaultValue = null,
+                Optional = true,
+            },
+        },
+    };
+
+    var engine = new TweakEngine(new BackupManager());
+    var result = engine.ApplyChanges(new[] { (tweak, true) })[0];
+    int? realValue = ReadToy("Real");
+    var status = engine.GetStatus(tweak, new ScanContext { Loaded = true, AppsQueryOk = true, TasksQueryOk = true });
+
+    Reset();
+    return Report("a blocked legacy action cannot fail the whole tweak",
+        result.Success && realValue == 1 && status == TweakStatus.Optimized,
+        $"tweak reported success={result.Success} (message: '{result.Message}'), " +
+        $"the value that matters was written={realValue == 1}, status={status} (expected Optimized)");
 }
 
 // Clicking a preset used to silently untick every Manual tweak the user had chosen by hand,

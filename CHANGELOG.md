@@ -32,6 +32,10 @@ A page that lists everything that starts with Windows and lets you switch any of
 
 ### Tweaks fixed (verified against Windows 11 24H2/25H2, build 26200)
 
+- **Remove Widgets Button did nothing on current Windows — and it is in the Safe preset.** It only wrote `TaskbarDa`, which Microsoft's UCPD driver now blocks for every known executable (measured on build 26200: the write is refused outright). It now applies the `Dsh!AllowNewsAndInterests` policy, which current Windows honours, and keeps `TaskbarDa` as an optional fallback for builds before 24H2.
+- **Windows AI & Recall was only half blocked.** Added `AllowRecallEnablement = 0` and `TurnOffSavingSnapshots = 1` — without them Recall can be switched back on and keeps saving snapshots.
+- Actions can now be marked optional: a legacy value the OS refuses to write is logged and skipped instead of failing the whole tweak or pinning it to "Not applied" forever.
+
 - **Remove Dev Home** never removed anything: the package is `Microsoft.Windows.DevHome`, and the old pattern did not match it — so it also reported itself as already done.
 - **Remove 'Share'** pointed at a context-menu key that no longer exists; the handler now lives under `AllFileSystemObjects`. Same story: it claimed to be applied without doing anything.
 - **Disable Compatibility Telemetry Tasks** now also covers *Microsoft Compatibility Appraiser Exp*, the task that replaced the two originals on 24H2/25H2 (the old ones are kept for machines upgraded from Windows 10).

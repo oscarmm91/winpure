@@ -384,12 +384,44 @@ public static class TweakCatalog
             {
                 Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis", 1, null),
                 Dword(@"HKCU\Software\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis", 1, null),
-                // The two policies Microsoft added after Recall shipped: without them, Recall
-                // can still be switched back on and keeps saving snapshots.
+                // Verified against this machine's own WindowsCopilot.admx (build 26200), which
+                // is what actually defines the policy — not a reference repo. AllowRecallEnablement
+                // is declared with enabled=1/disabled=0, so 0 is what blocks Recall.
+                // ("TurnOffSavingSnapshots", which several debloaters still ship, is NOT declared
+                // in this build's ADMX at all — dropped rather than written and hoped for.)
                 Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "AllowRecallEnablement", 0, null),
-                Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "TurnOffSavingSnapshots", 1, null),
+                Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "AllowRecallExport", 0, null),
                 Dword(@"HKLM\SOFTWARE\Policies\WindowsNotepad", "DisableAIFeatures", 1, null),
                 Str(@"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer", "SettingsPageVisibility", "hide:aicomponents", null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "apps-click-to-do", Category = TweakCategory.Apps, Preset = PresetLevel.Balanced,
+            Name = "Disable Click to Do",
+            Description = "Turn off the AI overlay that appears when you select text or an image.",
+            Help = "Click to Do sends what you select to on-device AI to offer actions. Policy verified against this machine's WindowsCopilot.admx, where it is declared with enabled=1.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "DisableClickToDo", 1, null),
+                Dword(@"HKCU\Software\Policies\Microsoft\Windows\WindowsAI", "DisableClickToDo", 1, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "apps-paint-ai", Category = TweakCategory.Apps, Preset = PresetLevel.Manual,
+            Name = "Disable Paint AI Features",
+            Description = "Turn off Cocreator, Image Creator and generative fill in Paint.",
+            Help = "Removes the AI buttons from Paint's toolbar. The three policies come from this machine's own WindowsCopilot.admx, which puts them under CurrentVersion\\Policies\\Paint (machine scope).",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\Paint", "DisableCocreator", 1, null),
+                Dword(@"HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\Paint", "DisableImageCreator", 1, null),
+                Dword(@"HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\Paint", "DisableGenerativeFill", 1, null),
             },
         };
 

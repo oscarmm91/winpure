@@ -52,7 +52,9 @@ failures += TogglingAStartupEntryIsByteExact() ? 0 : 1;
 failures += DisablingAnUntouchedEntryIsUndoneByDeleting() ? 0 : 1;
 failures += TheStartupScannerFindsWhatWindowsHas() ? 0 : 1;
 failures += AnOptionalActionCannotFailTheWholeTweak() ? 0 : 1;
+failures += TheDocsAgreeWithTheCatalog() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
+ReportPolicyWritesNotBackedByAnAdmx();
 
 Cleanup();
 Console.WriteLine();
@@ -239,6 +241,81 @@ bool OnlySafeRepairsOfferCancel()
         ok,
         $"repair-system-files cancellable={systemFiles?.Cancellable.ToString() ?? "(missing)"}, " +
         $"the other {others.Count} tools cancellable={others.All(t => t.Cancellable)}");
+}
+
+// A tweak lives in three places: the catalog, the table in docs/tweaks.md and the per-category
+// count in README.md. Keeping them in step by hand did not work — the README advertised 16
+// Privacy tweaks while the catalog had 18, and nobody noticed for weeks, because the earlier
+// check only ever compared the catalog against tweaks.md.
+bool TheDocsAgreeWithTheCatalog()
+{
+    string root = FindRepoRoot();
+    if (root.Length == 0)
+        return Report("the docs agree with the catalog", true, "skipped: repo not next to the test binary");
+
+    var catalog = TweakCatalog.Build()
+        .GroupBy(t => t.Category)
+        .ToDictionary(g => g.Key, g => g.Count());
+
+    string tweaksMd = File.ReadAllText(Path.Combine(root, "docs", "tweaks.md"));
+    string readme = File.ReadAllText(Path.Combine(root, "README.md"));
+
+    // docs/tweaks.md: one data row per tweak, per section (Repair has its own section).
+    var mdRows = new Dictionary<string, int>();
+    foreach (var section in Regex.Split(tweaksMd, @"\n## ").Skip(1))
+    {
+        string title = section.Split('\n')[0];
+        int rows = section.Split('\n').Count(l =>
+            l.StartsWith("| ") && !l.Contains("---") &&
+            !l.StartsWith("| Tweak") && !l.StartsWith("| Tool"));
+        mdRows[title] = rows;
+    }
+
+    var problems = new List<string>();
+    // Category name as it appears in the docs → the enum it maps to.
+    var titles = new (string Doc, TweakCategory Cat)[]
+    {
+        ("Privacy & Telemetry", TweakCategory.Privacy),
+        ("Bloatware & Apps", TweakCategory.Apps),
+        ("Services", TweakCategory.Services),
+        ("Performance", TweakCategory.Performance),
+        ("UI & Personalization", TweakCategory.UI),
+        ("Context Menu", TweakCategory.ContextMenu),
+    };
+
+    foreach (var (doc, cat) in titles)
+    {
+        int inCatalog = catalog.TryGetValue(cat, out int n) ? n : 0;
+
+        var mdKey = mdRows.Keys.FirstOrDefault(k => k.Contains(doc, StringComparison.Ordinal));
+        if (mdKey is null) problems.Add($"docs/tweaks.md has no '{doc}' section");
+        else if (mdRows[mdKey] != inCatalog)
+            problems.Add($"{doc}: catalog {inCatalog} vs tweaks.md {mdRows[mdKey]}");
+
+        var m = Regex.Match(readme, @"<b>" + Regex.Escape(doc) + @"</b>[^0-9]*(\d+) tweaks");
+        if (!m.Success) problems.Add($"README has no count for '{doc}'");
+        else if (int.Parse(m.Groups[1].Value) != inCatalog)
+            problems.Add($"{doc}: catalog {inCatalog} vs README {m.Groups[1].Value}");
+    }
+
+    return Report("the docs agree with the catalog",
+        problems.Count == 0,
+        problems.Count == 0
+            ? $"{catalog.Values.Sum()} tweaks: every category matches in the catalog, docs/tweaks.md and README.md"
+            : string.Join(" | ", problems));
+}
+
+static string FindRepoRoot()
+{
+    var dir = new DirectoryInfo(AppContext.BaseDirectory);
+    while (dir is not null)
+    {
+        if (File.Exists(Path.Combine(dir.FullName, "README.md")) &&
+            Directory.Exists(Path.Combine(dir.FullName, "src", "WinPure")))
+            return dir.FullName;
+        dir = dir.Parent;
+    }
+    return "";
 }
 
 // Some tweaks carry a legacy fallback that current Windows refuses to write — the Widgets
@@ -566,6 +643,41 @@ void ReportCatalogDeadWeightOnThisMachine()
     Console.WriteLine();
     Console.WriteLine("Tweaks with nothing to act on, on this machine (informational, not a failure):");
     Console.WriteLine(dead.Count == 0 ? "  none" : string.Join(Environment.NewLine, dead));
+}
+
+// A value under \Policies\ is only a real policy if Windows declares it in one of the .admx
+// files under PolicyDefinitions. Anything else is a name that looks official and may be
+// ignored — which is exactly how the dead Widgets tweak looked, and how a "TurnOffSavingSnapshots"
+// copied from a reference repo turned out not to exist on this build.
+// Informational, not a failure: a CI image can carry a different set of ADMX than a desktop.
+void ReportPolicyWritesNotBackedByAnAdmx()
+{
+    string admxDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.Windows), "PolicyDefinitions");
+    if (!Directory.Exists(admxDir))
+    {
+        Console.WriteLine("\n(skipping the policy audit: no PolicyDefinitions on this machine)");
+        return;
+    }
+
+    string admx = string.Concat(Directory.EnumerateFiles(admxDir, "*.admx")
+        .Select(f => { try { return File.ReadAllText(f); } catch { return ""; } }));
+
+    var undeclared = new List<string>();
+    int checkedCount = 0;
+    foreach (var tweak in TweakCatalog.Build())
+        foreach (var action in tweak.Actions.OfType<RegistryValueAction>())
+        {
+            if (!action.KeyPath.Contains(@"\Policies\", StringComparison.OrdinalIgnoreCase)) continue;
+            checkedCount++;
+            if (!admx.Contains($"valueName=\"{action.ValueName}\"", StringComparison.OrdinalIgnoreCase))
+                undeclared.Add($"  {tweak.Id}: {action.ValueName}  ({action.KeyPath})");
+        }
+
+    Console.WriteLine();
+    Console.WriteLine($"Policy values not declared by any ADMX on this machine "
+                    + $"({checkedCount} policy writes checked, informational):");
+    Console.WriteLine(undeclared.Count == 0 ? "  none" : string.Join(Environment.NewLine, undeclared));
 }
 
 static bool RegistryKeyExists(string keyPath)

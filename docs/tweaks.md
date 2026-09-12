@@ -48,7 +48,9 @@ App removals use `Remove-AppxPackage -AllUsers` + de-provisioning. **Undo = rein
 | Remove Get Help & Tips | Balanced | `Microsoft.GetHelp`, `Microsoft.Getstarted`, `Microsoft.StartExperiencesApp` (Tips on 24H2/25H2) |
 | Remove Xbox Apps & Overlay | Aggressive | Xbox app family + Game DVR off (`GameDVR_Enabled = 0`, `AllowGameDVR = 0`) |
 | Disable Copilot / Windows AI | Aggressive | `TurnOffWindowsCopilot = 1` (HKLM + HKCU) + taskbar button off |
-| Disable Windows AI & Recall | Aggressive | `WindowsAI!DisableAIDataAnalysis = 1` (HKLM + HKCU), `AllowRecallEnablement = 0`, `TurnOffSavingSnapshots = 1`, Notepad AI off, AI Settings page hidden |
+| Disable Windows AI & Recall | Aggressive | `WindowsAI!DisableAIDataAnalysis = 1` (HKLM + HKCU), `AllowRecallEnablement = 0`, `AllowRecallExport = 0`, Notepad AI off, AI Settings page hidden |
+| Disable Click to Do | Balanced | `WindowsAI!DisableClickToDo = 1` (HKLM + HKCU) - the AI overlay on selected text/images |
+| Disable Paint AI Features | Manual | `CurrentVersion\Policies\Paint!DisableCocreator / DisableImageCreator / DisableGenerativeFill = 1` |
 | Remove OneDrive | Aggressive | `OneDriveSetup /uninstall` + `DisableFileSyncNGSC = 1` (files stay on disk) |
 
 ## ⚙️ Services

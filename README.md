@@ -52,7 +52,7 @@ Selecting a preset only marks the toggles — **nothing changes until you click 
 > 📚 Full tweak reference with registry details: [docs/tweaks.md](docs/tweaks.md)
 
 <details>
-<summary>🔒 <b>Privacy & Telemetry</b> — 16 tweaks</summary>
+<summary>🔒 <b>Privacy & Telemetry</b> — 18 tweaks</summary>
 <br/>
 Telemetry (AllowTelemetry → 0), diagnostics data, DiagTrack service, outbound telemetry firewall block, Bing in Start Menu, silent app installs, Consumer Features, Delivery Optimization, background apps, Activity History, location tracking, app-launch tracking, Advertising ID, Windows Feedback, online speech recognition, inking/typing personalization, Compatibility-Appraiser & CEIP scheduled tasks.
 <br/><br/>
@@ -60,9 +60,9 @@ Telemetry (AllowTelemetry → 0), diagnostics data, DiagTrack service, outbound 
 </details>
 
 <details>
-<summary>📦 <b>Bloatware & Apps</b> — 17 tweaks</summary>
+<summary>📦 <b>Bloatware & Apps</b> — 20 tweaks</summary>
 <br/>
-Candy Crush, TikTok/Facebook/X/Instagram, Netflix/Disney+/Prime/Spotify, Skype, Clipchamp, Paint 3D & 3D Viewer, To Do, Groove/Movies & TV, Solitaire, Wallet, Whiteboard, Phone Link, Dev Home, Get Help & Tips, Xbox suite + Game DVR, Copilot, Windows AI & Recall, OneDrive.
+Candy Crush, TikTok/Facebook/X/Instagram, Netflix/Disney+/Prime/Spotify, Skype, Clipchamp, Paint 3D & 3D Viewer, To Do, Groove/Movies & TV, Solitaire, Wallet, Whiteboard, Phone Link, Dev Home, Get Help & Tips, Xbox suite + Game DVR, Copilot, Windows AI & Recall, Click to Do, Paint's AI features, OneDrive.
 <br/><br/>
 <img src="docs/screenshots/apps.png" width="800"/>
 </details>

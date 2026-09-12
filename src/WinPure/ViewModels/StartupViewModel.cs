@@ -88,8 +88,22 @@ public sealed class StartupViewModel : PageViewModel
         IsEmpty = Items.Count == 0;
     }
 
+    private bool _userGuardAccepted;
+
     private void OnToggled(StartupItemViewModel item, bool enabled)
     {
+        // Every entry here lives under the signed-in user's registry or Startup folder. When
+        // WinPure runs as another account, ask once per session before writing to the wrong profile.
+        if (!_userGuardAccepted)
+        {
+            if (!Main.ConfirmDespiteGuards("change startup apps", g => g.Id == SystemGuards.DifferentUserId))
+            {
+                item.SetEnabledSilently(!enabled);
+                return;
+            }
+            _userGuardAccepted = true;
+        }
+
         // Turning an entry OFF is "applying" the tweak; turning it back on is reverting it.
         var tweak = BuildTweak(item.Entry);
         var results = _engine.ApplyChanges(new[] { (tweak, apply: !enabled) });

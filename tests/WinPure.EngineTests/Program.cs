@@ -54,6 +54,12 @@ failures += TheStartupScannerFindsWhatWindowsHas() ? 0 : 1;
 failures += AnOptionalActionCannotFailTheWholeTweak() ? 0 : 1;
 failures += TheDocsAgreeWithTheCatalog() ? 0 : 1;
 failures += AFailedBackupIsNeverExcusedAsAnOptionalAction() ? 0 : 1;
+failures += DifferentUserGuardFiresOnlyOnARealMismatch() ? 0 : 1;
+failures += RebootGuardFiresOnAnySingleSignal() ? 0 : 1;
+failures += BitLockerGuardFiresOnlyMidOperation() ? 0 : 1;
+failures += CoreAppsGuardIgnoresAFailedListing() ? 0 : 1;
+failures += EventLogGuardFiresOnlyWhenStopped() ? 0 : 1;
+failures += GuardInputsReadThisMachineCorrectly() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
 
@@ -242,6 +248,116 @@ bool OnlySafeRepairsOfferCancel()
         ok,
         $"repair-system-files cancellable={systemFiles?.Cancellable.ToString() ?? "(missing)"}, " +
         $"the other {others.Count} tools cancellable={others.All(t => t.Cancellable)}");
+}
+
+// ---------------------------------------------------------------- pre-apply guards
+// Each guard is judged against made-up facts, so it can be tested without a real machine in a
+// bad state. Every test checks both directions: a guard that fires on a healthy system trains
+// users to click "Continue" without reading, which is worse than having no guard at all.
+
+static GuardInputs HealthyInputs() => new()
+{
+    SessionUser = @"PC\alice",
+    ProcessUser = @"PC\alice",
+    PendingRebootSignals = Array.Empty<string>(),
+    BitLockerStatus = "FullyDecrypted",
+    EventLogStatus = "Running",
+    AppsQueryOk = true,
+    InstalledPackages = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        { "Microsoft.WindowsStore", "MicrosoftWindows.Client.CBS" },
+};
+
+static bool Fires(GuardInputs facts, string id) => SystemGuards.Evaluate(facts).Any(w => w.Id == id);
+
+bool DifferentUserGuardFiresOnlyOnARealMismatch()
+{
+    var h = HealthyInputs();
+    bool healthyIsSilent = SystemGuards.Evaluate(h).Count == 0;
+    bool mismatch = Fires(h with { ProcessUser = @"PC\Administrator" }, SystemGuards.DifferentUserId);
+    bool caseOnly = Fires(h with { ProcessUser = @"pc\ALICE" }, SystemGuards.DifferentUserId);
+    bool unknown = Fires(h with { SessionUser = null }, SystemGuards.DifferentUserId);
+
+    return Report("the different-user guard fires only on a real mismatch",
+        healthyIsSilent && mismatch && !caseOnly && !unknown,
+        $"healthy system silent={healthyIsSilent}, other account fires={mismatch}, " +
+        $"same account in other case silent={!caseOnly}, unreadable session silent={!unknown}");
+}
+
+// Sophia's version needs all five keys at once ([Array]::TrueForAll) and so never fires.
+bool RebootGuardFiresOnAnySingleSignal()
+{
+    var h = HealthyInputs();
+    bool one = Fires(h with { PendingRebootSignals = new[] { "Windows Update needs a restart" } }, "reboot-pending");
+    bool none = Fires(h, "reboot-pending");
+
+    return Report("the reboot guard fires on any single pending signal",
+        one && !none,
+        $"one signal fires={one} (a require-all-five version never would), no signal silent={!none}");
+}
+
+bool BitLockerGuardFiresOnlyMidOperation()
+{
+    var h = HealthyInputs();
+    bool encrypting = Fires(h with { BitLockerStatus = "EncryptionInProgress" }, "bitlocker-busy");
+    bool paused = Fires(h with { BitLockerStatus = "DecryptionPaused" }, "bitlocker-busy");
+    bool encrypted = Fires(h with { BitLockerStatus = "FullyEncrypted" }, "bitlocker-busy");
+    bool unknown = Fires(h with { BitLockerStatus = null }, "bitlocker-busy");
+
+    return Report("the BitLocker guard fires only while the drive is mid-operation",
+        encrypting && paused && !encrypted && !unknown,
+        $"encrypting fires={encrypting}, paused fires={paused}, fully encrypted silent={!encrypted}, " +
+        $"unreadable (Home, or no elevation) silent={!unknown}");
+}
+
+// The same trap the scan fell into once: an empty list from a failed query is not evidence.
+bool CoreAppsGuardIgnoresAFailedListing()
+{
+    var h = HealthyInputs();
+    var empty = new HashSet<string>();
+    bool failedListing = Fires(h with { AppsQueryOk = false, InstalledPackages = empty }, "core-apps-missing");
+    bool reallyMissing = Fires(h with { InstalledPackages = empty }, "core-apps-missing");
+    bool present = Fires(h, "core-apps-missing");
+
+    return Report("the core-apps guard ignores a failed app listing",
+        !failedListing && reallyMissing && !present,
+        $"failed listing silent={!failedListing}, really missing fires={reallyMissing}, both present silent={!present}");
+}
+
+bool EventLogGuardFiresOnlyWhenStopped()
+{
+    var h = HealthyInputs();
+    bool stopped = Fires(h with { EventLogStatus = "Stopped" }, "eventlog-stopped");
+    bool unknown = Fires(h with { EventLogStatus = null }, "eventlog-stopped");
+    bool running = Fires(h, "eventlog-stopped");
+
+    return Report("the Event Log guard fires only when the service is stopped",
+        stopped && !unknown && !running,
+        $"stopped fires={stopped}, running silent={!running}, unreadable silent={!unknown}");
+}
+
+// The different-user guard compares two names that come from two different APIs: the session
+// user from wtsapi32 and the process identity from .NET. If their formats disagreed — "alice"
+// against "PC\alice" — the guard would fire on EVERY machine for every user. On the machine
+// running the tests, signed in as the same account that runs them, the two must be identical.
+bool GuardInputsReadThisMachineCorrectly()
+{
+    var facts = GuardInputs.Gather(ScanContext.Gather());
+    var warnings = SystemGuards.Evaluate(facts);
+
+    bool sameFormat = facts.SessionUser is null
+        || facts.SessionUser.Equals(facts.ProcessUser, StringComparison.OrdinalIgnoreCase);
+
+    Console.WriteLine();
+    Console.WriteLine("Pre-apply guards on this machine (informational):");
+    Console.WriteLine($"  session user={facts.SessionUser ?? "(unreadable)"}  process user={facts.ProcessUser ?? "(unreadable)"}");
+    Console.WriteLine($"  BitLocker={facts.BitLockerStatus ?? "(unreadable)"}  EventLog={facts.EventLogStatus ?? "(unreadable)"}  " +
+                      $"pending-restart signals={facts.PendingRebootSignals.Count}");
+    Console.WriteLine(warnings.Count == 0 ? "  no warnings" : string.Join(Environment.NewLine, warnings.Select(w => $"  [{w.Severity}] {w.Title}: {w.Detail}")));
+
+    return Report("guard inputs read this machine in a consistent format",
+        sameFormat,
+        $"session '{facts.SessionUser}' vs process '{facts.ProcessUser}' — they must match when both are readable, " +
+        "or the different-user guard would fire for everyone");
 }
 
 // The forgiveness granted to an optional action must never extend to the backup itself.

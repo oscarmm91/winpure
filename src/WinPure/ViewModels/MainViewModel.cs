@@ -199,15 +199,27 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             // Registry-backed tweaks resolve instantly; Appx/tasks/power need one PS pass.
-            var ctx = await Task.Run(ScanContext.Gather);
+            var (ctx, guards) = await Task.Run(() =>
+            {
+                // Started alongside the scan rather than after it: it is its own PowerShell call,
+                // and waiting for it in sequence would add its whole duration to every scan.
+                var bitLocker = Task.Run(GuardInputs.ReadBitLockerStatus);
+                var c = ScanContext.Gather();
+                return (c, SystemGuards.Evaluate(GuardInputs.Gather(c, bitLocker)));
+            });
             _scanContext = ctx;
+            _guards = guards;
+            foreach (var g in guards) LogService.Log($"Guard: {g.Title} — {g.Detail}");
             foreach (var tweak in AllTweaks)
                 tweak.RefreshStatus(_engine, ctx);
             _startup.Load(ctx);
             UpdatePendingCount();
             UpdateDashboard();
             int undetected = AllTweaks.Count(t => t.Status == TweakStatus.Unknown);
-            StatusText = ctx.Warnings.Count == 0
+            StatusText = ctx.Warnings.Count == 0 && guards.Count > 0
+                // Kept short: this text shares the status bar with the apply hint.
+                ? $"Scan complete — {guards.Count} system warning{(guards.Count == 1 ? "" : "s")}, shown before applying."
+                : ctx.Warnings.Count == 0
                 ? $"Scan complete. {_dashboard.OptimizedCount} of {_dashboard.TotalCount} tweaks already optimized."
                 // Name what could not be checked. "Some states are unknown" told the user
                 // nothing, and an undetected tweak used to look exactly like an optimized one.
@@ -254,6 +266,29 @@ public sealed class MainViewModel : ObservableObject
             : $"{level} preset selected, keeping {keptManual} manual selection{(keptManual == 1 ? "" : "s")} — review and click Apply Changes.";
     }
 
+    // ---------------------------------------------------------------- guards
+
+    private List<GuardWarning> _guards = new();
+
+    /// <summary>
+    /// A brake, not a banner: a warning that only prints stops working the moment the next step
+    /// is one click away. Returns true when there is nothing to warn about or the user chose to
+    /// go ahead anyway. The default button is No.
+    /// </summary>
+    internal bool ConfirmDespiteGuards(string what, Func<GuardWarning, bool>? only = null)
+    {
+        var relevant = _guards.Where(g => only is null || only(g)).ToList();
+        if (relevant.Count == 0) return true;
+
+        var answer = MessageBox.Show(
+            $"Before you {what}, WinPure found:\n\n{SystemGuards.Describe(relevant)}\n\nContinue anyway?",
+            "WinPure — Check before continuing", MessageBoxButton.YesNo, MessageBoxImage.Warning,
+            MessageBoxResult.No);
+        bool go = answer == MessageBoxResult.Yes;
+        LogService.Log($"Guards shown before '{what}' ({string.Join(", ", relevant.Select(g => g.Id))}): user chose {(go ? "to continue" : "to stop")}");
+        return go;
+    }
+
     // ---------------------------------------------------------------- apply
 
     public async Task ApplyChangesAsync()
@@ -263,6 +298,7 @@ public sealed class MainViewModel : ObservableObject
             .Select(t => (t.Tweak, apply: t.IsSelected))
             .ToList();
         if (changes.Count == 0) return;
+        if (!ConfirmDespiteGuards("apply these changes")) return;
 
         var irreversible = changes.Where(c => c.apply && !c.Tweak.FullyReversible).ToList();
         if (irreversible.Count > 0)
@@ -322,6 +358,9 @@ public sealed class MainViewModel : ObservableObject
 
     private async void RestoreSession(BackupSessionViewModel vm)
     {
+        // Restoring as the wrong user writes the per-user half of the backup into the wrong profile.
+        if (!ConfirmDespiteGuards("restore this backup", g => g.Id == SystemGuards.DifferentUserId)) return;
+
         var answer = MessageBox.Show(
             $"Restore the snapshot from {vm.Title}?\nAll {vm.Session.Entries.Count} captured values will be written back.",
             "WinPure — Restore backup", MessageBoxButton.YesNo, MessageBoxImage.Question);

@@ -23,6 +23,16 @@ A page that lists everything that starts with Windows and lets you switch any of
 - Backups are written atomically, and unreadable backup files are logged instead of quietly disappearing from the Restore page.
 - New `tests/WinPure.EngineTests` project covering the backup/revert engine, the scan, the catalog and the repair tools, run on every CI build.
 
+### Checks before changing anything
+
+WinPure now looks at the state of the system on every scan and, if something is wrong, tells you **before** applying — with the default answer set to *No*. It never refuses to run: someone fixing another person's PC, or who turned a service off on purpose, can still go ahead.
+
+- **Running as a different user.** Elevating with a second administrator account sends every per-user tweak and every Startup change to *that* account's profile, and a restore would follow it there. Also checked before restoring a backup and before the first Startup change.
+- **A restart is pending** — from Windows servicing, Windows Update, or files queued for replacement. Changes applied now can be overwritten when Windows finishes. (Sophia Script's version of this check requires all five of its signals at once, so it effectively never fires; this one fires on any.)
+- **BitLocker is encrypting or decrypting** the system drive. Read-only: WinPure will never offer to decrypt a drive.
+- **Core Windows app components are missing** — a sign another tool already removed them, and that removing more apps may break Start or Settings. Only judged when the app listing actually succeeded.
+- **The Event Log service is stopped**, which is rarely deliberate and usually means another tool has been here.
+
 ### Interface
 
 - Long repairs now show **elapsed time**, so a 25-minute SFC no longer looks like a frozen app, and the ones that are safe to interrupt gained a **Cancel** button. SFC + DISM deliberately has none: killing it midway can leave Windows' component store inconsistent.

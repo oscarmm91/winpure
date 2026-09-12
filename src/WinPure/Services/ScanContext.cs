@@ -124,6 +124,10 @@ public sealed class ScanContext
                 $r.onedrive = [bool]((Test-Path "$env:ProgramFiles\Microsoft OneDrive\OneDrive.exe") -or (Test-Path "$env:LOCALAPPDATA\Microsoft\OneDrive\OneDrive.exe"))
             } catch { }
 
+            # For the pre-apply guards: a .NET enum name, so it reads the same on a Spanish Windows.
+            # BitLocker is deliberately NOT queried here - see GuardInputs.ReadBitLockerStatus.
+            try { $r.eventLog = [string](Get-Service -Name EventLog).Status } catch { }
+
             $r | ConvertTo-Json -Depth 4 -Compress
             """;
 
@@ -163,7 +167,7 @@ public sealed class ScanContext
                         t.TryGetProperty("enabled", out var en) && en.GetBoolean()));
                 }
 
-            foreach (var key in new[] { "hibernate", "powerplan" })
+            foreach (var key in new[] { "hibernate", "powerplan", "eventLog" })
                 if (root.TryGetProperty(key, out var v) && v.GetString() is { } s) ctx.Extras[key] = s;
             if (root.TryGetProperty("fwTelemetryBlock", out var fw)) ctx.Extras["fwTelemetryBlock"] = fw.GetBoolean() ? "1" : "0";
             if (root.TryGetProperty("onedrive", out var od)) ctx.Extras["onedrive"] = od.GetBoolean() ? "1" : "0";

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
 using Microsoft.Win32;
 using WinPure.Models;
@@ -115,6 +116,8 @@ public sealed class MainViewModel : ObservableObject
         ApplyCommand = new RelayCommand(_ => _ = ApplyChangesAsync(), _ => !IsBusy && PendingCount > 0);
         RescanCommand = new RelayCommand(_ => _ = ScanAsync(), _ => !IsBusy);
         SelectPresetCommand = new RelayCommand(p => SelectPreset((PresetLevel)p!), _ => !IsBusy);
+        ExportConfigCommand = new RelayCommand(_ => ExportConfigToFile(), _ => !IsBusy);
+        ImportConfigCommand = new RelayCommand(_ => ImportConfigFromFile(), _ => !IsBusy);
     }
 
     private void AddCategory(string label, string glyph, TweakCategory category, string title, string subtitle)
@@ -186,6 +189,8 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand ApplyCommand { get; }
     public RelayCommand RescanCommand { get; }
     public RelayCommand SelectPresetCommand { get; }
+    public RelayCommand ExportConfigCommand { get; }
+    public RelayCommand ImportConfigCommand { get; }
 
     private void UpdatePendingCount() => PendingCount = AllTweaks.Count(t => t.IsDirty);
 
@@ -268,6 +273,87 @@ public sealed class MainViewModel : ObservableObject
         StatusText = keptManual == 0
             ? $"{level} preset selected — review and click Apply Changes."
             : $"{level} preset selected, keeping {keptManual} manual selection{(keptManual == 1 ? "" : "s")} — review and click Apply Changes.";
+    }
+
+    // ---------------------------------------------------------------- configuration files
+
+    private void ExportConfigToFile()
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export WinPure configuration",
+            Filter = "WinPure configuration (*.json)|*.json",
+            FileName = $"winpure-config-{DateTime.Now:yyyy-MM-dd}.json",
+            AddExtension = true,
+        };
+        if (dialog.ShowDialog() != true) return;
+
+        try
+        {
+            var ids = AllTweaks.Where(t => t.IsSelected).Select(t => t.Tweak.Id).ToList();
+            string version = typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "";
+            File.WriteAllText(dialog.FileName, ConfigFile.Serialize(ids, version));
+            StatusText = $"Configuration exported — {ids.Count} tweak{(ids.Count == 1 ? "" : "s")} switched on.";
+            LogService.Log($"Configuration exported to {dialog.FileName} ({ids.Count} tweaks).");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show($"The configuration could not be saved:\n\n{ex.Message}", "WinPure — Export configuration",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void ImportConfigFromFile()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Import WinPure configuration",
+            Filter = "WinPure configuration (*.json)|*.json|All files (*.*)|*.*",
+        };
+        if (dialog.ShowDialog() != true) return;
+
+        try
+        {
+            // Checked before reading, so a huge file picked by mistake is never loaded into memory.
+            if (new FileInfo(dialog.FileName).Length > ConfigFile.MaxChars * 4L)
+                throw new InvalidDataException("This file is too large to be a WinPure configuration.");
+            ImportConfig(File.ReadAllText(dialog.FileName));
+            LogService.Log($"Configuration imported from {dialog.FileName}: {StatusText}");
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(ex.Message, "WinPure — Import configuration", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    /// <summary>
+    /// Ticks the tweaks a configuration file lists. It never unticks anything — so an import can never
+    /// schedule a revert — and never applies: that stays the user's click, with the usual checks and
+    /// the confirmation for app removals. Returns how many were ticked, already on, and unknown.
+    /// </summary>
+    internal (int Ticked, int AlreadyOn, int Unknown) ImportConfig(string json)
+    {
+        var parsed = ConfigFile.Parse(json, AllTweaks.Select(t => t.Tweak.Id));
+        var byId = AllTweaks.ToDictionary(t => t.Tweak.Id, StringComparer.Ordinal);
+
+        int ticked = 0, alreadyOn = 0, removesApps = 0;
+        foreach (var id in parsed.KnownIds)
+        {
+            var tweak = byId[id];
+            if (tweak.IsSelected) { alreadyOn++; continue; }
+            tweak.IsSelected = true;
+            ticked++;
+            if (!tweak.FullyReversible) removesApps++;
+        }
+        ActivePreset = null;
+
+        // Kept short: the status bar shares its row with the apply hint.
+        StatusText = $"Imported: {ticked} ticked"
+            + (alreadyOn > 0 ? $", {alreadyOn} already on" : "")
+            + (removesApps > 0 ? $", {removesApps} remove apps" : "")
+            + (parsed.UnknownIds.Count > 0 ? $", {parsed.UnknownIds.Count} unknown skipped" : "")
+            + " — review, then Apply Changes.";
+        return (ticked, alreadyOn, parsed.UnknownIds.Count);
     }
 
     // ---------------------------------------------------------------- guards

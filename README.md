@@ -25,6 +25,7 @@
 - 🛡 **It never breaks your system.** Every registry value, service and scheduled task is snapshotted **before** it is touched. One click in the *Restore* page rolls anything back.
 - ⚡ **One-click presets** — *Safe*, *Balanced* and *Aggressive* — or full manual control, tweak by tweak. Mix both freely.
 - 🔍 **Honest state detection.** On launch WinPure scans your system and shows what is *already optimized* vs *not applied*. No fake "boost" buttons.
+- 📤 **Export / import your configuration** — tick the same tweaks on another PC from one small file. Importing only ticks boxes; nothing changes until you click Apply.
 - 🧰 **Repair toolbox built in** — SFC + DISM, Windows Update reset, network reset, restore points and temp cleanup.
 - 📴 **100 % offline & portable.** A single .exe — no installer, no .NET needed, no telemetry of its own, runs from a USB stick.
 - 🆓 **MIT licensed.** Free for everyone, forever.

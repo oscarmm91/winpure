@@ -80,6 +80,8 @@ failures += EveryScheduledTaskIsWatched() ? 0 : 1;
 failures += AFailedFeatureScanIsUnknownNotOptimized() ? 0 : 1;
 failures += RevertingAFeatureRestoresItsRecordedState() ? 0 : 1;
 failures += ATamperedFeatureInABackupIsRefused() ? 0 : 1;
+failures += AConfigFileRoundTripsAndRejectsForeignFiles() ? 0 : 1;
+failures += ImportingTicksButNeverUnticksOrApplies() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
 
@@ -781,6 +783,70 @@ bool ATamperedFeatureInABackupIsRefused()
             $"failures={failures} (expected 2), writes that reached DISM={features.Writes.Count} (expected 0)");
     }
     finally { OptionalFeatures.Backend = real; }
+}
+
+// A configuration file can come from anyone, so everything that is not a WinPure configuration this
+// version can read is refused with a message, and ids this version does not know are set aside.
+bool AConfigFileRoundTripsAndRejectsForeignFiles()
+{
+    var catalog = new[] { "privacy-telemetry", "ui-dark-mode", "apps-xbox" };
+    var problems = new List<string>();
+
+    var back = ConfigFile.Parse(ConfigFile.Serialize(new[] { "ui-dark-mode", "privacy-telemetry", "from-a-newer-version" }, "1.2.0"), catalog);
+    if (!back.KnownIds.OrderBy(i => i).SequenceEqual(new[] { "privacy-telemetry", "ui-dark-mode" }))
+        problems.Add($"round trip gave [{string.Join(",", back.KnownIds)}]");
+    if (!back.UnknownIds.SequenceEqual(new[] { "from-a-newer-version" }))
+        problems.Add($"unknown ids were [{string.Join(",", back.UnknownIds)}]");
+
+    var foreign = new (string what, string json)[]
+    {
+        ("not JSON", "this is not json"),
+        ("another app's file", """{"App":"SomethingElse","Format":1,"Tweaks":["ui-dark-mode"]}"""),
+        ("no app name", """{"Format":1,"Tweaks":["ui-dark-mode"]}"""),
+        ("a future format", """{"App":"WinPure","Format":2,"Tweaks":["ui-dark-mode"]}"""),
+        ("a wrong type", """{"App":"WinPure","Format":"one"}"""),
+        ("a huge file", "{\"App\":\"WinPure\",\"Format\":1,\"Tweaks\":[\"" + new string('a', ConfigFile.MaxChars) + "\"]}"),
+    };
+    foreach (var (what, json) in foreign)
+    {
+        try
+        {
+            ConfigFile.Parse(json, catalog);
+            problems.Add($"{what} was accepted");
+        }
+        catch (InvalidDataException) { }
+        catch (Exception ex) { problems.Add($"{what} threw {ex.GetType().Name} instead of a readable refusal"); }
+    }
+
+    return Report("a configuration file round-trips and foreign files are refused",
+        problems.Count == 0,
+        problems.Count == 0 ? $"round trip exact, 1 unknown id set aside, {foreign.Length} kinds of foreign file refused" : string.Join(" | ", problems));
+}
+
+// Importing ticks boxes and nothing else. Unticking what the file does not list would schedule a
+// revert on the next Apply, and applying on import would take the decision away from the user.
+bool ImportingTicksButNeverUnticksOrApplies()
+{
+    Reset();
+    var main = new WinPure.ViewModels.MainViewModel();
+    var handNotInFile = main.AllTweaks[0];   // ticked by hand, absent from the file: must stay ticked
+    var handInFile = main.AllTweaks[1];      // ticked by hand and listed: counts as already on
+    var inFile = main.AllTweaks[2];          // listed and not ticked: gets ticked
+    handNotInFile.IsSelected = true;
+    handInFile.IsSelected = true;
+
+    int backupsBefore = Directory.Exists(scratch) ? Directory.GetFiles(scratch).Length : 0;
+    var (ticked, alreadyOn, unknown) = main.ImportConfig(
+        ConfigFile.Serialize(new[] { inFile.Tweak.Id, handInFile.Tweak.Id, "not-in-this-version" }, "1.2.0"));
+    int backupsAfter = Directory.Exists(scratch) ? Directory.GetFiles(scratch).Length : 0;
+
+    bool untouchedStayOff = main.AllTweaks.Skip(3).All(t => !t.IsSelected);
+    return Report("importing ticks boxes but never unticks or applies",
+        inFile.IsSelected && handNotInFile.IsSelected && handInFile.IsSelected && untouchedStayOff &&
+        ticked == 1 && alreadyOn == 1 && unknown == 1 && backupsAfter == backupsBefore,
+        $"listed tweak ticked={inFile.IsSelected}, hand-ticked but not listed still ticked={handNotInFile.IsSelected} (expected True), " +
+        $"nothing else ticked={untouchedStayOff}, counts ticked/alreadyOn/unknown={ticked}/{alreadyOn}/{unknown} (expected 1/1/1), " +
+        $"backups written={backupsAfter - backupsBefore} (expected 0)");
 }
 
 // The forgiveness granted to an optional action must never extend to the backup itself.

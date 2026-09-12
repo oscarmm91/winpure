@@ -109,6 +109,29 @@
                     <TextBlock Text="Rescan system" Margin="8,0,0,0"/>
                 </StackPanel>
             </Button>
+
+            <!-- configuration files -->
+            <DockPanel Margin="0,28,0,10">
+                <TextBlock Text="Configuration" DockPanel.Dock="Left" FontSize="12.5"
+                           Foreground="{StaticResource Brush.TextSecondary}"/>
+                <Separator Margin="14,0,0,0" Background="{StaticResource Brush.Divider}"/>
+            </DockPanel>
+            <TextBlock FontSize="12" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap"
+                       Text="Save which tweaks are switched on, then tick the same ones on another PC. Importing only ticks boxes and never unticks any — nothing changes until you click Apply Changes."/>
+            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                <Button Style="{StaticResource SubtleButton}" Command="{Binding Main.ExportConfigCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xEDE1;" FontFamily="{StaticResource Font.Icon}" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Text="Export configuration" Margin="8,0,0,0"/>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource SubtleButton}" Margin="10,0,0,0" Command="{Binding Main.ImportConfigCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE8B5;" FontFamily="{StaticResource Font.Icon}" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Text="Import configuration" Margin="8,0,0,0"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

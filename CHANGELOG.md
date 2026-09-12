@@ -50,6 +50,14 @@ WinPure now looks at the state of the system on every scan and, if something is 
 - New: **Disable Reserved Storage** (in no preset), with the same record-and-restore undo.
 - A setting read back from a backup file is checked before anything runs, so an edited backup cannot make WinPure — which runs as administrator — execute something else.
 
+### New: export and import your configuration
+
+Two buttons on the Dashboard save which tweaks are switched on to a small JSON file, and tick the same ones on another PC.
+
+- The file holds tweak names only — no values, paths or commands — so a configuration from anyone can at most tick boxes.
+- Importing never unticks anything and never applies anything: you review the ticks and click Apply Changes, with the usual checks and the confirmation for app removals. Tweaks this version does not know are skipped and counted.
+- Different from a backup, which rolls back this PC.
+
 ### New: Windows Features
 
 A new page for Windows' optional features, switched with DISM and undone to the state each one had:

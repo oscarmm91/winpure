@@ -91,6 +91,7 @@ public sealed class RepairViewModel : PageViewModel
     private async Task RunAsync(RepairToolViewModel vm)
     {
         var tool = vm.Tool;
+        if (!Main.ConfirmDespiteGuards($"run \"{tool.Name}\"", SystemGuards.ForRepair)) return;
         if (tool.ConfirmText is not null)
         {
             var answer = MessageBox.Show(tool.ConfirmText, $"WinPure — {tool.Name}",
@@ -104,7 +105,10 @@ public sealed class RepairViewModel : PageViewModel
         LogService.Log($"Repair started: {tool.Name}");
         try
         {
-            var result = await Task.Run(() => PowerShellRunner.Run(tool.Script, tool.TimeoutMs, token));
+            // A tool that is safe to cancel may also die with the app. One that is not — SFC/DISM —
+            // keeps running if WinPure is closed: killing DISM midway is the harm Cancellable exists
+            // to prevent, and closing the window must not do it through the back door.
+            var result = await Task.Run(() => PowerShellRunner.Run(tool.Script, tool.TimeoutMs, token, dieWithApp: tool.Cancellable));
             string elapsed = RepairToolViewModel.Format(vm.Elapsed);
             string lastLine = result.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
                 .LastOrDefault()?.Trim() ?? "";

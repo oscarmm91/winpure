@@ -91,6 +91,7 @@ public static class RepairCatalog
         new RepairTool
         {
             Id = "repair-temp-files",
+            ConfirmText = "This deletes everything in your temporary folder and in the Windows Temp folder. Files that are in use are skipped. Continue?",
             Name = "Clean Temporary Files",
             Description = "Delete user and system temp files to free disk space.",
             Icon = "",

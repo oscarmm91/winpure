@@ -31,6 +31,12 @@ if (args.Length > 0 && args[0] == "crash-child")
     return 0;
 }
 
+if (args.Length > 1 && args[0] == "orphan-child")
+{
+    RunOrphanChild(args[1]);
+    return 0;
+}
+
 int failures = 0;
 Console.WriteLine("=== WinPure engine tests ===");
 Console.WriteLine($"scratch backups: {scratch}");
@@ -60,6 +66,10 @@ failures += BitLockerGuardFiresOnlyMidOperation() ? 0 : 1;
 failures += CoreAppsGuardIgnoresAFailedListing() ? 0 : 1;
 failures += EventLogGuardFiresOnlyWhenStopped() ? 0 : 1;
 failures += GuardInputsReadThisMachineCorrectly() ? 0 : 1;
+failures += CoreAppsGuardKnowsLtscAndPartialListings() ? 0 : 1;
+failures += GatherNeverThrowsWhenTheBitLockerQueryFails() ? 0 : 1;
+failures += EachActionAsksOnlyTheGuardsThatConcernIt() ? 0 : 1;
+failures += AChildPowerShellDiesWithTheApp() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
 
@@ -259,10 +269,14 @@ static GuardInputs HealthyInputs() => new()
 {
     SessionUser = @"PC\alice",
     ProcessUser = @"PC\alice",
+    SessionSid = "S-1-5-21-1-1001",
+    ProcessSid = "S-1-5-21-1-1001",
     PendingRebootSignals = Array.Empty<string>(),
     BitLockerStatus = "FullyDecrypted",
     EventLogStatus = "Running",
     AppsQueryOk = true,
+    AppsListedForAllUsers = true,
+    EditionIsLtsc = false,
     InstalledPackages = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         { "Microsoft.WindowsStore", "MicrosoftWindows.Client.CBS" },
 };
@@ -273,14 +287,18 @@ bool DifferentUserGuardFiresOnlyOnARealMismatch()
 {
     var h = HealthyInputs();
     bool healthyIsSilent = SystemGuards.Evaluate(h).Count == 0;
-    bool mismatch = Fires(h with { ProcessUser = @"PC\Administrator" }, SystemGuards.DifferentUserId);
-    bool caseOnly = Fires(h with { ProcessUser = @"pc\ALICE" }, SystemGuards.DifferentUserId);
-    bool unknown = Fires(h with { SessionUser = null }, SystemGuards.DifferentUserId);
+    bool otherAccount = Fires(h with { ProcessUser = @"PC\Administrator", ProcessSid = "S-1-5-21-1-500" },
+        SystemGuards.DifferentUserId);
+    // The same person, named differently by the two APIs — what a Microsoft or Entra account can
+    // look like. Comparing names would fire here for every such user; comparing SIDs must not.
+    bool sameSidOtherName = Fires(h with { SessionUser = "alice", ProcessUser = @"MicrosoftAccount\alice@outlook.com" },
+        SystemGuards.DifferentUserId);
+    bool unknown = Fires(h with { SessionSid = null }, SystemGuards.DifferentUserId);
 
     return Report("the different-user guard fires only on a real mismatch",
-        healthyIsSilent && mismatch && !caseOnly && !unknown,
-        $"healthy system silent={healthyIsSilent}, other account fires={mismatch}, " +
-        $"same account in other case silent={!caseOnly}, unreadable session silent={!unknown}");
+        healthyIsSilent && otherAccount && !sameSidOtherName && !unknown,
+        $"healthy system silent={healthyIsSilent}, other account fires={otherAccount}, " +
+        $"same account with differently formatted names silent={!sameSidOtherName}, unreadable session silent={!unknown}");
 }
 
 // Sophia's version needs all five keys at once ([Array]::TrueForAll) and so never fires.
@@ -344,20 +362,156 @@ bool GuardInputsReadThisMachineCorrectly()
     var facts = GuardInputs.Gather(ScanContext.Gather());
     var warnings = SystemGuards.Evaluate(facts);
 
-    bool sameFormat = facts.SessionUser is null
-        || facts.SessionUser.Equals(facts.ProcessUser, StringComparison.OrdinalIgnoreCase);
+    bool sameAccount = facts.SessionSid is null
+        || facts.SessionSid.Equals(facts.ProcessSid, StringComparison.OrdinalIgnoreCase);
 
     Console.WriteLine();
     Console.WriteLine("Pre-apply guards on this machine (informational):");
-    Console.WriteLine($"  session user={facts.SessionUser ?? "(unreadable)"}  process user={facts.ProcessUser ?? "(unreadable)"}");
+    Console.WriteLine($"  session user={facts.SessionUser ?? "(unreadable)"} [{facts.SessionSid ?? "no SID"}]");
+    Console.WriteLine($"  process user={facts.ProcessUser ?? "(unreadable)"} [{facts.ProcessSid ?? "no SID"}]");
     Console.WriteLine($"  BitLocker={facts.BitLockerStatus ?? "(unreadable)"}  EventLog={facts.EventLogStatus ?? "(unreadable)"}  " +
-                      $"pending-restart signals={facts.PendingRebootSignals.Count}");
+                      $"pending-restart signals={facts.PendingRebootSignals.Count}  LTSC={facts.EditionIsLtsc}  " +
+                      $"apps listed for all users={facts.AppsListedForAllUsers}");
     Console.WriteLine(warnings.Count == 0 ? "  no warnings" : string.Join(Environment.NewLine, warnings.Select(w => $"  [{w.Severity}] {w.Title}: {w.Detail}")));
 
-    return Report("guard inputs read this machine in a consistent format",
-        sameFormat,
-        $"session '{facts.SessionUser}' vs process '{facts.ProcessUser}' — they must match when both are readable, " +
-        "or the different-user guard would fire for everyone");
+    return Report("guard inputs resolve the signed-in user to the same account",
+        sameAccount,
+        $"session SID '{facts.SessionSid}' vs process SID '{facts.ProcessSid}' — signed in and running as the same " +
+        "account, they must match, or the different-user guard would fire for everyone");
+}
+
+// LTSC ships without the Store on purpose, and the current-user fallback listing is not the
+// machine's list. Neither may produce a "missing components" warning.
+bool CoreAppsGuardKnowsLtscAndPartialListings()
+{
+    var h = HealthyInputs();
+    var shellOnly = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "MicrosoftWindows.Client.CBS" };
+    var nothing = new HashSet<string>();
+
+    bool ltscWithoutStore = Fires(h with { EditionIsLtsc = true, InstalledPackages = shellOnly }, SystemGuards.CoreAppsMissingId);
+    bool ltscWithoutShell = Fires(h with { EditionIsLtsc = true, InstalledPackages = nothing }, SystemGuards.CoreAppsMissingId);
+    bool proWithoutStore = Fires(h with { InstalledPackages = shellOnly }, SystemGuards.CoreAppsMissingId);
+    bool userOnlyListing = Fires(h with { AppsListedForAllUsers = false, InstalledPackages = nothing }, SystemGuards.CoreAppsMissingId);
+
+    return Report("the core-apps guard knows LTSC and partial listings",
+        !ltscWithoutStore && ltscWithoutShell && proWithoutStore && !userOnlyListing,
+        $"LTSC without Store silent={!ltscWithoutStore}, LTSC without shell fires={ltscWithoutShell}, " +
+        $"Pro without Store fires={proWithoutStore}, current-user-only listing silent={!userOnlyListing}");
+}
+
+// GuardInputs.Gather promises never to throw, and the scan that calls it has no catch: a failure
+// there would take the whole scan down. The BitLocker query is the one input that arrives as a
+// task, and a faulted task rethrows on .Result.
+bool GatherNeverThrowsWhenTheBitLockerQueryFails()
+{
+    var ctx = new ScanContext { Loaded = true, AppsQueryOk = true, TasksQueryOk = true };
+    try
+    {
+        var facts = GuardInputs.Gather(ctx, Task.FromException<string?>(new InvalidOperationException("simulated WMI failure")));
+        return Report("gathering guard facts survives a failed BitLocker query",
+            facts.BitLockerStatus is null,
+            $"returned normally with BitLocker status={facts.BitLockerStatus ?? "(unknown)"} (expected unknown)");
+    }
+    catch (Exception ex)
+    {
+        return Report("gathering guard facts survives a failed BitLocker query", false,
+            $"threw {ex.GetType().Name}: {ex.Message} — in the app this would take the whole scan down");
+    }
+}
+
+// A guard shown where it does not apply is noise, and noise teaches people to stop reading.
+bool EachActionAsksOnlyTheGuardsThatConcernIt()
+{
+    var everythingWrong = HealthyInputs() with
+    {
+        ProcessUser = @"PC\Administrator",
+        ProcessSid = "S-1-5-21-1-500",
+        PendingRebootSignals = new[] { "Windows Update needs a restart" },
+        BitLockerStatus = "EncryptionInProgress",
+        InstalledPackages = new HashSet<string>(),
+        EventLogStatus = "Stopped",
+    };
+    var all = SystemGuards.Evaluate(everythingWrong);
+
+    static string Ids(IEnumerable<GuardWarning> g) => string.Join(",", g.Select(w => w.Id).OrderBy(x => x, StringComparer.Ordinal));
+    string apply = Ids(SystemGuards.ForApply(all));
+    string restore = Ids(SystemGuards.ForRestore(all));
+    string startup = Ids(SystemGuards.ForStartup(all));
+    string repair = Ids(SystemGuards.ForRepair(all));
+    string expectedRepair = Ids(all.Where(w => w.Id is SystemGuards.DifferentUserId or SystemGuards.RebootPendingId or SystemGuards.BitLockerBusyId));
+
+    bool ok = all.Count == 5 && SystemGuards.ForApply(all).Count == 5
+        && restore == SystemGuards.DifferentUserId
+        && startup == SystemGuards.DifferentUserId
+        && repair == expectedRepair && SystemGuards.ForRepair(all).Count == 3;
+
+    return Report("each action asks only about the guards that concern it", ok,
+        $"all five fired={all.Count == 5}; apply=[{apply}]; restore=[{restore}]; startup=[{startup}]; repair=[{repair}]");
+}
+
+// Closing WinPure mid-scan used to leave powershell.exe running, with the timeout that should
+// have stopped it gone along with the app. A child test process starts a PowerShell and is then
+// killed WITHOUT its process tree — exactly what happens when the app dies — and the PowerShell
+// must not survive it.
+bool AChildPowerShellDiesWithTheApp()
+{
+    const string name = "a child PowerShell dies with the app";
+    string pidFile = Path.Combine(Path.GetTempPath(), $"winpure-orphan-{Environment.ProcessId}.pid");
+    string jobFile = pidFile + ".job";
+    foreach (var f in new[] { pidFile, jobFile }) { try { File.Delete(f); } catch { } }
+
+    var psi = new ProcessStartInfo(Environment.ProcessPath!, $"orphan-child \"{pidFile}\"") { UseShellExecute = false };
+    using var child = Process.Start(psi)!;
+
+    int pid = 0;
+    string job = "";
+    var clock = Stopwatch.StartNew();
+    while (clock.Elapsed < TimeSpan.FromSeconds(90) && (pid == 0 || job.Length == 0))
+    {
+        try { if (pid == 0 && File.Exists(pidFile)) int.TryParse(File.ReadAllText(pidFile).Trim(), out pid); } catch { }
+        try { if (job.Length == 0 && File.Exists(jobFile)) job = File.ReadAllText(jobFile).Trim(); } catch { }
+        Thread.Sleep(250);
+    }
+
+    if (pid == 0 || job.Length == 0)
+    {
+        try { child.Kill(entireProcessTree: true); } catch { }
+        return Report(name, false, $"the child never reported its PowerShell within 90 s (pid={pid}, job='{job}')");
+    }
+
+    child.Kill();                     // the app dies — deliberately NOT its process tree
+    child.WaitForExit(10_000);
+    Thread.Sleep(3_000);
+
+    bool survived = false;
+    try
+    {
+        using var ps = Process.GetProcessById(pid);
+        survived = !ps.HasExited;
+        if (survived) ps.Kill();      // clean up whatever the test left behind
+    }
+    catch (ArgumentException) { }     // no such process: it died, as it should
+    foreach (var f in new[] { pidFile, jobFile }) { try { File.Delete(f); } catch { } }
+
+    // A CI runner may refuse nested job objects; locally that would be a real regression.
+    if (job != "True" && Environment.GetEnvironmentVariable("CI") == "true")
+        return Report(name, true, "skipped on CI: this environment would not place the child in a job object");
+
+    return Report(name, !survived,
+        $"placed in the kill-on-close job={job}; PowerShell pid {pid} still alive after the app was killed={survived} (expected False)");
+}
+
+void RunOrphanChild(string pidFile)
+{
+    Task.Run(() => PowerShellRunner.Run(
+        $"Set-Content -LiteralPath '{pidFile}' -Value $PID; Start-Sleep -Seconds 120", timeoutMs: 180_000));
+
+    // PowerShell writes its PID only after it was started and placed in the job, so by then the
+    // assignment result is final.
+    var clock = Stopwatch.StartNew();
+    while (!File.Exists(pidFile) && clock.Elapsed < TimeSpan.FromSeconds(90)) Thread.Sleep(100);
+    File.WriteAllText(pidFile + ".job", PowerShellRunner.LastJobAssignOk.ToString());
+    Thread.Sleep(Timeout.Infinite);
 }
 
 // The forgiveness granted to an optional action must never extend to the backup itself.

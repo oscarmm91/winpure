@@ -23,6 +23,11 @@ public sealed class ScanContext
     public bool Loaded { get; internal set; }
     /// <summary>The installed-packages query succeeded. False → app detection is unknown, not empty.</summary>
     public bool AppsQueryOk { get; internal set; }
+    /// <summary>
+    /// True when the listing covered every user. False when it fell back to the current user's
+    /// packages — which, run as another account, are THAT account's apps, not the machine's.
+    /// </summary>
+    public bool AppsListedForAllUsers { get; internal set; }
     /// <summary>The scheduled-task query succeeded. False → task detection is unknown, not "disabled".</summary>
     public bool TasksQueryOk { get; internal set; }
     /// <summary>Human-readable list of what could not be determined, for the status bar.</summary>
@@ -173,6 +178,7 @@ public sealed class ScanContext
             if (root.TryGetProperty("onedrive", out var od)) ctx.Extras["onedrive"] = od.GetBoolean() ? "1" : "0";
 
             ctx.Loaded = true;
+            ctx.AppsListedForAllUsers = ctx.AppsQueryOk && Text(root, "appsScope") != "user";
 
             if (!ctx.AppsQueryOk)
             {

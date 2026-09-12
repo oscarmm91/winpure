@@ -44,8 +44,10 @@ public static class NativeMethods
     {
         string? user = QuerySession(sessionId, WtsUserName);
         if (string.IsNullOrEmpty(user)) return null;
+        // Without the domain the answer is incomplete, not "the same user": a bare name could
+        // resolve to a different account of the same name. Incomplete means unknown.
         string? domain = QuerySession(sessionId, WtsDomainName);
-        return string.IsNullOrEmpty(domain) ? user : $"{domain}\\{user}";
+        return string.IsNullOrEmpty(domain) ? null : $"{domain}\\{user}";
     }
 
     private static string? QuerySession(int sessionId, int infoClass)

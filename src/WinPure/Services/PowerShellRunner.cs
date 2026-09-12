@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace WinPure.Services;
@@ -19,7 +20,12 @@ public static class PowerShellRunner
     /// Output is drained asynchronously so a chatty or hung child can neither fill the
     /// pipe buffers nor outlive the timeout.
     /// </summary>
-    public static PsResult Run(string script, int timeoutMs = 120_000, CancellationToken cancel = default)
+    /// <param name="dieWithApp">
+    /// True (the default): the child is ended by Windows if WinPure exits or is killed. Pass false
+    /// only for work that must never be interrupted halfway, such as DISM repairing Windows.
+    /// </param>
+    public static PsResult Run(string script, int timeoutMs = 120_000, CancellationToken cancel = default,
+        bool dieWithApp = true)
     {
         try
         {
@@ -39,6 +45,7 @@ public static class PowerShellRunner
 
             using var p = Process.Start(psi);
             if (p is null) return new PsResult(-1, "", "Could not start powershell.exe");
+            if (dieWithApp) AssignToJob(p);
 
             // Read both streams on background threads: ReadToEnd() on a hung child blocks
             // forever and WaitForExit(timeout) below would never even be reached.
@@ -97,6 +104,89 @@ public static class PowerShellRunner
             : !string.IsNullOrWhiteSpace(result.Output) ? result.Output
             : $"exit code {result.ExitCode}";
         throw new InvalidOperationException($"{what} failed: {detail}");
+    }
+
+    // ---------------------------------------------------------------- kill-on-close job
+
+    /// <summary>
+    /// Whether the most recent child was placed in the job. Tests use it to tell "the job does
+    /// not work" apart from "this environment refuses nested jobs".
+    /// </summary>
+    internal static bool LastJobAssignOk { get; private set; }
+
+    private static readonly Lazy<IntPtr> ChildJob = new(CreateKillOnCloseJob);
+
+    /// <summary>
+    /// Children go into a Windows job object marked kill-on-close, whose only handle lives in this
+    /// process and is never closed by hand. When WinPure exits — or is killed — Windows closes that
+    /// handle and ends every child with it. Without this, closing the app mid-scan left
+    /// powershell.exe running, with the timeout that should have stopped it gone along with the app.
+    /// </summary>
+    private static void AssignToJob(Process p)
+    {
+        try
+        {
+            IntPtr job = ChildJob.Value;
+            LastJobAssignOk = job != IntPtr.Zero && AssignProcessToJobObject(job, p.Handle);
+            if (!LastJobAssignOk)
+                LogService.Log("Could not place PowerShell in the kill-on-close job; it may outlive the app.");
+        }
+        catch { LastJobAssignOk = false; }
+    }
+
+    private static IntPtr CreateKillOnCloseJob()
+    {
+        IntPtr job = CreateJobObject(IntPtr.Zero, null);
+        if (job == IntPtr.Zero) return IntPtr.Zero;
+        var info = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
+        info.BasicLimitInformation.LimitFlags = JobObjectLimitKillOnJobClose;
+        return SetInformationJobObject(job, JobObjectExtendedLimitInformation, ref info,
+            Marshal.SizeOf<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>()) ? job : IntPtr.Zero;
+    }
+
+    private const int JobObjectExtendedLimitInformation = 9;
+    private const uint JobObjectLimitKillOnJobClose = 0x2000;
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr CreateJobObject(IntPtr attributes, string? name);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetInformationJobObject(IntPtr job, int infoClass,
+        ref JOBOBJECT_EXTENDED_LIMIT_INFORMATION info, int length);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct JOBOBJECT_BASIC_LIMIT_INFORMATION
+    {
+        public long PerProcessUserTimeLimit;
+        public long PerJobUserTimeLimit;
+        public uint LimitFlags;
+        public UIntPtr MinimumWorkingSetSize;
+        public UIntPtr MaximumWorkingSetSize;
+        public uint ActiveProcessLimit;
+        public UIntPtr Affinity;
+        public uint PriorityClass;
+        public uint SchedulingClass;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct IO_COUNTERS
+    {
+        public ulong ReadOperationCount, WriteOperationCount, OtherOperationCount;
+        public ulong ReadTransferCount, WriteTransferCount, OtherTransferCount;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+    {
+        public JOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimitInformation;
+        public IO_COUNTERS IoInfo;
+        public UIntPtr ProcessMemoryLimit;
+        public UIntPtr JobMemoryLimit;
+        public UIntPtr PeakProcessMemoryUsed;
+        public UIntPtr PeakJobMemoryUsed;
     }
 
     private static void Kill(Process p)

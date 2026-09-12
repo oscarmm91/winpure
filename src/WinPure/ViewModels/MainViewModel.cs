@@ -223,7 +223,9 @@ public sealed class MainViewModel : ObservableObject
                 ? $"Scan complete. {_dashboard.OptimizedCount} of {_dashboard.TotalCount} tweaks already optimized."
                 // Name what could not be checked. "Some states are unknown" told the user
                 // nothing, and an undetected tweak used to look exactly like an optimized one.
-                : $"Scan incomplete — {string.Join("; ", ctx.Warnings)}. {undetected} tweak(s) could not be checked.";
+                : $"Scan incomplete — {string.Join("; ", ctx.Warnings)}. {undetected} tweak(s) could not be checked."
+                  // An incomplete scan must not hide the system warnings it did find.
+                  + (guards.Count > 0 ? $" {guards.Count} system warning{(guards.Count == 1 ? "" : "s")}." : "");
             LogService.Log(StatusText);
         }
         finally
@@ -275,9 +277,11 @@ public sealed class MainViewModel : ObservableObject
     /// is one click away. Returns true when there is nothing to warn about or the user chose to
     /// go ahead anyway. The default button is No.
     /// </summary>
-    internal bool ConfirmDespiteGuards(string what, Func<GuardWarning, bool>? only = null)
+    internal bool ConfirmDespiteGuards(string what, Func<IEnumerable<GuardWarning>, List<GuardWarning>>? select = null)
     {
-        var relevant = _guards.Where(g => only is null || only(g)).ToList();
+        // Which guards concern which action is decided in SystemGuards (ForApply, ForRestore,
+        // ForStartup, ForRepair), where it is tested — not in a lambda at each call site.
+        var relevant = (select ?? SystemGuards.ForApply)(_guards);
         if (relevant.Count == 0) return true;
 
         var answer = MessageBox.Show(
@@ -359,7 +363,7 @@ public sealed class MainViewModel : ObservableObject
     private async void RestoreSession(BackupSessionViewModel vm)
     {
         // Restoring as the wrong user writes the per-user half of the backup into the wrong profile.
-        if (!ConfirmDespiteGuards("restore this backup", g => g.Id == SystemGuards.DifferentUserId)) return;
+        if (!ConfirmDespiteGuards("restore this backup", SystemGuards.ForRestore)) return;
 
         var answer = MessageBox.Show(
             $"Restore the snapshot from {vm.Title}?\nAll {vm.Session.Entries.Count} captured values will be written back.",

@@ -96,7 +96,7 @@ public sealed class StartupViewModel : PageViewModel
         // WinPure runs as another account, ask once per session before writing to the wrong profile.
         if (!_userGuardAccepted)
         {
-            if (!Main.ConfirmDespiteGuards("change startup apps", g => g.Id == SystemGuards.DifferentUserId))
+            if (!Main.ConfirmDespiteGuards("change startup apps", SystemGuards.ForStartup))
             {
                 item.SetEnabledSilently(!enabled);
                 return;

@@ -86,6 +86,7 @@ failures += AConfigFileRoundTripsAndRejectsForeignFiles() ? 0 : 1;
 failures += ImportingTicksButNeverUnticksOrApplies() ? 0 : 1;
 failures += SearchFindsTweaksInEveryCategory() ? 0 : 1;
 failures += EachCategoryShowsItsPendingCount() ? 0 : 1;
+failures += ClickingTheSidebarLeavesSearch() ? 0 : 1;
 failures += AForgedBackupCannotReachBeyondWhatWinPureChanges() ? 0 : 1;
 failures += PowerShellQuotingDoublesEveryQuote() ? 0 : 1;
 failures += BackupsLiveWhereOnlyAdministratorsCanWrite() ? 0 : 1;
@@ -844,19 +845,24 @@ bool ImportingTicksButNeverUnticksOrApplies()
     var inFile = main.AllTweaks[2];          // listed and not ticked: gets ticked
     handNotInFile.IsSelected = true;
     handInFile.IsSelected = true;
+    // Two app removals, so the status bar's "remove apps" count cannot come out right by accident: with the
+    // condition inverted it would count the one reversible tweak ticked instead, and still say a number.
+    var removals = main.AllTweaks.Where(t => !t.FullyReversible && t != handNotInFile && t != handInFile && t != inFile).Take(2).ToList();
 
     int backupsBefore = Directory.Exists(scratch) ? Directory.GetFiles(scratch).Length : 0;
-    var (ticked, alreadyOn, unknown) = main.ImportConfig(
-        ConfigFile.Serialize(new[] { inFile.Tweak.Id, handInFile.Tweak.Id, "not-in-this-version" }, "1.2.0"));
+    var listed = new[] { inFile.Tweak.Id, handInFile.Tweak.Id, "not-in-this-version" }.Concat(removals.Select(r => r.Tweak.Id));
+    var (ticked, alreadyOn, unknown) = main.ImportConfig(ConfigFile.Serialize(listed, "1.2.0"));
     int backupsAfter = Directory.Exists(scratch) ? Directory.GetFiles(scratch).Length : 0;
 
-    bool untouchedStayOff = main.AllTweaks.Skip(3).All(t => !t.IsSelected);
+    var involved = new HashSet<WinPure.ViewModels.TweakViewModel>(removals) { handNotInFile, handInFile, inFile };
+    bool untouchedStayOff = main.AllTweaks.Where(t => !involved.Contains(t)).All(t => !t.IsSelected);
+    bool removalsAnnounced = main.StatusText.Contains("2 remove apps", StringComparison.Ordinal);
     return Report("importing ticks boxes but never unticks or applies",
-        inFile.IsSelected && handNotInFile.IsSelected && handInFile.IsSelected && untouchedStayOff &&
-        ticked == 1 && alreadyOn == 1 && unknown == 1 && backupsAfter == backupsBefore,
+        inFile.IsSelected && handNotInFile.IsSelected && handInFile.IsSelected && untouchedStayOff && removals.Count == 2 &&
+        ticked == 3 && alreadyOn == 1 && unknown == 1 && removalsAnnounced && backupsAfter == backupsBefore,
         $"listed tweak ticked={inFile.IsSelected}, hand-ticked but not listed still ticked={handNotInFile.IsSelected} (expected True), " +
-        $"nothing else ticked={untouchedStayOff}, counts ticked/alreadyOn/unknown={ticked}/{alreadyOn}/{unknown} (expected 1/1/1), " +
-        $"backups written={backupsAfter - backupsBefore} (expected 0)");
+        $"nothing else ticked={untouchedStayOff}, counts ticked/alreadyOn/unknown={ticked}/{alreadyOn}/{unknown} (expected 3/1/1), " +
+        $"status says '2 remove apps'={removalsAnnounced} ('{main.StatusText}'), backups written={backupsAfter - backupsBefore} (expected 0)");
 }
 
 // Search looks in every category, replaces the page while it has text, and shows the same tweaks
@@ -884,6 +890,30 @@ bool SearchFindsTweaksInEveryCategory()
         page is not null && allMatch && narrowed && categories >= 2 && sameToggle && backToStart,
         $"'GAME' => {results.Count} of {main.AllTweaks.Count} tweaks from {categories} categories, all mention it={allMatch}, " +
         $"ticking a result counts as pending={sameToggle}, cleared search returns to the start page={backToStart}");
+}
+
+// Clicking any sidebar entry while searching leaves the results — including the entry the search started
+// from, whose button was unchecked while searching. The other search test only cleared the box, so a
+// review could remove this whole path and stay green.
+bool ClickingTheSidebarLeavesSearch()
+{
+    var main = new WinPure.ViewModels.MainViewModel();
+    var start = main.CurrentNav;
+
+    main.SearchText = "game";
+    bool startUnchecked = !start.IsCurrent;
+    start.IsCurrent = true;   // click the entry the search started from
+    bool leftViaSameEntry = !main.IsSearching && ReferenceEquals(main.CurrentPage, start.Page) && start.IsCurrent;
+
+    main.SearchText = "game";
+    var privacy = main.NavItems.First(n => n.Page is WinPure.ViewModels.CategoryPageViewModel { Category: TweakCategory.Privacy });
+    privacy.IsCurrent = true; // click another entry
+    bool leftViaOtherEntry = !main.IsSearching && ReferenceEquals(main.CurrentPage, privacy.Page) && privacy.IsCurrent && !start.IsCurrent;
+
+    return Report("clicking the sidebar leaves search",
+        startUnchecked && leftViaSameEntry && leftViaOtherEntry,
+        $"starting entry unchecked while searching={startUnchecked}, clicking it leaves search={leftViaSameEntry}, " +
+        $"clicking another entry leaves search and opens it={leftViaOtherEntry}");
 }
 
 // Each category in the sidebar shows how many of its tweaks are waiting for Apply Changes.
@@ -1467,6 +1497,29 @@ bool EveryStaticResourceAndBindingPathExists()
             string member = m.Groups[1].Value;
             if (typeof(WinPure.ViewModels.MainViewModel).GetProperty(member) is null)
                 problems.Add($"{name}: MainViewModel has no '{member}'");
+        }
+    }
+
+    // Bindings straight to the window's view-model, and to each sidebar entry, were not checked at all: a
+    // review renamed SearchText to a typo in MainWindow.xaml and this test stayed green.
+    var directContexts = new (string File, Type[] Types)[]
+    {
+        ("MainWindow.xaml", new[] { typeof(WinPure.ViewModels.MainViewModel), typeof(WinPure.ViewModels.NavItem) }),
+        ("Styles.xaml", new[] { typeof(WinPure.ViewModels.NavItem) }),
+    };
+    foreach (var (fileName, types) in directContexts)
+    {
+        var file = xamlFiles.FirstOrDefault(f => Path.GetFileName(f) == fileName);
+        if (file is null)
+        {
+            problems.Add($"{fileName} was not found");
+            continue;
+        }
+        foreach (Match m in Regex.Matches(File.ReadAllText(file), @"\{Binding\s+(?:Path=)?([A-Za-z_][A-Za-z0-9_]*)"))
+        {
+            string member = m.Groups[1].Value;
+            if (!types.Any(t => t.GetProperty(member) is not null))
+                problems.Add($"{fileName}: no '{member}' on {string.Join(" or ", types.Select(t => t.Name))}");
         }
     }
 

@@ -15,8 +15,21 @@ public sealed class BackupManager
     /// Where snapshots live. Settable so a test harness can point it at a scratch folder
     /// instead of the user's real backups; the app never changes it.
     /// </summary>
-    public static string BackupDirectory { get; set; } =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "WinPure", "Backups");
+    public static string BackupDirectory { get; set; } = BackupStore.DefaultDirectory;
+
+    private static bool _storePrepared;
+
+    /// <summary>
+    /// The real backup folder is protected and the old per-user backups copied in, once per run, before
+    /// anything is read or written. Tests point BackupDirectory at a scratch folder and skip this.
+    /// </summary>
+    private static void PrepareStore()
+    {
+        if (_storePrepared || BackupDirectory != BackupStore.DefaultDirectory) return;
+        BackupStore.EnsureProtected(BackupDirectory);
+        BackupStore.MigrateLegacy(BackupStore.LegacyDirectory, BackupDirectory);
+        _storePrepared = true;
+    }
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
@@ -34,6 +47,7 @@ public sealed class BackupManager
     public void SaveSession(BackupSession session)
     {
         if (session.Entries.Count == 0 && session.TweakNames.Count == 0) return;
+        PrepareStore();   // throws if the folder cannot be protected: then nothing is written, and nothing changed
         Directory.CreateDirectory(BackupDirectory);
         string path = Path.Combine(BackupDirectory, session.Id + ".json");
         string tmp = path + ".tmp";
@@ -86,6 +100,16 @@ public sealed class BackupManager
     public List<BackupSession> ListSessions()
     {
         var sessions = new List<BackupSession>();
+        try
+        {
+            PrepareStore();
+        }
+        catch (Exception ex)
+        {
+            // Never fall back to reading an unprotected folder: that is the hole this closes.
+            LogService.Log($"Backup folder could not be protected, so no backups are listed: {ex.Message}");
+            return sessions;
+        }
         if (!Directory.Exists(BackupDirectory)) return sessions;
         int unreadable = 0;
         foreach (var file in Directory.EnumerateFiles(BackupDirectory, "backup_*.json"))

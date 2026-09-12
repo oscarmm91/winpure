@@ -1,7 +1,7 @@
 # WinPure — Tweak Reference
 
 Every tweak, what it touches, and which preset includes it. **Manual** = never auto-selected by a preset.
-All registry/service changes are snapshotted to `%AppData%\WinPure\Backups\` before being applied.
+All registry/service changes are snapshotted to `%ProgramData%\WinPure\Backups\` (a folder only administrators can write) before being applied.
 
 ## 🔒 Privacy & Telemetry
 

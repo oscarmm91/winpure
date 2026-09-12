@@ -65,6 +65,9 @@ Backups are plain files in your profile, which any program you run can edit with
 - A restored entry may now only touch what WinPure itself changes: the registry values, keys, services, scheduled tasks and Windows features in its catalog, and the Startup page's own switches. Anything else is refused and logged.
 - Every service and task name is quoted before it reaches PowerShell, including the typographic quotes PowerShell also accepts.
 - A backup made by an older version that restores a value this version no longer changes is refused too, and listed in the log.
+- **Backups moved to `%ProgramData%\WinPure\Backups`**, a folder only administrators can write, with its permissions locked so that not even the account that owns a file can reopen it. A second review showed why checking entries is not enough on its own: a forged file could still ask for things a genuine undo asks for — SMB 1.0 back on, a disabled service back to Automatic — and hijack a plain Undo with a future date. Only a file's origin tells them apart.
+- Your existing backups are copied into the new folder the first time this version runs, and the originals in `%AppData%\WinPure\Backups` are left where they were. Backups are now shared by every administrator account on the PC.
+- The entry checks stay as a second layer, and got stricter: service start modes, the exact value restored into a context-menu handler, the exact Startup switch keys, and scheduled-task paths with doubled backslashes.
 
 ### Finding your way around
 

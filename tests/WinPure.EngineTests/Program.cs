@@ -88,6 +88,8 @@ failures += SearchFindsTweaksInEveryCategory() ? 0 : 1;
 failures += EachCategoryShowsItsPendingCount() ? 0 : 1;
 failures += AForgedBackupCannotReachBeyondWhatWinPureChanges() ? 0 : 1;
 failures += PowerShellQuotingDoublesEveryQuote() ? 0 : 1;
+failures += BackupsLiveWhereOnlyAdministratorsCanWrite() ? 0 : 1;
+failures += OldBackupsAreCopiedOnceAndLeftInPlace() ? 0 : 1;
 failures += WingetIdsAreCheckedAndTheExportIsReadExactly() ? 0 : 1;
 failures += AnInstallIsJudgedByWhatWingetSeesAfterwards() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
@@ -930,6 +932,20 @@ bool AForgedBackupCannotReachBeyondWhatWinPureChanges()
     using (var key = Registry.CurrentUser.OpenSubKey(forgedSub)) touched = key is not null;
     try { Registry.CurrentUser.DeleteSubKeyTree(forgedSub, throwOnMissingSubKey: false); } catch { }
 
+    // The second review's entries use paths and names the catalog really has, with forged data. They are
+    // checked against the policy itself: restoring them unelevated would fail anyway, and hide a broken policy.
+    var catalogService = TweakCatalog.Build().SelectMany(t => t.Actions).OfType<ServiceAction>().First().ServiceName;
+    var catalogHandler = TweakCatalog.Build().SelectMany(t => t.Actions).OfType<RegistryKeyAction>().First(k => k.KeyDefaultValue is { Length: > 0 });
+    var forgedData = new[]
+    {
+        new BackupEntry { Type = "service", TweakId = "forged", ServiceName = catalogService, StartMode = 999 },
+        new BackupEntry { Type = "registry-key", TweakId = "forged", KeyPath = catalogHandler.KeyPath, Existed = true, Value = "{11111111-2222-3333-4444-555555555555}" },
+        new BackupEntry { Type = "startup-entry", TweakId = "forged", KeyPath = @"HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\StartupApproved\Run", ValueName = "X", Value = "020000000000000000000000", Existed = true },
+        new BackupEntry { Type = "scheduled-task", TweakId = "forged", TaskPath = @"\\Microsoft\Windows\Feedback\Siuf\DmClient", Existed = true, TaskWasEnabled = true },
+    };
+    var slipped = forgedData.Where(e => BackupEntryPolicy.IsAllowed(e, out _)).Select(e => e.Type).ToList();
+    failures += forgedData.Length - slipped.Count;   // counted as refused only when the policy said no
+
     // What WinPure really writes must still restore.
     var real = TweakCatalog.Build().SelectMany(t => t.Actions).OfType<RegistryValueAction>().First();
     bool genuineAllowed =
@@ -941,10 +957,88 @@ bool AForgedBackupCannotReachBeyondWhatWinPureChanges()
         }, out _) &&
         BackupEntryPolicy.IsAllowed(new BackupEntry { Type = "scheduled-task", TweakId = "t", TaskPath = @"\GoogleUpdateTaskMachineUA{1B2C3D4E}", Existed = true }, out _);
 
+    int total = forged.Length + forgedData.Length;
     return Report("a forged backup cannot reach beyond what WinPure changes",
-        failures == forged.Length && !touched && genuineAllowed,
-        $"refused {failures} of {forged.Length} forged entries (expected all), forged registry key created={touched} (expected False), " +
-        $"genuine catalog value, Startup switch and third-party logon task still allowed={genuineAllowed}");
+        failures == total && slipped.Count == 0 && !touched && genuineAllowed,
+        $"refused {failures} of {total} forged entries (expected all; slipped past the policy: [{string.Join(",", slipped)}]), " +
+        $"forged registry key created={touched} (expected False), genuine catalog value, Startup switch and third-party logon task still allowed={genuineAllowed}");
+}
+
+// The real defence against forged backups: only SYSTEM and Administrators can write the folder, and the
+// owner cannot rewrite its permissions. Checked on a real folder from this unelevated process, which is
+// exactly the kind of program that must not be able to plant a backup. The probe folder stays behind in
+// %TEMP%: once locked, an unelevated test can no longer delete it, which is the point.
+bool BackupsLiveWhereOnlyAdministratorsCanWrite()
+{
+    var problems = new List<string>();
+
+    if (!BackupStore.IsProtected(BackupStore.ProtectedSecurity()))
+        problems.Add("the permissions WinPure sets are not judged protected");
+    var open = new System.Security.AccessControl.DirectorySecurity();
+    open.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+        new System.Security.Principal.SecurityIdentifier(System.Security.Principal.WellKnownSidType.BuiltinUsersSid, null),
+        System.Security.AccessControl.FileSystemRights.Modify, System.Security.AccessControl.AccessControlType.Allow));
+    if (BackupStore.IsProtected(open)) problems.Add("a folder any user can modify is judged protected");
+    if (!BackupStore.DefaultDirectory.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), StringComparison.OrdinalIgnoreCase))
+        problems.Add($"backups default to {BackupStore.DefaultDirectory}, not under ProgramData");
+
+    string probe = Path.Combine(Path.GetTempPath(), "winpure-acl-probe");
+    var info = new DirectoryInfo(probe);
+    if (info.Exists)
+    {
+        try { info.Delete(recursive: true); info.Refresh(); } catch { /* locked by an earlier run: reuse it */ }
+    }
+    if (!info.Exists) info.Create(BackupStore.ProtectedSecurity());
+
+    bool wrote = false, rewrotePermissions = false;
+    try { File.WriteAllText(Path.Combine(probe, "backup_planted.json"), "{}"); wrote = true; }
+    catch (UnauthorizedAccessException) { }
+    try
+    {
+        var sec = new DirectoryInfo(probe).GetAccessControl();
+        sec.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+            System.Security.Principal.WindowsIdentity.GetCurrent().User!, System.Security.AccessControl.FileSystemRights.FullControl,
+            System.Security.AccessControl.AccessControlType.Allow));
+        new DirectoryInfo(probe).SetAccessControl(sec);
+        rewrotePermissions = true;
+    }
+    catch (UnauthorizedAccessException) { }
+    catch (InvalidOperationException) { }
+    if (wrote) problems.Add("an unelevated process wrote a file into the protected folder");
+    if (rewrotePermissions) problems.Add("an unelevated owner granted itself access to the protected folder");
+
+    return Report("backups live where only administrators can write",
+        problems.Count == 0,
+        problems.Count == 0
+            ? "ProgramData by default; this unelevated test could neither write into a protected folder nor change its permissions"
+            : string.Join(" | ", problems));
+}
+
+// Backups from before the move live in the user's AppData. They are copied into the protected folder
+// once — never moved, so nothing is lost if anything goes wrong — and not copied again on the next run.
+bool OldBackupsAreCopiedOnceAndLeftInPlace()
+{
+    string root = Path.Combine(scratch, "migration");
+    string legacy = Path.Combine(root, "legacy"), target = Path.Combine(root, "target");
+    try { Directory.Delete(root, recursive: true); } catch { }
+    Directory.CreateDirectory(legacy);
+    Directory.CreateDirectory(target);
+    File.WriteAllText(Path.Combine(legacy, "backup_20260612_064833.json"), "{\"Id\":\"a\"}");
+    File.WriteAllText(Path.Combine(legacy, "backup_20260912_150221.json"), "{\"Id\":\"b\"}");
+    File.WriteAllText(Path.Combine(legacy, "notes.txt"), "not a backup");
+
+    int first = BackupStore.MigrateLegacy(legacy, target);
+    File.WriteAllText(Path.Combine(legacy, "backup_20260913_000000.json"), "{\"Id\":\"c\"}");
+    int second = BackupStore.MigrateLegacy(legacy, target);
+
+    bool originalsKept = Directory.GetFiles(legacy, "backup_*.json").Length == 3;
+    bool copiedExactly = File.ReadAllText(Path.Combine(target, "backup_20260612_064833.json")) == "{\"Id\":\"a\"}";
+    int inTarget = Directory.GetFiles(target, "backup_*.json").Length;
+    try { Directory.Delete(root, recursive: true); } catch { }
+
+    return Report("old backups are copied once and left in place",
+        first == 2 && second == 0 && originalsKept && copiedExactly && inTarget == 2,
+        $"first run copied {first} (expected 2), second run {second} (expected 0), originals kept={originalsKept}, content identical={copiedExactly}, backups in the new folder={inTarget} (expected 2)");
 }
 
 // Every service and task name reaches PowerShell inside single quotes. PowerShell treats the typographic

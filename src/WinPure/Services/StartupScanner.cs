@@ -31,6 +31,12 @@ public static class StartupScanner
         new($@"HKLM\SOFTWARE\WOW6432Node\{RunSuffix}", $@"HKLM\SOFTWARE\{ApprovedRoot}\Run32", "All users (32-bit)"),
     };
 
+    /// <summary>Every StartupApproved key the scanner reads and writes — the only ones a backup may restore a switch into.</summary>
+    internal static IEnumerable<string> ApprovedKeys =>
+        RunLocations.Select(l => l.ApprovedKey)
+            .Append($@"HKCU\Software\{ApprovedRoot}\StartupFolder")
+            .Append($@"HKLM\SOFTWARE\{ApprovedRoot}\StartupFolder");
+
     public static List<StartupEntry> Scan(ScanContext? ctx = null)
     {
         var entries = new List<StartupEntry>();

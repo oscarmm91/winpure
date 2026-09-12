@@ -9,6 +9,10 @@ namespace WinPure.Services;
 /// services, scheduled tasks and Windows features, plus the Startup page's switches. A forged entry that
 /// points anywhere else — Winlogon, a service nobody tweaks, a quote smuggled into a task name — is
 /// refused before anything runs.
+///
+/// This is the second layer. A second review showed its limit: the data of a genuine undo — SMB 1.0 back
+/// on, a service back to Automatic — is exactly what a forged file would ask for, so no list can tell
+/// them apart. The first layer is that backups live where only administrators can write (BackupStore).
 /// </summary>
 internal static class BackupEntryPolicy
 {
@@ -16,18 +20,21 @@ internal static class BackupEntryPolicy
     internal static string? TestKeyPrefix { get; set; }
 
     private sealed record Allowed(
-        HashSet<string> Values, HashSet<string> Keys, HashSet<string> Services, HashSet<string> Tasks, HashSet<string> Features);
+        Dictionary<string, string> Values, Dictionary<string, string?> Keys, HashSet<string> Services,
+        HashSet<string> Tasks, HashSet<string> Features, HashSet<string> StartupKeys);
 
     private static readonly Lazy<Allowed> FromCatalog = new(() =>
     {
         var ignoreCase = StringComparer.OrdinalIgnoreCase;
-        var allowed = new Allowed(new(ignoreCase), new(ignoreCase), new(ignoreCase), new(ignoreCase), new(ignoreCase));
+        var allowed = new Allowed(new(ignoreCase), new(ignoreCase), new(ignoreCase), new(ignoreCase), new(ignoreCase),
+            new(StartupScanner.ApprovedKeys.Select(Normalize), ignoreCase));
         foreach (var action in TweakCatalog.Build().SelectMany(t => t.Actions))
         {
             switch (action)
             {
-                case RegistryValueAction value: allowed.Values.Add(Normalize(value.KeyPath) + "!" + value.ValueName); break;
-                case RegistryKeyAction key: allowed.Keys.Add(Normalize(key.KeyPath)); break;
+                // value slot -> the kind the catalog writes; key -> the (Default) the catalog knows for it
+                case RegistryValueAction value: allowed.Values[Normalize(value.KeyPath) + "!" + value.ValueName] = value.Kind.ToString(); break;
+                case RegistryKeyAction key: allowed.Keys[Normalize(key.KeyPath)] = key.KeyDefaultValue; break;
                 case ServiceAction service: allowed.Services.Add(service.ServiceName); break;
                 case ScheduledTaskAction task: allowed.Tasks.Add(task.TaskPath); break;
                 case FeatureAction feature: allowed.Features.Add(feature.FeatureName); break;
@@ -45,27 +52,57 @@ internal static class BackupEntryPolicy
         {
             case "registry-value":
                 if (entry.KeyPath is null || entry.ValueName is null) return true; // restoring it does nothing
-                if (UnderTestKey(entry.KeyPath) || allowed.Values.Contains(Normalize(entry.KeyPath) + "!" + entry.ValueName)) return true;
-                reason = "WinPure never changes this registry value";
-                return false;
+                if (UnderTestKey(entry.KeyPath)) return true;
+                if (!allowed.Values.TryGetValue(Normalize(entry.KeyPath) + "!" + entry.ValueName, out string? catalogKind))
+                {
+                    reason = "WinPure never changes this registry value";
+                    return false;
+                }
+                // The kind the value really had may differ from the catalog's; a kind that makes Windows
+                // expand or parse the data differently (ExpandString, MultiString, Binary) must not appear.
+                if (entry.Kind is not null && entry.Kind != catalogKind && entry.Kind is not ("DWord" or "QWord" or "String"))
+                {
+                    reason = $"a {entry.Kind} value where WinPure writes a {catalogKind}";
+                    return false;
+                }
+                return true;
 
             case "registry-key":
                 if (entry.KeyPath is null) return true;
-                if (UnderTestKey(entry.KeyPath) || allowed.Keys.Contains(Normalize(entry.KeyPath))) return true;
-                reason = "WinPure never changes this registry key";
-                return false;
+                if (UnderTestKey(entry.KeyPath)) return true;
+                if (!allowed.Keys.TryGetValue(Normalize(entry.KeyPath), out string? catalogDefault))
+                {
+                    reason = "WinPure never changes this registry key";
+                    return false;
+                }
+                // The (Default) of a context-menu handler is a CLSID: only the one the catalog restores.
+                if (entry.Existed && entry.Value is not null && entry.Value != (catalogDefault ?? ""))
+                {
+                    reason = "a (Default) value WinPure never writes for this key";
+                    return false;
+                }
+                return true;
 
             case "startup-entry":
                 if (entry.KeyPath is null || entry.ValueName is null) return true;
-                if (IsStartupApprovedKey(entry.KeyPath) && (entry.Value is null || IsTwelveByteHex(entry.Value))) return true;
+                if ((UnderTestKey(entry.KeyPath) || allowed.StartupKeys.Contains(Normalize(entry.KeyPath))) &&
+                    (entry.Value is null || IsTwelveByteHex(entry.Value))) return true;
                 reason = "this is not a Startup switch";
                 return false;
 
             case "service":
                 if (entry.ServiceName is null) return true;
-                if (allowed.Services.Contains(entry.ServiceName)) return true;
-                reason = "WinPure never changes this service";
-                return false;
+                if (!allowed.Services.Contains(entry.ServiceName))
+                {
+                    reason = "WinPure never changes this service";
+                    return false;
+                }
+                if (entry.StartMode is not null and not (2 or 3 or 4))
+                {
+                    reason = $"start mode {entry.StartMode} is not Automatic, Manual or Disabled";
+                    return false;
+                }
+                return true;
 
             case "scheduled-task":
                 if (entry.TaskPath is null) return true;
@@ -78,8 +115,12 @@ internal static class BackupEntryPolicy
                 reason = "WinPure never changes this Windows feature";
                 return false;
 
+            case "system-state":
+                // Kind and state are validated in SystemState.Restore, the only way this type is restored.
+                return true;
+
             default:
-                // system-state validates its own values (SystemState.Restore); unknown types restore nothing.
+                // Unknown types restore nothing (RestoreEntry has no case for them).
                 return true;
         }
     }
@@ -88,16 +129,6 @@ internal static class BackupEntryPolicy
         TestKeyPrefix is { } prefix &&
         (keyPath.Equals(prefix, StringComparison.OrdinalIgnoreCase) ||
          keyPath.StartsWith(prefix + @"\", StringComparison.OrdinalIgnoreCase));
-
-    /// <summary>Where Task Manager and the Startup page keep their switches, for this user or all users.</summary>
-    private static bool IsStartupApprovedKey(string keyPath)
-    {
-        string path = Normalize(keyPath);
-        bool hive = path.StartsWith(@"HKCU\", StringComparison.OrdinalIgnoreCase) ||
-                    path.StartsWith(@"HKLM\", StringComparison.OrdinalIgnoreCase);
-        return hive && new[] { @"\StartupApproved\Run", @"\StartupApproved\Run32", @"\StartupApproved\StartupFolder" }
-            .Any(suffix => path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
-    }
 
     private static bool IsTwelveByteHex(string value) =>
         value.Length == 24 && value.All(Uri.IsHexDigit);
@@ -109,6 +140,7 @@ internal static class BackupEntryPolicy
     private static bool IsStartupTaskPath(string taskPath) =>
         taskPath.Length is > 1 and <= 260 &&
         taskPath.StartsWith(@"\", StringComparison.Ordinal) &&
+        !taskPath.Contains(@"\\", StringComparison.Ordinal) &&   // "\\Microsoft\..." would slip past the next check
         !taskPath.StartsWith(@"\Microsoft\", StringComparison.OrdinalIgnoreCase) &&
         taskPath.All(c => char.IsLetterOrDigit(c) || " _-.(){}#+,@".Contains(c) || c == (char)92);
 

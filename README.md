@@ -37,7 +37,7 @@
 2. Run it — Windows asks for administrator permission (needed for HKLM, services and scheduled tasks).
 3. Pick a preset or flip individual toggles → **Apply Changes**. A backup is created automatically first.
 
-> 📁 Backups: `%AppData%\WinPure\Backups\` · Logs: `%AppData%\WinPure\Logs\`
+> 📁 Backups: `%ProgramData%\WinPure\Backups\` (only administrators can write there) · Logs: `%AppData%\WinPure\Logs\`
 
 ## Presets
 

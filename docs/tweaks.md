@@ -24,6 +24,9 @@ All registry/service changes are snapshotted to `%AppData%\WinPure\Backups\` bef
 | Disable Online Speech Recognition | Balanced | `OnlineSpeechPrivacy!HasAccepted = 0` |
 | Disable Inking & Typing Personalization | Balanced | InputPersonalization restrictions + TIPC off |
 | Disable Compatibility Telemetry Tasks | Aggressive | Disables the *Microsoft Compatibility Appraiser*, *Appraiser Exp* (its 24H2/25H2 successor) & *ProgramDataUpdater* scheduled tasks |
+| Disable Search History | Safe | `SearchSettings!IsDeviceSearchHistoryEnabled = 0` |
+| Don't Share Your Language List With Websites | Balanced | `International\User Profile!HttpAcceptLanguageOptOut = 1` |
+| Disable Diagnostic Data Tasks | Aggressive | Disables *StartupAppTask*, *Autochk\Proxy*, *DiskDiagnosticDataCollector*, *MapsToastTask* & *MapsUpdateTask* (MareBackup left alone: it feeds Windows Backup) |
 | Disable CEIP & Feedback Tasks | Aggressive | Disables *Consolidator*, *UsbCeip*, *DmClient* scheduled tasks |
 
 ## 📦 Bloatware & Apps
@@ -51,6 +54,10 @@ App removals use `Remove-AppxPackage -AllUsers` + de-provisioning. **Undo = rein
 | Disable Windows AI & Recall | Aggressive | `WindowsAI!DisableAIDataAnalysis = 1` (HKLM + HKCU), `AllowRecallEnablement = 0`, `AllowRecallExport = 0`, Notepad AI off, AI Settings page hidden |
 | Disable Click to Do | Balanced | `WindowsAI!DisableClickToDo = 1` (HKLM + HKCU) - the AI overlay on selected text/images |
 | Disable Paint AI Features | Manual | `CurrentVersion\Policies\Paint!DisableCocreator / DisableImageCreator / DisableGenerativeFill = 1` |
+| Remove Preinstalled Casual Games | Balanced | `Asphalt8Airborne`, `CaesarsSlotsFreeCasino`, `COOKINGFEVER`, `DisneyMagicKingdoms`, `FarmVille2CountryEscape`, `HiddenCity`, `MarchofEmpires`, `NYTCrossword`, `RoyalRevolt` |
+| Remove AI Hub | Balanced | `Microsoft.Windows.AIHub` (Copilot+ PCs) |
+| Disable Game Bar Capture | Manual | `GameDVR!AppCaptureEnabled = 0` + `GameBar!ShowStartupPanel = 0` — nothing uninstalled; an alternative to removing Xbox |
+| Disable Game Bar Integration | Aggressive | `GameBar!UseNexusForGameBarEnabled = 0` + do-nothing handler under `HKCU\SOFTWARE\Classes\ms-gamebar` — silences the ms-gamebar popup after removing Xbox |
 | Remove OneDrive | Aggressive | `OneDriveSetup /uninstall` + `DisableFileSyncNGSC = 1` (files stay on disk) |
 
 ## ⚙️ Services
@@ -83,6 +90,10 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Disable Mouse Acceleration | Manual | `MouseSpeed/Threshold1/Threshold2 = 0` |
 | Enable Long Paths | Manual | `FileSystem!LongPathsEnabled = 1` |
 | Disable Remote Desktop | Manual | `fDenyTSConnections = 1` — on Pro this disables a feature that works |
+| Disable Fast Startup | Balanced | `Session Manager\Power!HiberbootEnabled = 0` |
+| Don't Get Updates As Soon As They're Available | Balanced | `WindowsUpdate\UX\Settings!IsContinuousInnovationOptedIn = 0` — security updates unaffected |
+| Enable Daily Registry Backup | Manual | `Configuration Manager!EnablePeriodicBackup = 1` |
+| Sync the Clock With pool.ntp.org | Manual | `W32Time\Parameters!NtpServer = pool.ntp.org,0x8` |
 
 ## 🎨 UI & Personalization
 
@@ -97,6 +108,11 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Show File Extensions | Safe | `HideFileExt = 0` |
 | Show Hidden Files | Manual | `Hidden = 1` |
 | Remove Widgets Button | Safe | `Dsh!AllowNewsAndInterests = 0` (the policy current Windows honours). `TaskbarDa = 0` is still written for pre-24H2 builds, but newer ones block it - it is optional and cannot fail the tweak |
+| Disable Search Highlights | Safe | `SearchSettings!IsDynamicSearchBoxEnabled = 0` |
+| Turn NumLock On at Startup | Manual | `Keyboard!InitialKeyboardIndicators` for your account and for the sign-in screen (`HKU\.DEFAULT`) |
+| Block Spotlight as Desktop Background | Manual | `Policies\...\CloudContent!DisableSpotlightCollectionOnDesktop = 1` (per-user policy) |
+| Disable 'What's New' Screens After Updates | Safe | `UserProfileEngagement!ScoobeSystemSettingEnabled = 0` + `SubscribedContent-310093Enabled = 0` |
+| Disable the F1 Help Key | Manual | Empty help handler under `HKCU\Software\Classes\Typelib\{8cec5860-...}\1.0\0\win64` (64-bit programs) |
 | Remove Task View Button | Safe | `ShowTaskViewButton = 0` |
 | Remove Chat/Teams Button | Safe | `TaskbarMn = 0` |
 | Align Taskbar Left | Manual | `TaskbarAl = 0` |
@@ -114,6 +130,7 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Remove 'Ask Copilot' | Safe | Blocked shell extension `{CB3B0003-8088-4EDE-8769-8B354AB2FF8C}` |
 | Remove 'Share' | Manual | Deletes the `ModernSharing` handler under `AllFileSystemObjects` (recreated on revert) |
 | Remove 'Give access to' | Safe | Deletes the 6 `Sharing` handlers: files, folders, background, drives & both library folders |
+| Allow the Context Menu on More Than 15 Files | Balanced | `CurrentVersion\Explorer!MultipleInvokePromptMinimum = 300` |
 
 ## 🔧 Repair & Maintenance (one-shot tools)
 

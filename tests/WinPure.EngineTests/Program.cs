@@ -69,6 +69,7 @@ failures += GuardInputsReadThisMachineCorrectly() ? 0 : 1;
 failures += CoreAppsGuardKnowsLtscAndPartialListings() ? 0 : 1;
 failures += GatherNeverThrowsWhenTheBitLockerQueryFails() ? 0 : 1;
 failures += EachActionAsksOnlyTheGuardsThatConcernIt() ? 0 : 1;
+failures += AnAbsentValueCanAlreadyBeTheWantedState() ? 0 : 1;
 failures += AChildPowerShellDiesWithTheApp() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
@@ -120,6 +121,27 @@ bool RevertDeletesAValueThatNeverExisted()
     return Report("revert deletes a value that never existed",
         afterRevert is null,
         $"applied={afterApply}, reverted={(afterRevert?.ToString() ?? "(absent)")} (expected absent; the old engine left 1)");
+}
+
+// A Settings toggle that is off by default is only written once someone turns it on, so a
+// stock machine has no value at all. For that tweak "missing" must read as applied — and
+// every other tweak must keep reading a missing value as not applied.
+bool AnAbsentValueCanAlreadyBeTheWantedState()
+{
+    Reset(); // the value does not exist
+
+    var offByDefault = new RegistryValueAction { KeyPath = ToyKey, ValueName = "OptedIn", ApplyValue = 0, AbsentMeansApplied = true };
+    var ordinary = new RegistryValueAction { KeyPath = ToyKey, ValueName = "OptedIn", ApplyValue = 0 };
+    var ctx = new ScanContext();
+
+    bool? absentFlagged = offByDefault.IsApplied(ctx);
+    bool? absentOrdinary = ordinary.IsApplied(ctx);
+    WriteToy("OptedIn", 1);
+    bool? turnedOn = offByDefault.IsApplied(ctx);
+
+    return Report("a value that is off by default can already count as applied",
+        absentFlagged == true && absentOrdinary == false && turnedOn == false,
+        $"absent with flag={absentFlagged} (expected True), absent without={absentOrdinary} (expected False), turned on={turnedOn} (expected False)");
 }
 
 // The snapshot must be on disk before the system is modified — simulated the way it

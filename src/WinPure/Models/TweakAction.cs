@@ -118,13 +118,19 @@ public sealed class RegistryValueAction : TweakAction
     public required object ApplyValue { get; init; }
     /// <summary>Stock default. Null = the value does not exist on a stock system → delete on revert.</summary>
     public object? DefaultValue { get; init; }
+    /// <summary>
+    /// True when a missing value already behaves like <see cref="ApplyValue"/> — a Settings toggle
+    /// that is off by default and only written once someone turns it on. Without this, a stock
+    /// machine reads "Not applied" forever over a setting that is already the way we want it.
+    /// </summary>
+    public bool AbsentMeansApplied { get; init; }
 
     public override bool? IsApplied(ScanContext ctx)
     {
         try
         {
             var current = ReadValue(KeyPath, ValueName, out _);
-            if (current is null) return false;
+            if (current is null) return AbsentMeansApplied;
             return ValuesEqual(current, ApplyValue);
         }
         catch { return null; }

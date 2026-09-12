@@ -295,6 +295,51 @@ public static class TweakCatalog
                 new ScheduledTaskAction { TaskPath = @"\Microsoft\Windows\Feedback\Siuf\DmClientOnScenarioDownload" },
             },
         };
+        yield return new Tweak
+        {
+            Id = "privacy-search-history", Category = TweakCategory.Privacy, Preset = PresetLevel.Safe,
+            Name = "Disable Search History",
+            Description = "Stop Windows search from keeping a history of what you searched on this device.",
+            Help = "Turns off 'Search history on this device' in Settings. Past searches stop being suggested.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\SearchSettings", "IsDeviceSearchHistoryEnabled", 0, 1),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "privacy-language-list", Category = TweakCategory.Privacy, Preset = PresetLevel.Balanced,
+            Name = "Don't Share Your Language List With Websites",
+            Description = "Stop websites from reading the list of languages installed in Windows.",
+            Help = "Your language list is a quiet fingerprinting signal. Sites that relied on it may pick their language from your browser settings instead.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Control Panel\International\User Profile", "HttpAcceptLanguageOptOut", 1, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "privacy-diagnostic-tasks", Category = TweakCategory.Privacy, Preset = PresetLevel.Aggressive,
+            Name = "Disable Diagnostic Data Tasks",
+            Description = "Disable scheduled tasks that collect disk and Autochk diagnostics, scan startup apps and update offline maps.",
+            Help = "Offline maps stop updating on their own. MareBackup, which Sophia Script also disables, is deliberately left alone: it feeds the app list Windows Backup uses to restore your apps on a new PC.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                // All five confirmed present on 25H2 build 26200 with these exact paths. They are
+                // also in ScanContext.WatchedTasks: a task missing from that list always reads as
+                // already applied.
+                new ScheduledTaskAction { TaskPath = @"\Microsoft\Windows\Application Experience\StartupAppTask" },
+                new ScheduledTaskAction { TaskPath = @"\Microsoft\Windows\Autochk\Proxy" },
+                new ScheduledTaskAction { TaskPath = @"\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" },
+                new ScheduledTaskAction { TaskPath = @"\Microsoft\Windows\Maps\MapsToastTask" },
+                new ScheduledTaskAction { TaskPath = @"\Microsoft\Windows\Maps\MapsUpdateTask" },
+            },
+        };
     }
 
     // ------------------------------------------------------------------ Apps / Bloatware
@@ -425,6 +470,57 @@ public static class TweakCatalog
                 Dword(@"HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\Paint", "DisableCocreator", 1, null),
                 Dword(@"HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\Paint", "DisableImageCreator", 1, null),
                 Dword(@"HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\Paint", "DisableGenerativeFill", 1, null),
+            },
+        };
+
+        // "RoyalRevolt" without a space: Win11Debloat's Apps.json lists the AppId as "Royal Revolt",
+        // which can never match a package name. CrapFixer has the real one, flaregamesGmbH.RoyalRevolt2,
+        // and Win-Debloat-Tools matches *RoyalRevolt* — two sources agreeing.
+        yield return AppRemoval("apps-casual-games", PresetLevel.Balanced, "Remove Preinstalled Casual Games",
+            "Uninstall third-party games some PCs ship with: Asphalt, Caesars Slots, Cooking Fever, Disney Magic Kingdoms, FarmVille, Hidden City, March of Empires, NYT Crossword and Royal Revolt.",
+            "",
+            "Asphalt8Airborne", "CaesarsSlotsFreeCasino", "COOKINGFEVER", "DisneyMagicKingdoms",
+            "FarmVille2CountryEscape", "HiddenCity", "MarchofEmpires", "NYTCrossword", "RoyalRevolt");
+
+        yield return AppRemoval("apps-aihub", PresetLevel.Balanced, "Remove AI Hub",
+            "Uninstall the AI Hub app that Copilot+ PCs ship with.", "", "Microsoft.Windows.AIHub");
+
+        yield return new Tweak
+        {
+            Id = "apps-gamebar-capture", Category = TweakCategory.Apps, Preset = PresetLevel.Manual,
+            Name = "Disable Game Bar Capture",
+            Description = "Turn off Game Bar's clips, screenshots and recording, and its startup tips, without uninstalling anything.",
+            Help = "An alternative to removing the Xbox apps, so it is in no preset: Aggressive removes them outright. Game Bar stays installed. GameDVR_Enabled, which Sophia Script writes alongside AppCaptureEnabled, is deliberately left to Remove Xbox Apps — two tweaks writing one value would overwrite each other's backups.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\GameDVR", "AppCaptureEnabled", 0, null),
+                Dword(@"HKCU\Software\Microsoft\GameBar", "ShowStartupPanel", 0, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "apps-gamebar-integration", Category = TweakCategory.Apps, Preset = PresetLevel.Aggressive,
+            Name = "Disable Game Bar Integration",
+            Description = "Stop games and controllers from opening Game Bar — which also silences the \"You'll need a new app to open this ms-gamebar link\" popup once the Xbox apps are removed.",
+            Help = "Meant for PCs without Game Bar, which is why it sits in Aggressive next to Remove Xbox Apps. If Game Bar is still installed, the controller's Xbox button and games stop opening it until you undo this. Registers a do-nothing handler for ms-gamebar links under your account; undo removes it but leaves two empty registry keys behind.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                // Win11Debloat's Disable_Game_Bar_Integration.reg, with two changes. HKCU, not HKCR:
+                // measured on 25H2 the ms-gamebar class exists only under the user's hive, and HKCR is a
+                // merged view whose write target depends on where the key already lives. And no
+                // ms-gamebarservices: that class is not registered on 25H2 even with Game Bar installed
+                // (measured), so writing it would register a new protocol rather than silence one.
+                Dword(@"HKCU\SOFTWARE\Microsoft\GameBar", "UseNexusForGameBarEnabled", 0, null),
+                Str(@"HKCU\SOFTWARE\Classes\ms-gamebar", "NoOpenWith", "", null),
+                new RegistryKeyAction
+                {
+                    KeyPath = @"HKCU\SOFTWARE\Classes\ms-gamebar\shell\open\command",
+                    DeleteOnApply = false,
+                    KeyDefaultValue = "%SystemRoot%/System32/systray.exe",
+                },
             },
         };
 
@@ -645,6 +741,64 @@ public static class TweakCatalog
                 Dword(@"HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server", "fDenyTSConnections", 1, 1),
             },
         };
+        yield return new Tweak
+        {
+            Id = "perf-fast-startup", Category = TweakCategory.Performance, Preset = PresetLevel.Balanced,
+            Name = "Disable Fast Startup",
+            Description = "Make Shut down actually shut Windows down instead of hibernating its kernel.",
+            Help = "With Fast Startup, drivers are not reloaded after a shutdown and the system drive is left in a state other operating systems cannot safely write to. Turning it off fixes both; startup takes a few seconds longer.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power", "HiberbootEnabled", 0, 1),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "perf-early-updates", Category = TweakCategory.Performance, Preset = PresetLevel.Balanced,
+            Name = "Don't Get Updates As Soon As They're Available",
+            Description = "Leave the channel that installs optional preview updates before everyone else.",
+            Help = "The same switch as 'Get the latest updates as soon as they're available' in Windows Update settings, which is off unless someone turned it on. Security updates keep arriving as usual; only early optional releases stop.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                // Off unless someone turns it on: Microsoft's support page only describes switching it
+                // on, and the value is absent on this 25H2 machine. So a missing value already is the
+                // state this tweak wants. Only one search summary said "off by default" outright.
+                new RegistryValueAction
+                {
+                    KeyPath = @"HKLM\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings", ValueName = "IsContinuousInnovationOptedIn",
+                    Kind = RegistryValueKind.DWord, ApplyValue = 0, AbsentMeansApplied = true,
+                },
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "perf-registry-backup", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
+            Name = "Enable Daily Registry Backup",
+            Description = "Have Windows copy the registry to RegBack during idle maintenance, as it once did by default.",
+            Help = "A safety net if the registry is ever damaged. It uses some disk space — one copy of each registry hive. The RegIdleBackup task that does the copying is already enabled on current Windows; this turns on the setting it checks.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Configuration Manager", "EnablePeriodicBackup", 1, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "perf-ntp-server", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
+            Name = "Sync the Clock With pool.ntp.org",
+            Description = "Point Windows' time sync at the public NTP pool instead of time.windows.com.",
+            Help = "Useful when the clock keeps drifting. Takes effect at Windows' next automatic time sync; the Windows Time service is not started or restarted. Written as a registry value on purpose, so undo restores the server you actually had.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Str(@"HKLM\SYSTEM\CurrentControlSet\Services\W32Time\Parameters", "NtpServer", "pool.ntp.org,0x8", "time.windows.com,0x9"),
+            },
+        };
     }
 
     // ------------------------------------------------------------------ UI & Personalization
@@ -835,12 +989,94 @@ public static class TweakCatalog
                 Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "DisallowShaking", 1, 0),
             },
         };
+        yield return new Tweak
+        {
+            Id = "ui-search-highlights", Category = TweakCategory.UI, Preset = PresetLevel.Safe,
+            Name = "Disable Search Highlights",
+            Description = "Remove the illustrations and trending content from the search box and search home.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\SearchSettings", "IsDynamicSearchBoxEnabled", 0, 1),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "ui-numlock-login", Category = TweakCategory.UI, Preset = PresetLevel.Manual,
+            Name = "Turn NumLock On at Startup",
+            Description = "Start with the number pad active, on the sign-in screen as well as after you sign in.",
+            Help = "Sets both the sign-in screen and your account, which can differ. With Fast Startup on, Windows may bring back the keyboard state from before the last shutdown instead.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Str(@"HKCU\Control Panel\Keyboard", "InitialKeyboardIndicators", "2", "2147483648"),
+                Str(@"HKU\.DEFAULT\Control Panel\Keyboard", "InitialKeyboardIndicators", "2147483650", "2147483648"),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "ui-spotlight-desktop", Category = TweakCategory.UI, Preset = PresetLevel.Manual,
+            Name = "Block Spotlight as Desktop Background",
+            Description = "Remove Windows Spotlight — rotating Microsoft images with 'learn more' links — from the background options.",
+            Help = "Applied as a per-user policy (declared class=User in CloudContent.admx), so Settings shows that the option is managed. It stops Spotlight from being chosen; a picture or colour background is unaffected.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Policies\Microsoft\Windows\CloudContent", "DisableSpotlightCollectionOnDesktop", 1, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "ui-update-welcome", Category = TweakCategory.UI, Preset = PresetLevel.Safe,
+            Name = "Disable 'What's New' Screens After Updates",
+            Description = "Stop the full-screen welcome and 'finish setting up your device' pages that appear after updates.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\UserProfileEngagement", "ScoobeSystemSettingEnabled", 0, 1),
+                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-310093Enabled", 0, 1),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "ui-f1-help", Category = TweakCategory.UI, Preset = PresetLevel.Manual,
+            Name = "Disable the F1 Help Key",
+            Description = "Stop F1 from opening Windows' web help page in File Explorer and other 64-bit programs.",
+            Help = "Overrides the help handler for your account only, the way Sophia Script does. Programs with their own F1 help keep it. 32-bit programs still open the help page: they read a separate entry that is left alone. Undo removes the override but leaves its empty parent keys behind.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                new RegistryKeyAction
+                {
+                    KeyPath = @"HKCU\Software\Classes\Typelib\{8cec5860-07a1-11d9-b15e-000d56bfe6ee}\1.0\0\win64",
+                    DeleteOnApply = false,
+                    KeyDefaultValue = "",
+                },
+            },
+        };
     }
 
     // ------------------------------------------------------------------ Context Menu
 
     private static IEnumerable<Tweak> ContextMenu()
     {
+        yield return new Tweak
+        {
+            Id = "ctx-multi-invoke", Category = TweakCategory.ContextMenu, Preset = PresetLevel.Balanced,
+            Name = "Allow the Context Menu on More Than 15 Files",
+            Description = "Keep options like Open and Print in the right-click menu when more than 15 files are selected.",
+            Help = "Windows hides some menu entries once a selection passes 15 files. This raises the limit to 300. The key is ...\\CurrentVersion\\Explorer itself, not a subkey.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer", "MultipleInvokePromptMinimum", 300, null),
+            },
+        };
+
         yield return new Tweak
         {
             Id = "ctx-classic-menu", Category = TweakCategory.ContextMenu, Preset = PresetLevel.Safe,

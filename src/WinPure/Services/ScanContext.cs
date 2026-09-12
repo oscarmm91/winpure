@@ -52,6 +52,13 @@ public sealed class ScanContext
         @"\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip",
         @"\Microsoft\Windows\Feedback\Siuf\DmClient",
         @"\Microsoft\Windows\Feedback\Siuf\DmClientOnScenarioDownload",
+        // privacy-diagnostic-tasks. A ScheduledTaskAction whose task is not listed here always
+        // reads as already applied — every task a tweak disables must be added.
+        @"\Microsoft\Windows\Application Experience\StartupAppTask",
+        @"\Microsoft\Windows\Autochk\Proxy",
+        @"\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector",
+        @"\Microsoft\Windows\Maps\MapsToastTask",
+        @"\Microsoft\Windows\Maps\MapsUpdateTask",
     };
 
     public static ScanContext Gather()

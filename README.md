@@ -52,17 +52,17 @@ Selecting a preset only marks the toggles — **nothing changes until you click 
 > 📚 Full tweak reference with registry details: [docs/tweaks.md](docs/tweaks.md)
 
 <details>
-<summary>🔒 <b>Privacy & Telemetry</b> — 18 tweaks</summary>
+<summary>🔒 <b>Privacy & Telemetry</b> — 21 tweaks</summary>
 <br/>
-Telemetry (AllowTelemetry → 0), diagnostics data, DiagTrack service, outbound telemetry firewall block, Bing in Start Menu, silent app installs, Consumer Features, Delivery Optimization, background apps, Activity History, location tracking, app-launch tracking, Advertising ID, Windows Feedback, online speech recognition, inking/typing personalization, Compatibility-Appraiser & CEIP scheduled tasks.
+Telemetry (AllowTelemetry → 0), diagnostics data, DiagTrack service, outbound telemetry firewall block, Bing in Start Menu, silent app installs, Consumer Features, Delivery Optimization, background apps, Activity History, location tracking, app-launch tracking, Advertising ID, Windows Feedback, online speech recognition, inking/typing personalization, Compatibility-Appraiser & CEIP scheduled tasks, search history, the language list websites can read, diagnostic data tasks.
 <br/><br/>
 <img src="docs/screenshots/privacy.png" width="800"/>
 </details>
 
 <details>
-<summary>📦 <b>Bloatware & Apps</b> — 20 tweaks</summary>
+<summary>📦 <b>Bloatware & Apps</b> — 24 tweaks</summary>
 <br/>
-Candy Crush, TikTok/Facebook/X/Instagram, Netflix/Disney+/Prime/Spotify, Skype, Clipchamp, Paint 3D & 3D Viewer, To Do, Groove/Movies & TV, Solitaire, Wallet, Whiteboard, Phone Link, Dev Home, Get Help & Tips, Xbox suite + Game DVR, Copilot, Windows AI & Recall, Click to Do, Paint's AI features, OneDrive.
+Candy Crush, TikTok/Facebook/X/Instagram, Netflix/Disney+/Prime/Spotify, Skype, Clipchamp, Paint 3D & 3D Viewer, To Do, Groove/Movies & TV, Solitaire, Wallet, Whiteboard, Phone Link, Dev Home, Get Help & Tips, Xbox suite + Game DVR, Copilot, Windows AI & Recall, Click to Do, Paint's AI features, preinstalled casual games (Asphalt, FarmVille, Royal Revolt…), AI Hub, Game Bar capture, Game Bar integration (and its ms-gamebar popup), OneDrive.
 <br/><br/>
 <img src="docs/screenshots/apps.png" width="800"/>
 </details>
@@ -76,25 +76,25 @@ SysMain (SuperFetch), Windows Search indexing, Print Spooler, Remote Registry, E
 </details>
 
 <details>
-<summary>🚀 <b>Performance</b> — 10 tweaks</summary>
+<summary>🚀 <b>Performance</b> — 14 tweaks</summary>
 <br/>
-Faster app timeouts & shutdown, foreground-app priority, window animations, hibernation, High Performance power plan, fullscreen optimizations, mouse acceleration, long paths, Remote Desktop.
+Faster app timeouts & shutdown, foreground-app priority, window animations, hibernation, High Performance power plan, fullscreen optimizations, mouse acceleration, long paths, Remote Desktop, Fast Startup, early optional updates, daily registry backup, NTP time server.
 <br/><br/>
 <img src="docs/screenshots/performance.png" width="800"/>
 </details>
 
 <details>
-<summary>🎨 <b>UI & Personalization</b> — 14 tweaks</summary>
+<summary>🎨 <b>UI & Personalization</b> — 19 tweaks</summary>
 <br/>
-Dark mode, Snap Assist flyout, Start Menu suggestions/most-used/recently-added, "new app" badge, file extensions, hidden files, Widgets/Task View/Chat taskbar buttons, taskbar alignment, End Task on right-click, Aero Shake.
+Dark mode, Snap Assist flyout, Start Menu suggestions/most-used/recently-added, "new app" badge, file extensions, hidden files, Widgets/Task View/Chat taskbar buttons, taskbar alignment, End Task on right-click, Aero Shake, search highlights, NumLock at sign-in, Spotlight wallpaper, "What's new" screens after updates, the F1 help key.
 <br/><br/>
 <img src="docs/screenshots/ui.png" width="800"/>
 </details>
 
 <details>
-<summary>🖱️ <b>Context Menu</b> — 7 tweaks</summary>
+<summary>🖱️ <b>Context Menu</b> — 8 tweaks</summary>
 <br/>
-Restore the classic Windows 10 right-click menu, remove "Edit with Clipchamp / Notepad / Photos", "Ask Copilot", "Share" and "Give access to".
+Restore the classic Windows 10 right-click menu, remove "Edit with Clipchamp / Notepad / Photos", "Ask Copilot", "Share" and "Give access to", and lift the 15-file limit on right-click options.
 <br/><br/>
 <img src="docs/screenshots/contextmenu.png" width="800"/>
 </details>

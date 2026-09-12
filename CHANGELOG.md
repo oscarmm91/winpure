@@ -42,6 +42,16 @@ WinPure now looks at the state of the system on every scan and, if something is 
 - The preset buttons now show which preset is active, and keep showing it when you move between pages.
 - Buttons no longer stay greyed out after a long operation finishes until you move the mouse.
 
+### 17 new tweaks
+
+Registry keys, scheduled tasks and policies were checked against a real Windows 11 25H2 machine (build 26200) before being added, and every one reverts to the value the machine actually had.
+
+- **Privacy:** search history; the language list websites can read; diagnostic data tasks (disk diagnostics, Autochk, startup scan, offline maps — MareBackup is left alone because Windows Backup relies on it).
+- **Apps:** preinstalled casual games (Asphalt, FarmVille, Royal Revolt…); AI Hub on Copilot+ PCs; Game Bar capture, as a lighter option than removing the Xbox apps; Game Bar integration, which also silences the "you'll need a new app" popup for ms-gamebar links once those apps are gone.
+- **Performance:** Fast Startup; early optional updates (security updates unaffected); daily registry backup; syncing the clock with pool.ntp.org.
+- **Interface:** search highlights; NumLock on at sign-in; Spotlight as desktop background; the "What's new" screens after updates; the F1 help key.
+- **Context menu:** keep right-click options when more than 15 files are selected.
+
 ### Tweaks fixed (verified against Windows 11 24H2/25H2, build 26200)
 
 - **Remove Widgets Button did nothing on current Windows — and it is in the Safe preset.** It only wrote `TaskbarDa`, which Microsoft's UCPD driver now blocks for every known executable (measured on build 26200: the write is refused outright). It now applies the `Dsh!AllowNewsAndInterests` policy, which current Windows honours, and keeps `TaskbarDa` as an optional fallback for builds before 24H2.

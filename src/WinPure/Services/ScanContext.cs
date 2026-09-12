@@ -47,6 +47,7 @@ public sealed class ScanContext
     public static readonly string[] WatchedTasks =
     {
         @"\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser",
+        @"\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser Exp",
         @"\Microsoft\Windows\Application Experience\ProgramDataUpdater",
         @"\Microsoft\Windows\Customer Experience Improvement Program\Consolidator",
         @"\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip",

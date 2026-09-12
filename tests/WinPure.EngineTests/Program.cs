@@ -76,6 +76,7 @@ failures += EveryTweakHasAnIcon() ? 0 : 1;
 failures += RevertingAPowerPlanRestoresTheOneThatWasActive() ? 0 : 1;
 failures += RevertingHibernationKeepsItOffIfItWasOff() ? 0 : 1;
 failures += ATamperedSettingInABackupIsRefused() ? 0 : 1;
+failures += EveryScheduledTaskIsWatched() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
 
@@ -687,6 +688,23 @@ Tweak StateTweak(string id, SystemStateAction action) => new()
 
 static string Short(string guid) => guid.Length > 8 ? guid[..8] : guid;
 
+// A ScheduledTaskAction whose task is missing from ScanContext.WatchedTasks reads as applied forever:
+// the scan never asked about it. Compatibility Appraiser Exp sat like that for a day after being
+// added, while the changelog said it was covered.
+bool EveryScheduledTaskIsWatched()
+{
+    var watched = new HashSet<string>(ScanContext.WatchedTasks, StringComparer.OrdinalIgnoreCase);
+    var missing = TweakCatalog.Build()
+        .SelectMany(t => t.Actions.OfType<ScheduledTaskAction>().Select(a => (t.Id, a.TaskPath)))
+        .Where(x => !watched.Contains(x.TaskPath))
+        .Select(x => $"{x.Id}: {x.TaskPath}")
+        .ToList();
+
+    return Report("every scheduled task a tweak changes is watched by the scan",
+        missing.Count == 0,
+        missing.Count == 0 ? $"{watched.Count} tasks watched, none missing" : "not watched: " + string.Join(" | ", missing));
+}
+
 // The forgiveness granted to an optional action must never extend to the backup itself.
 // Both failures arrive as an exception on the same action, and the first version of this
 // feature could not tell them apart: with the snapshot flush inside the guard, a full disk
@@ -788,10 +806,33 @@ bool TheDocsAgreeWithTheCatalog()
             problems.Add($"{doc}: catalog {inCatalog} vs README {m.Groups[1].Value}");
     }
 
+    // Counts alone let a wrong preset or a renamed tweak through: a review injected both into
+    // tweaks.md and this test stayed green. So every row's name and preset are compared as well.
+    var allTweaks = TweakCatalog.Build();
+    var sections = Regex.Split(tweaksMd, @"\n## ").Skip(1).ToList();
+    foreach (var (doc, cat) in titles)
+    {
+        var section = sections.FirstOrDefault(s => s.Split('\n')[0].Contains(doc, StringComparison.Ordinal));
+        if (section is null) continue;
+        var inDocs = section.Split('\n')
+            .Where(l => l.StartsWith("| ") && !l.Contains("---") && !l.StartsWith("| Tweak"))
+            .Select(l => l.Split('|'))
+            .Where(cells => cells.Length > 3)
+            .Select(cells => (Name: cells[1].Trim(), Preset: cells[2].Trim()))
+            .ToList();
+        var inCatalog = allTweaks.Where(t => t.Category == cat)
+            .Select(t => (Name: t.Name, Preset: t.Preset.ToString()))
+            .ToList();
+        foreach (var t in inCatalog.Except(inDocs))
+            problems.Add($"{doc}: the catalog has '{t.Name}' ({t.Preset}) and tweaks.md does not");
+        foreach (var t in inDocs.Except(inCatalog))
+            problems.Add($"{doc}: tweaks.md has '{t.Name}' ({t.Preset}) and the catalog does not");
+    }
+
     return Report("the docs agree with the catalog",
         problems.Count == 0,
         problems.Count == 0
-            ? $"{catalog.Values.Sum()} tweaks: every category matches in the catalog, docs/tweaks.md and README.md"
+            ? $"{catalog.Values.Sum()} tweaks: every category count, and every tweak's name and preset, match in the catalog, docs/tweaks.md and README.md"
             : string.Join(" | ", problems));
 }
 
@@ -1059,7 +1100,6 @@ bool CatalogIsInternallyConsistent()
     foreach (var t in tweaks.Where(t => t.Actions.Count > 0 && t.Actions.All(a => a.Optional)))
         problems.Add($"{t.Id}: every action is optional, so it can succeed without doing anything");
 
-    var writes = new Dictionary<string, (string tweakId, string value)>(StringComparer.OrdinalIgnoreCase);
     foreach (var tweak in tweaks)
         foreach (var action in tweak.Actions)
         {
@@ -1071,23 +1111,107 @@ bool CatalogIsInternallyConsistent()
             };
             if (path is not null && !ParsesAsRegistryPath(path))
                 problems.Add($"{tweak.Id}: unparseable registry path '{path}'");
-
-            if (action is RegistryValueAction rv)
-            {
-                string slot = $"{rv.KeyPath}!{rv.ValueName}";
-                string value = rv.ApplyValue.ToString() ?? "";
-                if (writes.TryGetValue(slot, out var prev) && prev.value != value)
-                    problems.Add($"{prev.tweakId} and {tweak.Id} both write {slot} with different data ({prev.value} vs {value})");
-                else
-                    writes[slot] = (tweak.Id, value);
-            }
         }
+
+    problems.AddRange(FindConflictingWrites(tweaks));
+
+    // The conflict check has to catch what it claims to, so it is fed one known conflict of each
+    // kind. Without these, a check that silently stopped working would read as "no conflicts".
+    var controls = new[]
+    {
+        ControlTweak("control-hkcr", new RegistryValueAction { KeyPath = @"HKCR\WinPureControl", ValueName = "V", ApplyValue = 1 }),
+        ControlTweak("control-hkcu-classes", new RegistryValueAction { KeyPath = @"HKCU\Software\Classes\WinPureControl", ValueName = "V", ApplyValue = 2 }),
+        ControlTweak("control-delete", new RegistryKeyAction { KeyPath = @"HKCU\Software\WinPureControlZone", DeleteOnApply = true }),
+        ControlTweak("control-write-inside", new RegistryValueAction { KeyPath = @"HKCU\Software\WinPureControlZone\Inner", ValueName = "X", ApplyValue = 1 }),
+    };
+    var caught = FindConflictingWrites(controls);
+    if (!caught.Any(p => p.Contains("control-hkcr") && p.Contains("control-hkcu-classes")))
+        problems.Add("the conflict check missed an HKCR write colliding with the same key under HKCU Classes");
+    if (!caught.Any(p => p.Contains("control-delete") && p.Contains("control-write-inside")))
+        problems.Add("the conflict check missed a value written inside a key another tweak deletes");
 
     return Report("the catalog is internally consistent",
         problems.Count == 0,
         problems.Count == 0
-            ? $"{tweaks.Count} tweaks: ids unique, registry paths parseable, no conflicting writes"
+            ? $"{tweaks.Count} tweaks: ids unique, registry paths parseable, no conflicting writes (HKCR aliases and deleted keys included, both checks proven on a known conflict)"
             : string.Join(" | ", problems));
+}
+
+Tweak ControlTweak(string id, TweakAction action) => new()
+{
+    Id = id,
+    Category = TweakCategory.UI,
+    Name = id,
+    Description = "known conflict, tests only",
+    Icon = "x",
+    Actions = new TweakAction[] { action },
+};
+
+// Two tweaks writing different data to one value undo each other, and each one's backup records
+// the other's value. Compared on the key Windows really writes: HKCR is a merged view of the user's
+// and the machine's Classes keys, and a value inside a key that another tweak deletes is lost too.
+static List<string> FindConflictingWrites(IEnumerable<Tweak> tweaks)
+{
+    var problems = new List<string>();
+    var writes = new Dictionary<string, (string tweakId, string value, string shown)>();
+    var valueKeys = new List<(string tweakId, string key, string shown)>();
+    var deletedKeys = new List<(string tweakId, string key, string shown)>();
+
+    foreach (var tweak in tweaks)
+        foreach (var action in tweak.Actions)
+        {
+            if (action is RegistryValueAction rv)
+            {
+                string shown = $"{rv.KeyPath}!{rv.ValueName}";
+                string value = rv.ApplyValue.ToString() ?? "";
+                foreach (var key in RegistryAliases(rv.KeyPath))
+                {
+                    string slot = key + "!" + rv.ValueName.ToUpperInvariant();
+                    if (writes.TryGetValue(slot, out var prev) && prev.value != value)
+                        problems.Add($"{prev.tweakId} and {tweak.Id} both write {prev.shown} / {shown} with different data ({prev.value} vs {value})");
+                    else if (!writes.ContainsKey(slot))
+                        writes[slot] = (tweak.Id, value, shown);
+                    valueKeys.Add((tweak.Id, key, shown));
+                }
+            }
+            else if (action is RegistryKeyAction { DeleteOnApply: true } rk)
+            {
+                foreach (var key in RegistryAliases(rk.KeyPath))
+                    deletedKeys.Add((tweak.Id, key, rk.KeyPath));
+            }
+        }
+
+    foreach (var deleted in deletedKeys)
+        foreach (var write in valueKeys.Where(w => w.tweakId != deleted.tweakId &&
+                     (w.key == deleted.key || w.key.StartsWith(deleted.key + "\\", StringComparison.Ordinal))))
+            problems.Add($"{deleted.tweakId} deletes {deleted.shown}, inside which {write.tweakId} writes {write.shown}");
+
+    return problems.Distinct().ToList();
+}
+
+// Upper-cased, short hive names, with HKCR expanded to both keys it can land in.
+static IEnumerable<string> RegistryAliases(string keyPath)
+{
+    int idx = keyPath.IndexOf('\\');
+    string hive = (idx < 0 ? keyPath : keyPath[..idx]).ToUpperInvariant();
+    string rest = (idx < 0 ? "" : keyPath[(idx + 1)..]).ToUpperInvariant();
+    hive = hive switch
+    {
+        "HKEY_LOCAL_MACHINE" => "HKLM",
+        "HKEY_CURRENT_USER" => "HKCU",
+        "HKEY_CLASSES_ROOT" => "HKCR",
+        "HKEY_USERS" => "HKU",
+        _ => hive,
+    };
+    if (hive == "HKCR")
+    {
+        yield return @"HKCU\SOFTWARE\CLASSES\" + rest;
+        yield return @"HKLM\SOFTWARE\CLASSES\" + rest;
+    }
+    else
+    {
+        yield return hive + "\\" + rest;
+    }
 }
 
 static bool ParsesAsRegistryPath(string keyPath)

@@ -71,7 +71,7 @@ Registry keys, scheduled tasks and policies were checked against a real Windows 
 
 - **Remove Dev Home** never removed anything: the package is `Microsoft.Windows.DevHome`, and the old pattern did not match it — so it also reported itself as already done.
 - **Remove 'Share'** pointed at a context-menu key that no longer exists; the handler now lives under `AllFileSystemObjects`. Same story: it claimed to be applied without doing anything.
-- **Disable Compatibility Telemetry Tasks** now also covers *Microsoft Compatibility Appraiser Exp*, the task that replaced the two originals on 24H2/25H2 (the old ones are kept for machines upgraded from Windows 10).
+- **Disable Compatibility Telemetry Tasks** now also covers *Microsoft Compatibility Appraiser Exp*, the task that replaced the two originals on 24H2/25H2 (the old ones are kept for machines upgraded from Windows 10). The first version of that fix forgot to tell the scan about the new task, so the tweak read as already applied whatever the task's real state; a test now fails for any scheduled task the scan does not watch.
 - **Remove 'Give access to'** now clears all six handlers — the two library-folder ones were missed, so the entry still showed up on Documents, Pictures and friends.
 - **Remove Get Help & Tips** also covers `Microsoft.StartExperiencesApp`, which replaced `Microsoft.Getstarted`.
 - **Disable Connected Devices Platform** moved from Balanced to Manual: it stops Night Light from working, which nobody would trace back to this setting. Now says so.

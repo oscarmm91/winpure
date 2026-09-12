@@ -6,8 +6,9 @@ namespace WinPure.Models;
 public sealed class BackupEntry
 {
     /// <summary>
-    /// registry-value | registry-key | service | scheduled-task | startup-entry | system-state.
-    /// For system-state, ValueName is the SystemStateKind and Value the measured state.
+    /// registry-value | registry-key | service | scheduled-task | startup-entry | system-state | optional-feature.
+    /// For system-state, ValueName is the SystemStateKind and Value the measured state; for
+    /// optional-feature, ValueName is the DISM feature name and Value "Enabled" or "Disabled".
     /// </summary>
     public required string Type { get; set; }
     public required string TweakId { get; set; }

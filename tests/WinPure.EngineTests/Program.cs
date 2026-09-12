@@ -77,6 +77,9 @@ failures += RevertingAPowerPlanRestoresTheOneThatWasActive() ? 0 : 1;
 failures += RevertingHibernationKeepsItOffIfItWasOff() ? 0 : 1;
 failures += ATamperedSettingInABackupIsRefused() ? 0 : 1;
 failures += EveryScheduledTaskIsWatched() ? 0 : 1;
+failures += AFailedFeatureScanIsUnknownNotOptimized() ? 0 : 1;
+failures += RevertingAFeatureRestoresItsRecordedState() ? 0 : 1;
+failures += ATamperedFeatureInABackupIsRefused() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
 
@@ -705,6 +708,81 @@ bool EveryScheduledTaskIsWatched()
         missing.Count == 0 ? $"{watched.Count} tasks watched, none missing" : "not watched: " + string.Join(" | ", missing));
 }
 
+// Same lesson as apps and tasks: a feature query that failed must read Unknown, never "already
+// off". A feature this build does not include has nothing left to turn off — and cannot be turned on.
+bool AFailedFeatureScanIsUnknownNotOptimized()
+{
+    var turnOff = new FeatureAction { FeatureName = "Printing-XPSServices-Features", DefaultEnabled = true };
+    var turnOffAbsent = new FeatureAction { FeatureName = "MicrosoftWindowsPowerShellV2", DefaultEnabled = true };
+    var turnOnAbsent = new FeatureAction { FeatureName = "Containers-DisposableClientVM", Enable = true, DefaultEnabled = false };
+
+    var failed = new ScanContext { Loaded = true, FeaturesQueryOk = false };
+    var ok = new ScanContext { Loaded = true, FeaturesQueryOk = true };
+    ok.FeatureState["Printing-XPSServices-Features"] = 1; // enabled: turning it off is still to do
+
+    bool? whenFailed = turnOff.IsApplied(failed);
+    bool? whenEnabled = turnOff.IsApplied(ok);
+    bool? absentOff = turnOffAbsent.IsApplied(ok);
+    bool? absentOn = turnOnAbsent.IsApplied(ok);
+
+    return Report("a failed feature scan reads as Unknown, not Optimized",
+        whenFailed is null && whenEnabled == false && absentOff == true && absentOn is null,
+        $"query failed => {whenFailed?.ToString() ?? "null"} (expected null), still enabled => {whenEnabled?.ToString() ?? "null"} (expected False), " +
+        $"absent + turn off => {absentOff?.ToString() ?? "null"} (expected True), absent + turn on => {absentOn?.ToString() ?? "null"} (expected null)");
+}
+
+// A feature this PC already had off stays off after undo, even when the hand-written default says
+// Windows ships it on. The recorded state wins, as for every other kind of action.
+bool RevertingAFeatureRestoresItsRecordedState()
+{
+    Reset();
+    const string xps = "Printing-XPSServices-Features";
+    var features = new FakeFeatures();
+    features.States[xps] = OptionalFeatures.Disabled;
+    var real = OptionalFeatures.Backend;
+    OptionalFeatures.Backend = features;
+    try
+    {
+        var tweak = ControlTweak("test-feature", new FeatureAction { FeatureName = xps, DefaultEnabled = true });
+        var engine = new TweakEngine(new BackupManager());
+        engine.ApplyChanges(new[] { (tweak, true) });
+        engine.ApplyChanges(new[] { (tweak, false) });
+
+        return Report("reverting a feature restores the state it had",
+            features.States[xps] == OptionalFeatures.Disabled && !features.Writes.Contains(xps + "=on"),
+            $"was Disabled, writes=[{string.Join(",", features.Writes)}], now={features.States[xps]} " +
+            "(expected Disabled and never turned on; without a recorded state the default would turn it on)");
+    }
+    finally { OptionalFeatures.Backend = real; }
+}
+
+// A feature name read back from a backup ends up inside a DISM command line, so it is checked first.
+bool ATamperedFeatureInABackupIsRefused()
+{
+    var features = new FakeFeatures();
+    var real = OptionalFeatures.Backend;
+    OptionalFeatures.Backend = features;
+    try
+    {
+        var badName = new BackupEntry
+        {
+            Type = "optional-feature", TweakId = "test-tamper", Existed = true,
+            ValueName = "NetFx3' ; Remove-Item $env:TEMP -Recurse ; '", Value = "Enabled",
+        };
+        var badState = new BackupEntry
+        {
+            Type = "optional-feature", TweakId = "test-tamper", Existed = true,
+            ValueName = "NetFx3", Value = "Enabled; shutdown /s",
+        };
+        int failures = new BackupManager().RestoreEntries(new[] { badName, badState });
+
+        return Report("a tampered feature in a backup is refused",
+            failures == 2 && features.Writes.Count == 0,
+            $"failures={failures} (expected 2), writes that reached DISM={features.Writes.Count} (expected 0)");
+    }
+    finally { OptionalFeatures.Backend = real; }
+}
+
 // The forgiveness granted to an optional action must never extend to the backup itself.
 // Both failures arrive as an exception on the same action, and the first version of this
 // feature could not tell them apart: with the snapshot flush inside the guard, a full disk
@@ -789,6 +867,7 @@ bool TheDocsAgreeWithTheCatalog()
         ("Performance", TweakCategory.Performance),
         ("UI & Personalization", TweakCategory.UI),
         ("Context Menu", TweakCategory.ContextMenu),
+        ("Windows Features", TweakCategory.Features),
     };
 
     foreach (var (doc, cat) in titles)
@@ -1254,6 +1333,10 @@ void ReportCatalogDeadWeightOnThisMachine()
                     checkable++;
                     if (!RegistryKeyExists(key.KeyPath)) missing.Add("key " + key.KeyPath);
                     break;
+                case FeatureAction feature when ctx.FeaturesQueryOk:
+                    checkable++;
+                    if (!ctx.FeatureState.ContainsKey(feature.FeatureName)) missing.Add("feature " + feature.FeatureName);
+                    break;
             }
         }
         if (checkable > 0 && missing.Count == checkable)
@@ -1467,5 +1550,21 @@ sealed class FakeSetting : ISystemStateHandler
     {
         Writes.Add(state);
         Current = state;
+    }
+}
+
+/// <summary>Windows features held in memory, so tests never run DISM.</summary>
+sealed class FakeFeatures : IFeatureBackend
+{
+    public Dictionary<string, string> States { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<string> Writes { get; } = new();
+
+    public string Read(string featureName) =>
+        States.TryGetValue(featureName, out var state) ? state : OptionalFeatures.Missing;
+
+    public void Write(string featureName, bool enable)
+    {
+        Writes.Add($"{featureName}={(enable ? "on" : "off")}");
+        States[featureName] = enable ? OptionalFeatures.Enabled : OptionalFeatures.Disabled;
     }
 }

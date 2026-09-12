@@ -133,6 +133,21 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Remove 'Give access to' | Safe | Deletes the 6 `Sharing` handlers: files, folders, background, drives & both library folders |
 | Allow the Context Menu on More Than 15 Files | Balanced | `CurrentVersion\Explorer!MultipleInvokePromptMinimum = 300` |
 
+## 🧩 Windows Features
+
+Switched with DISM (`Enable-` / `Disable-WindowsOptionalFeature -NoRestart`, never `-All`) and detected with `Win32_OptionalFeature`. Undo puts back the state each feature had; a feature this Windows build does not include is left alone. Most changes finish after a restart.
+
+| Tweak | Preset | Feature |
+|---|---|---|
+| Remove PowerShell 2.0 | Balanced | `MicrosoftWindowsPowerShellV2`, `MicrosoftWindowsPowerShellV2Root` (already gone on current 25H2) |
+| Turn Off SMB 1.0 | Manual | `SMB1Protocol` |
+| Remove the XPS Document Writer | Manual | `Printing-XPSServices-Features` |
+| Remove Windows Media Player Legacy | Manual | `WindowsMediaPlayer` (Media Features stay on) |
+| Remove the Work Folders Client | Manual | `WorkFolders-Client` |
+| Turn On Windows Sandbox | Manual | `Containers-DisposableClientVM` (Pro, Enterprise, Education) |
+| Turn On Windows Subsystem for Linux | Manual | `Microsoft-Windows-Subsystem-Linux` + `VirtualMachinePlatform` |
+| Turn On .NET Framework 3.5 | Manual | `NetFx3` (downloaded from Windows Update) |
+
 ## 🔧 Repair & Maintenance (one-shot tools)
 
 | Tool | What it runs |

@@ -100,6 +100,12 @@ Restore the classic Windows 10 right-click menu, remove "Edit with Clipchamp / N
 </details>
 
 <details>
+<summary>🧩 <b>Windows Features</b> — 8 tweaks</summary>
+<br/>
+Turn off PowerShell 2.0, SMB 1.0, the XPS Document Writer, Windows Media Player Legacy and Work Folders — or turn on Windows Sandbox, WSL and .NET Framework 3.5. Undo puts back the state each feature had.
+</details>
+
+<details>
 <summary>🚦 <b>Startup Apps</b> — everything that starts with Windows</summary>
 <br/>
 Apps launched from the registry (per-user, machine-wide and 32-bit), shortcuts in both Startup folders, and third-party scheduled tasks that run at logon — in one list, with the publisher and the real command line. Switching one off <b>uninstalls nothing</b>: it flips the same switch Task Manager uses, so the two always agree, and the change is backed up like everything else. Entries whose file no longer exists are flagged.

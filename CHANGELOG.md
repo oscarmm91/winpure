@@ -50,6 +50,14 @@ WinPure now looks at the state of the system on every scan and, if something is 
 - New: **Disable Reserved Storage** (in no preset), with the same record-and-restore undo.
 - A setting read back from a backup file is checked before anything runs, so an edited backup cannot make WinPure — which runs as administrator — execute something else.
 
+### New: Windows Features
+
+A new page for Windows' optional features, switched with DISM and undone to the state each one had:
+
+- **Turn off:** PowerShell 2.0 (in Balanced — recent Windows 11 builds no longer include it), SMB 1.0, the XPS Document Writer, Windows Media Player Legacy and the Work Folders client.
+- **Turn on:** Windows Sandbox, Windows Subsystem for Linux and .NET Framework 3.5.
+- A feature query that fails reads as *Couldn't detect*, never *Already optimized*. A feature your Windows build does not include is left alone, and a feature read back from a backup file is checked before DISM ever runs.
+
 ### 17 new tweaks
 
 Registry keys, scheduled tasks and policies were checked against a real Windows 11 25H2 machine (build 26200) before being added, and every one reverts to the value the machine actually had.

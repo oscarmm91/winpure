@@ -30,6 +30,10 @@ public sealed class ScanContext
     public bool AppsListedForAllUsers { get; internal set; }
     /// <summary>The scheduled-task query succeeded. False → task detection is unknown, not "disabled".</summary>
     public bool TasksQueryOk { get; internal set; }
+    /// <summary>DISM feature name → Win32_OptionalFeature.InstallState. When <see cref="FeaturesQueryOk"/>, missing means "not in this build".</summary>
+    public Dictionary<string, int> FeatureState { get; } = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>The optional-features query succeeded. False → feature detection is unknown, not "already off".</summary>
+    public bool FeaturesQueryOk { get; internal set; }
     /// <summary>Human-readable list of what could not be determined, for the status bar.</summary>
     public List<string> Warnings { get; } = new();
 
@@ -126,6 +130,20 @@ public sealed class ScanContext
             $r.tasks = $tasks
             $r.logonTasks = @($logon)
 
+            $r.featuresOk = $false
+            try {
+                # Win32_OptionalFeature, not Get-WindowsOptionalFeature: it answers without elevation,
+                # where DISM's cmdlets refuse, and took 0.7 s for all 135 features on 25H2.
+                $features = @{}
+                foreach ($feature in Get-CimInstance Win32_OptionalFeature -ErrorAction Stop) {
+                    $features[[string]$feature.Name] = [int]$feature.InstallState
+                }
+                $r.features = $features
+                $r.featuresOk = $true
+            } catch {
+                $r.featuresError = $_.Exception.Message
+            }
+
             # Hibernation and the power plan are read straight from the registry by their actions.
             # Reserved storage has no registry value that reflects it, only DISM's enum name; it needs
             # elevation, so unelevated this throws and that tweak reads Unknown.
@@ -169,6 +187,12 @@ public sealed class ScanContext
                 foreach (var prop in tasks.EnumerateObject())
                     ctx.TaskEnabled[prop.Name] = prop.Value.GetBoolean();
 
+            ctx.FeaturesQueryOk = root.TryGetProperty("featuresOk", out var featuresOk) && featuresOk.GetBoolean();
+            if (root.TryGetProperty("features", out var features) && features.ValueKind == JsonValueKind.Object)
+                foreach (var prop in features.EnumerateObject())
+                    if (prop.Value.ValueKind == JsonValueKind.Number && prop.Value.TryGetInt32(out int installState))
+                        ctx.FeatureState[prop.Name] = installState;
+
             if (root.TryGetProperty("logonTasks", out var logon) && logon.ValueKind == JsonValueKind.Array)
                 foreach (var t in logon.EnumerateArray())
                 {
@@ -201,6 +225,12 @@ public sealed class ScanContext
             {
                 ctx.Warnings.Add("scheduled tasks could not be read");
                 LogService.Log($"Scan: scheduled task listing failed: {Text(root, "tasksError")}");
+            }
+
+            if (!ctx.FeaturesQueryOk)
+            {
+                ctx.Warnings.Add("Windows features could not be read");
+                LogService.Log($"Scan: optional feature listing failed: {Text(root, "featuresError")}");
             }
         }
         catch (Exception ex)

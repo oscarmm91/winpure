@@ -85,6 +85,8 @@ public sealed class MainViewModel : ObservableObject
             "Clean up the Start Menu, taskbar and File Explorer.");
         AddCategory("Context Menu", "", TweakCategory.ContextMenu, "Context Menu",
             "Remove clutter from the right-click menu or restore the classic one.");
+        AddCategory("Features", "", TweakCategory.Features, "Windows Features",
+            "Turn optional parts of Windows off, or on. Most of these changes finish after a restart.");
         _startup = new StartupViewModel(_engine)
         {
             Title = "Startup Apps",

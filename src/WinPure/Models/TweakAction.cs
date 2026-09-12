@@ -501,6 +501,60 @@ public sealed class StartupEntryAction : TweakAction
 }
 
 /// <summary>
+/// Turns a Windows optional feature off — or on, for the few worth adding (Sandbox, WSL). Detection
+/// comes from the scan, and a failed feature query reads Unknown, never "already done". Undo puts
+/// back the state this machine had; a feature this Windows build does not include is left alone.
+/// </summary>
+public sealed class FeatureAction : TweakAction
+{
+    public required string FeatureName { get; init; }
+    /// <summary>True when applying turns the feature ON.</summary>
+    public bool Enable { get; init; }
+    /// <summary>Whether a stock Windows has it on. Only used when no backup of this tweak exists.</summary>
+    public required bool DefaultEnabled { get; init; }
+
+    public override bool? IsApplied(ScanContext ctx)
+    {
+        if (!ctx.Loaded || !ctx.FeaturesQueryOk) return null;
+        if (!ctx.FeatureState.TryGetValue(FeatureName, out int installState))
+            // Not part of this build: nothing is left to turn off, and nothing could be turned on.
+            return Enable ? null : true;
+        string? state = OptionalFeatures.FromInstallState(installState);
+        return state is null ? null : state == (Enable ? OptionalFeatures.Enabled : OptionalFeatures.Disabled);
+    }
+
+    public override void Capture(Tweak tweak, List<BackupEntry> backup)
+    {
+        // Throws when the state cannot be read: no backup, so no change.
+        string state = OptionalFeatures.Backend.Read(FeatureName);
+        backup.Add(new BackupEntry
+        {
+            Type = "optional-feature",
+            TweakId = tweak.Id,
+            TweakName = tweak.Name,
+            ValueName = FeatureName,
+            Existed = state != OptionalFeatures.Missing,
+            Value = state == OptionalFeatures.Missing ? null : state,
+            Optional = Optional,
+        });
+    }
+
+    public override void Apply() => SwitchUnlessMissing(Enable);
+
+    public override void RevertToDefault() => SwitchUnlessMissing(DefaultEnabled);
+
+    private void SwitchUnlessMissing(bool enable)
+    {
+        var backend = OptionalFeatures.Backend;
+        string state = backend.Read(FeatureName);
+        if (state == OptionalFeatures.Missing) return;
+        // Already there: skip a DISM run that can take minutes.
+        if (state == (enable ? OptionalFeatures.Enabled : OptionalFeatures.Disabled)) return;
+        backend.Write(FeatureName, enable);
+    }
+}
+
+/// <summary>
 /// A setting changed through a command (powercfg, DISM) whose undo must put back what this machine
 /// had. These used to be CommandActions that captured nothing and reverted with a hand-written
 /// "stock" command: undoing High Performance switched a custom plan to Balanced, and undoing

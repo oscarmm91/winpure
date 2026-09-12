@@ -33,7 +33,8 @@ Phases 1, 2 and 3 are built, each followed by a separate commit applying its rev
 --oneline` is the record, not this paragraph. Phase 3 also turned up a bug this roadmap had not
 listed: the power plan and hibernation tweaks were undone with hand-written defaults. Fixed as
 Phase 3b (`SystemStateAction`), together with Reserved Storage. Still open from Phase 3: **Edge's
-new-tab policies**, waiting on the product decision described there.
+new-tab policies**, waiting on the product decision described there. From Phase 4, Windows
+optional features are built; OEM bloatware is not.
 
 ---
 
@@ -87,6 +88,9 @@ value; it is a product decision because it configures another vendor's app.
   the other direction, turning **Sandbox and WSL on**. Needs a `FeatureAction` plus a
   `FeaturesQueryOk` flag, so a failed query reads as *unknown* and not as *already optimized* —
   the same mistake we already paid for once.
+  **Built**, as the *Windows Features* page with eight tweaks. Measured on 25H2 build 26200:
+  PowerShell 2.0, WordPad, Fax and Recall no longer exist there as optional features, so only
+  PowerShell 2.0 was kept (for older builds, where it still ships).
 - **OEM bloatware** (Dell, HP, Lenovo, Samsung). ~20 verified AppIds. The honest caveat: none of
   it can be tested here, and some of those apps deliver real driver updates, so they never go in
   a preset.

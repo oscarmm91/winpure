@@ -190,6 +190,13 @@ public sealed class BackupManager
                 SystemState.Restore(entry.ValueName, entry.Value);
                 break;
             }
+            case "optional-feature":
+            {
+                // A feature that was not part of this build when we looked is left alone.
+                if (!entry.Existed) return;
+                OptionalFeatures.Restore(entry.ValueName, entry.Value);
+                break;
+            }
         }
     }
 
@@ -218,6 +225,7 @@ public sealed class BackupManager
             "service" => $"service {e.ServiceName}",
             "scheduled-task" => $"task {e.TaskPath}",
             "system-state" => $"{e.ValueName} setting",
+            "optional-feature" => $"Windows feature {e.ValueName}",
             _ => e.Type
         };
 }

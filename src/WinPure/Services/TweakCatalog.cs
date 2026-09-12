@@ -18,6 +18,7 @@ public static class TweakCatalog
         tweaks.AddRange(Performance());
         tweaks.AddRange(UI());
         tweaks.AddRange(ContextMenu());
+        tweaks.AddRange(Features());
         return tweaks;
     }
 
@@ -1072,6 +1073,123 @@ public static class TweakCatalog
                     DeleteOnApply = false,
                     KeyDefaultValue = "",
                 },
+            },
+        };
+    }
+
+    // ------------------------------------------------------------------ Windows Features
+
+    // Names are DISM's identifiers, the same on every Windows language. Each was read with
+    // Win32_OptionalFeature on Windows 11 Pro 25H2 build 26200 unless its comment says otherwise.
+    // All of them finish after a restart, and none is switched with -All (see DismFeatureBackend).
+    private static IEnumerable<Tweak> Features()
+    {
+        yield return new Tweak
+        {
+            Id = "features-powershell-v2", Category = TweakCategory.Features, Preset = PresetLevel.Balanced,
+            Name = "Remove PowerShell 2.0",
+            Description = "Turn off the old PowerShell 2.0 engine, which attackers use to get around PowerShell's logging.",
+            Help = "PowerShell 2.0 skips the script logging and malware scanning of current PowerShell, which is why attackers downgrade to it; nothing current needs it. Recent Windows 11 builds no longer include it at all, and on those this has nothing to do.",
+            Icon = "", RequiresRestart = true,
+            Actions = new TweakAction[]
+            {
+                // Both absent on 26200 (measured); names as in Sophia Script's feature list.
+                new FeatureAction { FeatureName = "MicrosoftWindowsPowerShellV2", DefaultEnabled = true },
+                new FeatureAction { FeatureName = "MicrosoftWindowsPowerShellV2Root", DefaultEnabled = true },
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "features-smb1", Category = TweakCategory.Features, Preset = PresetLevel.Manual,
+            Name = "Turn Off SMB 1.0",
+            Description = "Turn off the obsolete file-sharing protocol the WannaCry ransomware spread through.",
+            Help = "Already off on a clean Windows 11; this catches PCs upgraded from older versions. Very old NAS drives, printers and scanners that only speak SMB 1.0 stop working without it.",
+            Icon = "", RequiresRestart = true,
+            Actions = new TweakAction[]
+            {
+                new FeatureAction { FeatureName = "SMB1Protocol", DefaultEnabled = false },
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "features-xps", Category = TweakCategory.Features, Preset = PresetLevel.Manual,
+            Name = "Remove the XPS Document Writer",
+            Description = "Turn off XPS printing and the 'Microsoft XPS Document Writer' printer.",
+            Help = "XPS is a PDF alternative that never caught on. Microsoft Print to PDF is a separate feature and keeps working.",
+            Icon = "", RequiresRestart = true,
+            Actions = new TweakAction[]
+            {
+                // Disabled on this machine; on by default on Windows 10 and early Windows 11.
+                new FeatureAction { FeatureName = "Printing-XPSServices-Features", DefaultEnabled = true },
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "features-media-player-legacy", Category = TweakCategory.Features, Preset = PresetLevel.Manual,
+            Name = "Remove Windows Media Player Legacy",
+            Description = "Turn off the old Windows Media Player. The newer Media Player app is not affected.",
+            Help = "Only the legacy player goes. 'Media Features' as a whole stays on: turning that off also removes the Multimedia settings from Power Options, as Sophia Script notes.",
+            Icon = "", RequiresRestart = true,
+            Actions = new TweakAction[]
+            {
+                new FeatureAction { FeatureName = "WindowsMediaPlayer", DefaultEnabled = true },
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "features-work-folders", Category = TweakCategory.Features, Preset = PresetLevel.Manual,
+            Name = "Remove the Work Folders Client",
+            Description = "Turn off Work Folders, which syncs files with a company's Windows Server.",
+            Help = "Only useful if an organization set Work Folders up on its servers. At home nothing uses it.",
+            Icon = "", RequiresRestart = true,
+            Actions = new TweakAction[]
+            {
+                new FeatureAction { FeatureName = "WorkFolders-Client", DefaultEnabled = true },
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "features-sandbox", Category = TweakCategory.Features, Preset = PresetLevel.Manual,
+            Name = "Turn On Windows Sandbox",
+            Description = "Add Windows Sandbox: a throwaway desktop for trying unknown programs, wiped when you close it.",
+            Help = "Needs Windows 11 Pro, Enterprise or Education, and virtualization enabled in the BIOS/UEFI. On Home the feature does not exist, so this shows as unknown.",
+            Icon = "", RequiresRestart = true,
+            Actions = new TweakAction[]
+            {
+                new FeatureAction { FeatureName = "Containers-DisposableClientVM", Enable = true, DefaultEnabled = false },
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "features-wsl", Category = TweakCategory.Features, Preset = PresetLevel.Manual,
+            Name = "Turn On Windows Subsystem for Linux",
+            Description = "Add the two Windows features WSL needs to run Linux distributions.",
+            Help = "Adds the Windows side only: choose a distribution afterwards with 'wsl --install' or from the Microsoft Store. It uses virtualization, like Hyper-V.",
+            Icon = "", RequiresRestart = true,
+            Actions = new TweakAction[]
+            {
+                // Two separate features, not parent and child, as winutil lists them.
+                new FeatureAction { FeatureName = "Microsoft-Windows-Subsystem-Linux", Enable = true, DefaultEnabled = false },
+                new FeatureAction { FeatureName = "VirtualMachinePlatform", Enable = true, DefaultEnabled = false },
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "features-dotnet35", Category = TweakCategory.Features, Preset = PresetLevel.Manual,
+            Name = "Turn On .NET Framework 3.5",
+            Description = "Add .NET Framework 3.5, which includes 2.0 and 3.0, for older programs that ask for it.",
+            Help = "Downloaded from Windows Update, so it needs an internet connection and can take a few minutes.",
+            Icon = "", RequiresRestart = true,
+            Actions = new TweakAction[]
+            {
+                new FeatureAction { FeatureName = "NetFx3", Enable = true, DefaultEnabled = false },
             },
         };
     }

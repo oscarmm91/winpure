@@ -7,7 +7,8 @@ public enum TweakCategory
     Services,
     Performance,
     UI,
-    ContextMenu
+    ContextMenu,
+    Features
 }
 
 /// <summary>Lowest preset that includes the tweak. Manual = never auto-selected by a preset.</summary>

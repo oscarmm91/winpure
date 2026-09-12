@@ -326,7 +326,7 @@ public static class TweakCatalog
             Id = "privacy-diagnostic-tasks", Category = TweakCategory.Privacy, Preset = PresetLevel.Aggressive,
             Name = "Disable Diagnostic Data Tasks",
             Description = "Disable scheduled tasks that collect disk and Autochk diagnostics, scan startup apps and update offline maps.",
-            Help = "Offline maps stop updating on their own. MareBackup, which Sophia Script also disables, is deliberately left alone: it feeds the app list Windows Backup uses to restore your apps on a new PC.",
+            Help = "Offline maps stop updating on their own. The warning that a disk is about to fail comes from a different task (DiskDiagnosticResolver), which this leaves alone. MareBackup, which Sophia Script also disables, is deliberately left alone: it feeds the app list Windows Backup uses to restore your apps on a new PC.",
             Icon = "",
             Actions = new TweakAction[]
             {
@@ -501,10 +501,12 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
-            Id = "apps-gamebar-integration", Category = TweakCategory.Apps, Preset = PresetLevel.Aggressive,
+            // Manual, not Aggressive: Remove Xbox Apps tells Game Pass players to leave it unticked, and
+            // this one ticked on its own breaks the Xbox button while Game Bar is still installed.
+            Id = "apps-gamebar-integration", Category = TweakCategory.Apps, Preset = PresetLevel.Manual,
             Name = "Disable Game Bar Integration",
             Description = "Stop games and controllers from opening Game Bar — which also silences the \"You'll need a new app to open this ms-gamebar link\" popup once the Xbox apps are removed.",
-            Help = "Meant for PCs without Game Bar, which is why it sits in Aggressive next to Remove Xbox Apps. If Game Bar is still installed, the controller's Xbox button and games stop opening it until you undo this. Registers a do-nothing handler for ms-gamebar links under your account; undo removes it but leaves two empty registry keys behind.",
+            Help = "For PCs where the Xbox apps were removed, so it is in no preset. If Game Bar is still installed — say you kept it for Game Pass — the controller's Xbox button and games stop opening it. Reinstalling Game Bar is not expected to undo this; Undo here does, leaving two empty registry keys behind. The similar prompt for ms-gamingoverlay links is a different case: Sophia Script silences it with the values Disable Game Bar Capture and Remove Xbox Apps write.",
             Icon = "",
             Actions = new TweakAction[]
             {
@@ -757,7 +759,7 @@ public static class TweakCatalog
             Id = "perf-fast-startup", Category = TweakCategory.Performance, Preset = PresetLevel.Balanced,
             Name = "Disable Fast Startup",
             Description = "Make Shut down actually shut Windows down instead of hibernating its kernel.",
-            Help = "With Fast Startup, drivers are not reloaded after a shutdown and the system drive is left in a state other operating systems cannot safely write to. Turning it off fixes both; startup takes a few seconds longer.",
+            Help = "With Fast Startup, drivers are not reloaded after a shutdown and the system drive is left in a state other operating systems cannot safely write to. Turning it off fixes both; startup takes a few seconds longer. Disable Hibernation also stops Fast Startup from working, even though this setting then still reads as not applied.",
             Icon = "",
             Actions = new TweakAction[]
             {
@@ -770,7 +772,7 @@ public static class TweakCatalog
             Id = "perf-early-updates", Category = TweakCategory.Performance, Preset = PresetLevel.Balanced,
             Name = "Don't Get Updates As Soon As They're Available",
             Description = "Leave the channel that installs optional preview updates before everyone else.",
-            Help = "The same switch as 'Get the latest updates as soon as they're available' in Windows Update settings, which is off unless someone turned it on. Security updates keep arriving as usual; only early optional releases stop.",
+            Help = "The same switch as 'Get the latest updates as soon as they're available' in Windows Update settings, which is off unless someone turned it on. Security updates keep arriving as usual; only early optional releases stop. On a PC managed by an organization, its Windows Update policy decides instead, and this setting may have no visible effect.",
             Icon = "",
             Actions = new TweakAction[]
             {
@@ -803,11 +805,13 @@ public static class TweakCatalog
             Id = "perf-ntp-server", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
             Name = "Sync the Clock With pool.ntp.org",
             Description = "Point Windows' time sync at the public NTP pool instead of time.windows.com.",
-            Help = "Useful when the clock keeps drifting. Takes effect at Windows' next automatic time sync; the Windows Time service is not started or restarted. Written as a registry value on purpose, so undo restores the server you actually had.",
+            Help = "Useful when the clock keeps drifting. Only the server changes, not how often Windows syncs. On most home PCs the Windows Time service starts fresh for every sync, so the next one uses it; where the service runs all the time (typical on work PCs) it applies after a restart. Written as a registry value on purpose, so undo restores the server you actually had.",
             Icon = "",
             Actions = new TweakAction[]
             {
-                Str(@"HKLM\SYSTEM\CurrentControlSet\Services\W32Time\Parameters", "NtpServer", "pool.ntp.org,0x8", "time.windows.com,0x9"),
+                // 0x9 like the stock value: 0x8 is client mode, 0x1 keeps SpecialPollInterval (4.5 h
+                // measured here). winutil writes 0x8, which silently changes the polling interval too.
+                Str(@"HKLM\SYSTEM\CurrentControlSet\Services\W32Time\Parameters", "NtpServer", "pool.ntp.org,0x9", "time.windows.com,0x9"),
             },
         };
     }
@@ -1021,7 +1025,8 @@ public static class TweakCatalog
             Icon = "",
             Actions = new TweakAction[]
             {
-                Str(@"HKCU\Control Panel\Keyboard", "InitialKeyboardIndicators", "2", "2147483648"),
+                // The user key takes "0"/"2" (winutil); the sign-in screen's takes the 0x80000000 form (Sophia).
+                Str(@"HKCU\Control Panel\Keyboard", "InitialKeyboardIndicators", "2", "0"),
                 Str(@"HKU\.DEFAULT\Control Panel\Keyboard", "InitialKeyboardIndicators", "2147483650", "2147483648"),
             },
         };

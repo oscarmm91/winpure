@@ -57,7 +57,7 @@ App removals use `Remove-AppxPackage -AllUsers` + de-provisioning. **Undo = rein
 | Remove Preinstalled Casual Games | Balanced | `Asphalt8Airborne`, `CaesarsSlotsFreeCasino`, `COOKINGFEVER`, `DisneyMagicKingdoms`, `FarmVille2CountryEscape`, `HiddenCity`, `MarchofEmpires`, `NYTCrossword`, `RoyalRevolt` |
 | Remove AI Hub | Balanced | `Microsoft.Windows.AIHub` (Copilot+ PCs) |
 | Disable Game Bar Capture | Manual | `GameDVR!AppCaptureEnabled = 0` + `GameBar!ShowStartupPanel = 0` — nothing uninstalled; an alternative to removing Xbox |
-| Disable Game Bar Integration | Aggressive | `GameBar!UseNexusForGameBarEnabled = 0` + do-nothing handler under `HKCU\SOFTWARE\Classes\ms-gamebar` — silences the ms-gamebar popup after removing Xbox |
+| Disable Game Bar Integration | Manual | `GameBar!UseNexusForGameBarEnabled = 0` + do-nothing handler under `HKCU\SOFTWARE\Classes\ms-gamebar` — silences the ms-gamebar popup after removing Xbox |
 | Remove OneDrive | Aggressive | `OneDriveSetup /uninstall` + `DisableFileSyncNGSC = 1` (files stay on disk) |
 
 ## ⚙️ Services
@@ -94,7 +94,7 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Disable Fast Startup | Balanced | `Session Manager\Power!HiberbootEnabled = 0` |
 | Don't Get Updates As Soon As They're Available | Balanced | `WindowsUpdate\UX\Settings!IsContinuousInnovationOptedIn = 0` — security updates unaffected |
 | Enable Daily Registry Backup | Manual | `Configuration Manager!EnablePeriodicBackup = 1` |
-| Sync the Clock With pool.ntp.org | Manual | `W32Time\Parameters!NtpServer = pool.ntp.org,0x8` |
+| Sync the Clock With pool.ntp.org | Manual | `W32Time\Parameters!NtpServer = pool.ntp.org,0x9` (same flags as stock: only the server changes) |
 
 ## 🎨 UI & Personalization
 

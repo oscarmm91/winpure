@@ -55,6 +55,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly DashboardViewModel _dashboard;
     private readonly RestoreViewModel _restore;
     private readonly StartupViewModel _startup;
+    private readonly InstallerViewModel _installer;
 
     public MainViewModel()
     {
@@ -119,6 +120,15 @@ public sealed class MainViewModel : ObservableObject
         });
         NavItems.Add(new NavItem { Label = "Restore", Glyph = "", Page = _restore });
 
+        // Last, apart from the tweaks on purpose: the only page whose changes Restore cannot undo.
+        _installer = new InstallerViewModel
+        {
+            Title = "Install Apps",
+            Subtitle = "Popular apps installed with winget, straight from their publishers. Unlike every tweak, an install is not undone by Restore — remove an app from Settings > Apps.",
+            Main = this,
+        };
+        NavItems.Add(new NavItem { Label = "Install", Glyph = ((char)0xE896).ToString(), Page = _installer });
+
         foreach (var item in NavItems) item.Owner = this;
         _currentNav = NavItems[0];
         _currentNav.SetCurrentSilently(true);
@@ -168,6 +178,7 @@ public sealed class MainViewModel : ObservableObject
             old?.SetCurrentSilently(false);
             value.SetCurrentSilently(true);
             if (value.Page == _restore) LoadBackups();
+            if (value.Page == _installer && !_installer.HasChecked) _ = _installer.RefreshAsync();
             OnPropertyChanged();
             OnPropertyChanged(nameof(CurrentPage));
             OnPropertyChanged(nameof(ApplyHint));   // the hint differs on the Startup page

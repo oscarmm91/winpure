@@ -34,7 +34,11 @@ Phases 1, 2 and 3 are built, each followed by a separate commit applying its rev
 listed: the power plan and hibernation tweaks were undone with hand-written defaults. Fixed as
 Phase 3b (`SystemStateAction`), together with Reserved Storage. Still open from Phase 3: **Edge's
 new-tab policies**, waiting on the product decision described there. From Phase 4, Windows
-optional features are built; OEM bloatware is not.
+optional features are built; OEM bloatware is not. From Phase 5, export/import and the winget
+installer are built. **Apply to future users** is waiting: loading the Default profile hive needs
+administrator rights and cannot be tested from an unelevated session, and a mistake leaves new profiles
+broken. **The "no way back" section** is waiting on a product decision: moving app removal out of the
+presets changes what Balanced and Aggressive promise today. Phase 6 search and pending badges are built.
 
 ---
 

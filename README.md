@@ -108,6 +108,12 @@ Turn off PowerShell 2.0, SMB 1.0, the XPS Document Writer, Windows Media Player 
 </details>
 
 <details>
+<summary>📥 <b>Install Apps</b> — 23 apps with winget</summary>
+<br/>
+Browsers, 7-Zip, Everything, PowerToys, ShareX, Notepad++, password managers, VLC, OBS, Git, VS Code, Python, Node.js, Discord, Zoom, LibreOffice, Acrobat Reader, Steam and Epic — installed from their publishers with winget. The one thing WinPure cannot undo, so it lives on its own page, in no preset, and asks before every install.
+</details>
+
+<details>
 <summary>🚦 <b>Startup Apps</b> — everything that starts with Windows</summary>
 <br/>
 Apps launched from the registry (per-user, machine-wide and 32-bit), shortcuts in both Startup folders, and third-party scheduled tasks that run at logon — in one list, with the publisher and the real command line. Switching one off <b>uninstalls nothing</b>: it flips the same switch Task Manager uses, so the two always agree, and the change is backed up like everything else. Entries whose file no longer exists are flagged.

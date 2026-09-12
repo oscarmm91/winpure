@@ -88,6 +88,8 @@ failures += SearchFindsTweaksInEveryCategory() ? 0 : 1;
 failures += EachCategoryShowsItsPendingCount() ? 0 : 1;
 failures += AForgedBackupCannotReachBeyondWhatWinPureChanges() ? 0 : 1;
 failures += PowerShellQuotingDoublesEveryQuote() ? 0 : 1;
+failures += WingetIdsAreCheckedAndTheExportIsReadExactly() ? 0 : 1;
+failures += AnInstallIsJudgedByWhatWingetSeesAfterwards() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
 
@@ -958,6 +960,61 @@ bool PowerShellQuotingDoublesEveryQuote()
         $"quoted length {actual.Length} (expected {expected.Length}), exact={actual == expected}");
 }
 
+// Installed apps are read from winget's JSON export, whose ids are the same in every language, and
+// compared ignoring case: with --exact, "Voidtools.Everything" missed an app that was installed. A package
+// id only reaches winget's command line if it looks like one.
+bool WingetIdsAreCheckedAndTheExportIsReadExactly()
+{
+    var problems = new List<string>();
+    var catalog = AppInstallerCatalog.Build();
+    foreach (var app in catalog)
+        if (!Winget.IsValidId(app.Id)) problems.Add($"catalog id '{app.Id}' is rejected");
+    if (catalog.Select(a => a.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != catalog.Count)
+        problems.Add("the catalog lists an id twice");
+    foreach (var bad in new[] { "Git.Git'; Remove-Item $env:TEMP -Recurse; '", "Git Git", "", "-h", ".Git", "Git.Git;calc" })
+        if (Winget.IsValidId(bad)) problems.Add($"'{bad}' is accepted");
+
+    var ids = Winget.ParseExport("""{"Sources":[{"Packages":[{"PackageIdentifier":"voidtools.Everything"},{"PackageIdentifier":"Git.Git"},{"Version":"1"}]},{"Packages":null}]}""");
+    if (!(ids.Count == 2 && ids.Contains("Voidtools.Everything") && ids.Contains("Git.Git")))
+        problems.Add($"export read as [{string.Join(",", ids)}]");
+
+    return Report("winget ids are checked and the export is read exactly",
+        problems.Count == 0,
+        problems.Count == 0 ? $"{catalog.Count} catalog ids valid and unique, 6 malformed ids refused, export ids read ignoring case" : string.Join(" | ", problems));
+}
+
+// An installer can report success and leave nothing, or fail after installing. The card follows what
+// winget sees afterwards, never the exit code alone — and the page never runs a real winget in a test.
+bool AnInstallIsJudgedByWhatWingetSeesAfterwards()
+{
+    var fake = new FakeWinget();
+    var real = Winget.Backend;
+    Winget.Backend = fake;
+    try
+    {
+        var main = new WinPure.ViewModels.MainViewModel();
+        var page = main.NavItems.Select(n => n.Page).OfType<WinPure.ViewModels.InstallerViewModel>().Single();
+        page.RefreshAsync().GetAwaiter().GetResult();
+        var git = page.Apps.First(a => a.App.Id == "Git.Git");
+        var vlc = page.Apps.First(a => a.App.Id == "VideoLAN.VLC");
+        bool detected = git.IsInstalled && !vlc.IsInstalled && page.HasChecked;
+
+        page.InstallConfirmedAsync(vlc).GetAwaiter().GetResult();            // exit code 0, nothing installed
+        bool successThatInstalledNothing = !vlc.IsInstalled && vlc.StatusText.StartsWith("Not installed", StringComparison.Ordinal);
+
+        fake.ReallyInstalls.Add("VideoLAN.VLC");
+        fake.ExitCodes["VideoLAN.VLC"] = unchecked((int)0x8A150011);       // a failure code, yet the app arrives
+        page.InstallConfirmedAsync(vlc).GetAwaiter().GetResult();
+        bool failureThatInstalled = vlc.IsInstalled && vlc.StatusText.StartsWith("Installed", StringComparison.Ordinal);
+
+        return Report("an install is judged by what winget sees afterwards",
+            detected && successThatInstalledNothing && failureThatInstalled && fake.Installs.Count == 2 && !main.IsBusy,
+            $"detected before={detected}, 'success' with nothing installed shown as not installed={successThatInstalledNothing}, " +
+            $"'failure' that installed shown as installed={failureThatInstalled}, installs asked={fake.Installs.Count} (expected 2), busy afterwards={main.IsBusy}");
+    }
+    finally { Winget.Backend = real; }
+}
+
 // The forgiveness granted to an optional action must never extend to the backup itself.
 // Both failures arrive as an exception on the same action, and the first version of this
 // feature could not tell them apart: with the snapshot flush inside the guard, a full disk
@@ -1750,6 +1807,24 @@ sealed class FakeSetting : ISystemStateHandler
     {
         Writes.Add(state);
         Current = state;
+    }
+}
+
+/// <summary>A winget that never touches the network or installs anything.</summary>
+sealed class FakeWinget : IWingetBackend
+{
+    public HashSet<string> Present { get; } = new(StringComparer.OrdinalIgnoreCase) { "Git.Git" };
+    public HashSet<string> ReallyInstalls { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, int> ExitCodes { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<string> Installs { get; } = new();
+
+    public IReadOnlySet<string>? ReadInstalledIds() => new HashSet<string>(Present, StringComparer.OrdinalIgnoreCase);
+
+    public int Install(string id)
+    {
+        Installs.Add(id);
+        if (ReallyInstalls.Contains(id)) Present.Add(id);
+        return ExitCodes.TryGetValue(id, out int code) ? code : 0;
     }
 }
 

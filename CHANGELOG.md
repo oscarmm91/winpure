@@ -50,6 +50,14 @@ WinPure now looks at the state of the system on every scan and, if something is 
 - New: **Disable Reserved Storage** (in no preset), with the same record-and-restore undo.
 - A setting read back from a backup file is checked before anything runs, so an edited backup cannot make WinPure — which runs as administrator — execute something else.
 
+### New: Install Apps
+
+A separate page installs 23 popular apps with winget — browsers, 7-Zip, Everything, PowerToys, VLC, OBS, Git, VS Code, Discord, LibreOffice, Steam and more — straight from their publishers.
+
+- It is the one page WinPure cannot undo, so it stays apart from the tweaks, is in no preset, and asks before every install, saying that Restore will not remove the app and that installing accepts the app's license terms.
+- Which apps are already installed comes from winget's own export, checked when you open the page. Apps winget cannot match to its catalog show as *Not detected* rather than *Not installed*.
+- An install is judged by what winget sees afterwards, not by its exit code: an installer that reports success but leaves nothing behind is shown as not installed.
+
 ### Security: a backup file can no longer make WinPure run something else
 
 Backups are plain files in your profile, which any program you run can edit without administrator rights, while WinPure restores them as administrator. A review found that a hand-edited backup could have turned that into a way to run commands or write anywhere in the registry as administrator: service names and scheduled-task paths went straight into PowerShell, and registry values were restored wherever the file pointed.

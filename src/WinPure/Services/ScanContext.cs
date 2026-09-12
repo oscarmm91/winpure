@@ -143,7 +143,8 @@ public sealed class ScanContext
             $r | ConvertTo-Json -Depth 4 -Compress
             """;
 
-        var result = PowerShellRunner.Run(script, 60_000);
+        // Read-only, so it may die with the app: nothing is left half-done.
+        var result = PowerShellRunner.Run(script, 60_000, dieWithApp: true);
         if (!result.Success || string.IsNullOrWhiteSpace(result.Output))
         {
             string why = result.TimedOut ? "the system scan timed out"

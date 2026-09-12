@@ -347,7 +347,7 @@ public sealed class ScheduledTaskAction : TweakAction
         var result = PowerShellRunner.Run($$"""
             $t = Get-ScheduledTask -TaskPath '{{dir}}' -TaskName '{{name}}' -ErrorAction SilentlyContinue
             if (-not $t) { 'missing' } else { $t.State.ToString() }
-            """, 30_000);
+            """, 30_000, dieWithApp: true);
         string state = result.Output.Trim();
         if (!result.Success || state.Length == 0 || state == "missing") return (false, false);
         return (true, !state.Equals("Disabled", StringComparison.OrdinalIgnoreCase));

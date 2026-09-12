@@ -231,7 +231,7 @@ public static class TweakCatalog
             Name = "Disable Consumer Features",
             Description = "Stop Windows from auto-installing sponsored games and Store app links.",
             Help = "Sets the DisableWindowsConsumerFeatures policy (from Chris Titus WinUtil). Note: some promo-driven apps like Phone Link suggestions disappear.",
-            Icon = "",
+            Icon = "",
             Actions = new TweakAction[]
             {
                 Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent", "DisableWindowsConsumerFeatures", 1, null),
@@ -243,7 +243,7 @@ public static class TweakCatalog
             Id = "privacy-delivery-optimization", Category = TweakCategory.Privacy, Preset = PresetLevel.Balanced,
             Name = "Disable Delivery Optimization",
             Description = "Stop Windows from uploading updates to other PCs using your bandwidth.",
-            Icon = "",
+            Icon = "",
             Actions = new TweakAction[]
             {
                 Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization", "DODownloadMode", 0, null),
@@ -256,7 +256,7 @@ public static class TweakCatalog
             Name = "Disable Background Apps",
             Description = "Stop Microsoft Store apps from running in the background.",
             Help = "Global background-access kill switch (from Chris Titus WinUtil). Store apps stop working in the background: Mail and Calendar will not fetch or notify until you open them, and UWP push notifications, live tiles and Photos sync stop.",
-            Icon = "",
+            Icon = "",
             Actions = new TweakAction[]
             {
                 Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications", "GlobalUserDisabled", 1, 0),
@@ -427,7 +427,7 @@ public static class TweakCatalog
             Description = "Turn off Recall snapshots, Notepad AI and hide AI components from Settings.",
             Help = "DisableAIDataAnalysis stops Recall from saving screen captures, AllowRecallEnablement keeps it from being switched back on, Notepad AI is disabled and the AI components page is hidden. Snapshots Recall already saved are only deleted on the next restart — Microsoft's own policy description says so.",
             RequiresRestart = true,
-            Icon = "",
+            Icon = "",
             Actions = new TweakAction[]
             {
                 Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis", 1, null),
@@ -695,7 +695,7 @@ public static class TweakCatalog
             Name = "Disable Fullscreen Optimizations",
             Description = "Use true exclusive fullscreen in games for lower input latency.",
             Help = "From Chris Titus WinUtil. Note: disables color management in exclusive fullscreen.",
-            Icon = "",
+            Icon = "",
             Actions = new TweakAction[]
             {
                 Dword(@"HKCU\System\GameConfigStore", "GameDVR_DXGIHonorFSEWindowsCompatible", 1, 0),
@@ -708,7 +708,7 @@ public static class TweakCatalog
             Name = "Disable Mouse Acceleration",
             Description = "Make cursor movement 1:1 with physical mouse movement.",
             Help = "Sets MouseSpeed and both thresholds to 0 — preferred for gaming and precise work.",
-            Icon = "",
+            Icon = "",
             Actions = new TweakAction[]
             {
                 Str(@"HKCU\Control Panel\Mouse", "MouseSpeed", "0", "1"),
@@ -722,7 +722,7 @@ public static class TweakCatalog
             Id = "perf-long-paths", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
             Name = "Enable Long Paths",
             Description = "Allow file paths longer than 260 characters.",
-            Icon = "",
+            Icon = "",
             Actions = new TweakAction[]
             {
                 Dword(@"HKLM\SYSTEM\CurrentControlSet\Control\FileSystem", "LongPathsEnabled", 1, 0),
@@ -971,7 +971,7 @@ public static class TweakCatalog
             Name = "End Task on Taskbar Right-Click",
             Description = "Add an 'End task' option when right-clicking taskbar apps.",
             Help = "Enables the hidden taskbar developer setting (from Chris Titus WinUtil) — kill hung apps without opening Task Manager.",
-            Icon = "",
+            Icon = "",
             Actions = new TweakAction[]
             {
                 Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings", "TaskbarEndTask", 1, null),

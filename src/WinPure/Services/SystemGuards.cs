@@ -61,7 +61,7 @@ public sealed record GuardInputs
         {
             sessionUser = NativeMethods.GetSessionUser(Process.GetCurrentProcess().SessionId);
             if (sessionUser is not null)
-                sessionSid = new NTAccount(sessionUser).Translate(typeof(SecurityIdentifier)).Value;
+                sessionSid = ResolveSid(sessionUser, TimeSpan.FromSeconds(3));
         }
         catch { sessionSid = null; }
 
@@ -88,6 +88,23 @@ public sealed record GuardInputs
     }
 
     /// <summary>
+    /// DOMAIN\user to SID, or null when it cannot be resolved in time. The lookup gets its own
+    /// deadline because it runs inside the scan, which has no Cancel button, and for a domain account
+    /// on a laptop away from the office it may wait on a domain controller that is not there. (Not
+    /// measured: this machine is not on a domain. A local lookup takes milliseconds.)
+    /// </summary>
+    internal static string? ResolveSid(string account, TimeSpan timeout, Func<string, string>? lookup = null)
+    {
+        lookup ??= a => new NTAccount(a).Translate(typeof(SecurityIdentifier)).Value;
+        try
+        {
+            var task = Task.Run(() => lookup(account));
+            return task.Wait(timeout) ? task.Result : null;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
     /// Its own short PowerShell call, outside the shared scan pass — on purpose. Measured on
     /// 2026-09-12: Get-BitLockerVolume added ~10 s over a bare PowerShell start, because it goes
     /// through WMI (and without elevation spends that time only to answer "access denied").
@@ -99,7 +116,7 @@ public sealed record GuardInputs
     {
         var result = PowerShellRunner.Run(
             "[string](Get-BitLockerVolume -MountPoint $env:SystemDrive -ErrorAction Stop).VolumeStatus",
-            timeoutMs: 15_000);
+            timeoutMs: 15_000, dieWithApp: true);
         string status = result.Output.Trim();
         return result.Success && status.Length > 0 ? status : null;
     }

@@ -388,6 +388,10 @@ public sealed class MainViewModel : ObservableObject
 
     private void DeleteSession(BackupSessionViewModel vm)
     {
+        // Backups live in the profile of the account WinPure runs as. Elevated as someone else, this
+        // list is that account's backups, not the signed-in user's — and deleting cannot be undone.
+        if (!ConfirmDespiteGuards("delete this backup", SystemGuards.ForRestore)) return;
+
         var answer = MessageBox.Show(
             $"Delete the backup from {vm.Title}? This cannot be undone.",
             "WinPure — Delete backup", MessageBoxButton.YesNo, MessageBoxImage.Warning);

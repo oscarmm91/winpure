@@ -27,12 +27,13 @@ A page that lists everything that starts with Windows and lets you switch any of
 
 WinPure now looks at the state of the system on every scan and, if something is wrong, tells you **before** applying — with the default answer set to *No*. It never refuses to run: someone fixing another person's PC, or who turned a service off on purpose, can still go ahead.
 
-- **Running as a different user.** Elevating with a second administrator account sends every per-user tweak and every Startup change to *that* account's profile, and a restore would follow it there. Also checked before restoring a backup, before the first Startup change, and before a repair tool. The two accounts are compared by SID, not by name, so a Microsoft or work account whose name is formatted differently by different parts of Windows is never mistaken for someone else.
+- **Running as a different user.** Elevating with a second administrator account sends every per-user tweak and every Startup change to *that* account's profile, and a restore would follow it there. Also checked before restoring or deleting a backup (the backups listed belong to the account WinPure runs as), before the first Startup change, and before a repair tool. The two accounts are compared by SID, not by name, so a Microsoft or work account whose name is formatted differently by different parts of Windows is never mistaken for someone else.
 - **A restart is pending** from Windows servicing or Windows Update. Changes applied now can be overwritten when Windows finishes. (Sophia Script's version of this check requires all five of its signals at once, so it effectively never fires; this one fires on any. Files an installer queued for replacement are deliberately *not* counted: they do not affect settings, and some software leaves them there indefinitely, which would make the warning appear every day.)
 - **BitLocker is encrypting or decrypting** the system drive. Read-only: WinPure will never offer to decrypt a drive.
 - **Core Windows app components are missing** — a sign another tool already removed them, and that removing more apps may break Start or Settings. Only judged when the app listing succeeded and covered every user. On LTSC editions, which ship without the Microsoft Store by design, only the shell package is required.
 - Repair tools now also pass through these checks where they apply, and **Clean Temporary Files asks before deleting**.
-- **PowerShell helpers no longer outlive the app.** Closing WinPure mid-scan used to leave `powershell.exe` running with nothing left to stop it; Windows now ends them together with the app. The one exception is SFC + DISM, which keeps running if you close the window, because interrupting a Windows repair halfway is worse than letting it finish.
+- **Scans no longer leave PowerShell behind.** Closing WinPure mid-scan used to leave `powershell.exe` running with nothing left to stop it; Windows now ends read-only queries together with the app. Anything that changes the system — removing an app, stopping a service, uninstalling OneDrive, repairing Windows with SFC + DISM — is deliberately left to finish, because cutting it off halfway is worse than letting it complete.
+- Looking up the signed-in account can no longer stall the scan: it gets a three-second deadline, after which the different-user check simply stays silent.
 - **The Event Log service is stopped**, which is rarely deliberate and usually means another tool has been here.
 
 ### Interface
@@ -41,6 +42,7 @@ WinPure now looks at the state of the system on every scan and, if something is 
 - Choosing a preset no longer silently clears tweaks you ticked by hand — they are kept, and the status bar says how many.
 - The preset buttons now show which preset is active, and keep showing it when you move between pages.
 - Buttons no longer stay greyed out after a long operation finishes until you move the mouse.
+- Eight tweaks — the ones ported from WinUtil — showed a blank square where their icon should be.
 
 ### 17 new tweaks
 

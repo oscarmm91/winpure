@@ -21,11 +21,13 @@ public static class PowerShellRunner
     /// pipe buffers nor outlive the timeout.
     /// </summary>
     /// <param name="dieWithApp">
-    /// True (the default): the child is ended by Windows if WinPure exits or is killed. Pass false
-    /// only for work that must never be interrupted halfway, such as DISM repairing Windows.
+    /// True: Windows ends the child if WinPure exits or is killed. Only for read-only queries, which
+    /// lose nothing when cut short. Everything that changes the system keeps the default, false:
+    /// killing Remove-AppxPackage, a service stop or OneDriveSetup.exe halfway (the job takes the
+    /// processes PowerShell starts down with it) leaves the machine worse off than letting it finish.
     /// </param>
     public static PsResult Run(string script, int timeoutMs = 120_000, CancellationToken cancel = default,
-        bool dieWithApp = true)
+        bool dieWithApp = false)
     {
         try
         {

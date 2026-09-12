@@ -70,7 +70,9 @@ failures += CoreAppsGuardKnowsLtscAndPartialListings() ? 0 : 1;
 failures += GatherNeverThrowsWhenTheBitLockerQueryFails() ? 0 : 1;
 failures += EachActionAsksOnlyTheGuardsThatConcernIt() ? 0 : 1;
 failures += AnAbsentValueCanAlreadyBeTheWantedState() ? 0 : 1;
-failures += AChildPowerShellDiesWithTheApp() ? 0 : 1;
+failures += AQueryDiesWithTheAppButASystemChangeDoesNot() ? 0 : 1;
+failures += AHungAccountLookupCannotStallTheScan() ? 0 : 1;
+failures += EveryTweakHasAnIcon() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
 
@@ -475,65 +477,122 @@ bool EachActionAsksOnlyTheGuardsThatConcernIt()
 // have stopped it gone along with the app. A child test process starts a PowerShell and is then
 // killed WITHOUT its process tree — exactly what happens when the app dies — and the PowerShell
 // must not survive it.
-bool AChildPowerShellDiesWithTheApp()
+// Two halves, because the first version got the second one wrong. A read-only query must die with
+// the app (closing WinPure mid-scan used to leave powershell.exe running). A command that changes
+// the system must NOT: the job also kills what PowerShell started, so an uninstall or a service
+// stop cut in half would leave the machine worse off than letting it finish.
+bool AQueryDiesWithTheAppButASystemChangeDoesNot()
 {
-    const string name = "a child PowerShell dies with the app";
+    const string name = "a query dies with the app, a system change does not";
     string pidFile = Path.Combine(Path.GetTempPath(), $"winpure-orphan-{Environment.ProcessId}.pid");
     string jobFile = pidFile + ".job";
-    foreach (var f in new[] { pidFile, jobFile }) { try { File.Delete(f); } catch { } }
+    string keepFile = pidFile + ".keep";
+    void CleanFiles() { foreach (var f in new[] { pidFile, jobFile, keepFile }) { try { File.Delete(f); } catch { } } }
+    CleanFiles();
 
     var psi = new ProcessStartInfo(Environment.ProcessPath!, $"orphan-child \"{pidFile}\"") { UseShellExecute = false };
     using var child = Process.Start(psi)!;
 
-    int pid = 0;
+    int queryPid = 0, changePid = 0;
     string job = "";
     var clock = Stopwatch.StartNew();
-    while (clock.Elapsed < TimeSpan.FromSeconds(90) && (pid == 0 || job.Length == 0))
+    while (clock.Elapsed < TimeSpan.FromSeconds(90) && (queryPid == 0 || changePid == 0 || job.Length == 0))
     {
-        try { if (pid == 0 && File.Exists(pidFile)) int.TryParse(File.ReadAllText(pidFile).Trim(), out pid); } catch { }
+        if (queryPid == 0) queryPid = ReadPid(pidFile);
+        if (changePid == 0) changePid = ReadPid(keepFile);
         try { if (job.Length == 0 && File.Exists(jobFile)) job = File.ReadAllText(jobFile).Trim(); } catch { }
         Thread.Sleep(250);
     }
 
-    if (pid == 0 || job.Length == 0)
+    if (queryPid == 0 || changePid == 0 || job.Length == 0)
     {
         try { child.Kill(entireProcessTree: true); } catch { }
-        return Report(name, false, $"the child never reported its PowerShell within 90 s (pid={pid}, job='{job}')");
+        CleanFiles();
+        return Report(name, false,
+            $"the child never reported both PowerShells within 90 s (query pid={queryPid}, change pid={changePid}, job='{job}')");
     }
 
     child.Kill();                     // the app dies — deliberately NOT its process tree
     child.WaitForExit(10_000);
     Thread.Sleep(3_000);
 
-    bool survived = false;
-    try
-    {
-        using var ps = Process.GetProcessById(pid);
-        survived = !ps.HasExited;
-        if (survived) ps.Kill();      // clean up whatever the test left behind
-    }
-    catch (ArgumentException) { }     // no such process: it died, as it should
-    foreach (var f in new[] { pidFile, jobFile }) { try { File.Delete(f); } catch { } }
+    bool queryAlive = StillPowerShell(queryPid);
+    bool changeAlive = StillPowerShell(changePid);
+    CleanFiles();
 
     // A CI runner may refuse nested job objects; locally that would be a real regression.
     if (job != "True" && Environment.GetEnvironmentVariable("CI") == "true")
         return Report(name, true, "skipped on CI: this environment would not place the child in a job object");
 
-    return Report(name, !survived,
-        $"placed in the kill-on-close job={job}; PowerShell pid {pid} still alive after the app was killed={survived} (expected False)");
+    return Report(name, !queryAlive && changeAlive,
+        $"placed in the kill-on-close job={job}; after the app was killed: query alive={queryAlive} (expected False), " +
+        $"system change alive={changeAlive} (expected True)");
+}
+
+// Alive AND still powershell.exe — a PID can be handed to an unrelated process within seconds.
+// Whatever is still running is ended here, so the test leaves nothing behind.
+static bool StillPowerShell(int pid)
+{
+    try
+    {
+        using var p = Process.GetProcessById(pid);
+        bool alive = !p.HasExited && p.ProcessName.Equals("powershell", StringComparison.OrdinalIgnoreCase);
+        if (alive) p.Kill();
+        return alive;
+    }
+    catch { return false; }           // no such process
+}
+
+static int ReadPid(string file)
+{
+    try { return File.Exists(file) && int.TryParse(File.ReadAllText(file).Trim(), out int pid) ? pid : 0; }
+    catch { return 0; }
 }
 
 void RunOrphanChild(string pidFile)
 {
+    // A read-only query, the one kind that asks to die with the app.
     Task.Run(() => PowerShellRunner.Run(
-        $"Set-Content -LiteralPath '{pidFile}' -Value $PID; Start-Sleep -Seconds 120", timeoutMs: 180_000));
+        $"Set-Content -LiteralPath '{pidFile}' -Value $PID; Start-Sleep -Seconds 120", timeoutMs: 180_000, dieWithApp: true));
 
     // PowerShell writes its PID only after it was started and placed in the job, so by then the
-    // assignment result is final.
+    // assignment result is final. The second call below never touches the job, so it cannot change it.
     var clock = Stopwatch.StartNew();
     while (!File.Exists(pidFile) && clock.Elapsed < TimeSpan.FromSeconds(90)) Thread.Sleep(100);
     File.WriteAllText(pidFile + ".job", PowerShellRunner.LastJobAssignOk.ToString());
+
+    // The default, which is what every command that changes the system uses.
+    Task.Run(() => PowerShellRunner.Run(
+        $"Set-Content -LiteralPath '{pidFile}.keep' -Value $PID; Start-Sleep -Seconds 120", timeoutMs: 180_000));
     Thread.Sleep(Timeout.Infinite);
+}
+
+// Translating the signed-in account to a SID runs inside the scan, which has no Cancel button, and
+// for a domain account away from the office network it may wait on a domain controller that is not
+// there. It gets its own deadline, and an unanswered lookup reads as "could not tell".
+bool AHungAccountLookupCannotStallTheScan()
+{
+    var clock = Stopwatch.StartNew();
+    string? hung = GuardInputs.ResolveSid(@"CORP\someone", TimeSpan.FromMilliseconds(500),
+        _ => { Thread.Sleep(10_000); return "S-1-5-21-1"; });
+    double seconds = clock.Elapsed.TotalSeconds;
+    string? quick = GuardInputs.ResolveSid(@"CORP\someone", TimeSpan.FromSeconds(3), _ => "S-1-5-21-1");
+
+    return Report("a hung account lookup cannot stall the scan",
+        hung is null && seconds < 3 && quick == "S-1-5-21-1",
+        $"hung lookup returned {hung ?? "null"} after {seconds:0.0}s (expected null in under 3s), quick lookup returned {quick ?? "null"}");
+}
+
+// An empty Icon compiles fine and shows a blank square on the tweak's card. Eight tweaks — the ones
+// ported from WinUtil — sat like that, because nothing checked.
+bool EveryTweakHasAnIcon()
+{
+    var blank = TweakCatalog.Build()
+        .Where(t => t.Icon.Length != 1 || t.Icon[0] < 0xE700 || t.Icon[0] > 0xF8FF)
+        .Select(t => t.Id)
+        .ToList();
+    return Report("every tweak has an icon", blank.Count == 0,
+        blank.Count == 0 ? "every tweak has one Segoe Fluent glyph" : $"no glyph: {string.Join(", ", blank)}");
 }
 
 // The forgiveness granted to an optional action must never extend to the backup itself.

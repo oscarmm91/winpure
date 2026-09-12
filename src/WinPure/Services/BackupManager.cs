@@ -152,6 +152,24 @@ public sealed class BackupManager
                 ServiceAction.SetStartMode(entry.ServiceName, entry.StartMode.Value);
                 break;
             }
+            case "startup-entry":
+            {
+                if (entry.KeyPath is null || entry.ValueName is null) return;
+                if (entry.Existed && entry.Value is not null)
+                {
+                    // Byte-for-byte what was there, timestamp included.
+                    var (root, sub) = ParseHive(entry.KeyPath);
+                    using var key = root.CreateSubKey(sub, writable: true)
+                        ?? throw new InvalidOperationException($"Cannot open {entry.KeyPath}");
+                    key.SetValue(entry.ValueName, Convert.FromHexString(entry.Value), RegistryValueKind.Binary);
+                }
+                else
+                {
+                    // There was no override before; an absent value is how Windows says "enabled".
+                    RegistryHelper.DeleteValue(entry.KeyPath, entry.ValueName);
+                }
+                break;
+            }
             case "scheduled-task":
             {
                 if (entry.TaskPath is null) return;
@@ -164,10 +182,27 @@ public sealed class BackupManager
         }
     }
 
+    private static (RegistryKey root, string subKey) ParseHive(string keyPath)
+    {
+        int idx = keyPath.IndexOf('\\');
+        string hive = idx < 0 ? keyPath : keyPath[..idx];
+        string sub = idx < 0 ? "" : keyPath[(idx + 1)..];
+        RegistryKey root = hive.ToUpperInvariant() switch
+        {
+            "HKLM" or "HKEY_LOCAL_MACHINE" => Registry.LocalMachine,
+            "HKCU" or "HKEY_CURRENT_USER" => Registry.CurrentUser,
+            "HKCR" or "HKEY_CLASSES_ROOT" => Registry.ClassesRoot,
+            "HKU" or "HKEY_USERS" => Registry.Users,
+            _ => throw new ArgumentException($"Unknown hive in '{keyPath}'")
+        };
+        return (root, sub);
+    }
+
     private static string Describe(BackupEntry e) =>
         e.Type switch
         {
             "registry-value" => $"{e.KeyPath}!{e.ValueName}",
+            "startup-entry" => $"startup entry {e.ValueName}",
             "registry-key" => e.KeyPath ?? "?",
             "service" => $"service {e.ServiceName}",
             "scheduled-task" => $"task {e.TaskPath}",

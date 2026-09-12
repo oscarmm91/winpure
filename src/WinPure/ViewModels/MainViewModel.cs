@@ -43,6 +43,7 @@ public sealed class MainViewModel : ObservableObject
 
     private readonly DashboardViewModel _dashboard;
     private readonly RestoreViewModel _restore;
+    private readonly StartupViewModel _startup;
 
     public MainViewModel()
     {
@@ -84,6 +85,15 @@ public sealed class MainViewModel : ObservableObject
             "Clean up the Start Menu, taskbar and File Explorer.");
         AddCategory("Context Menu", "", TweakCategory.ContextMenu, "Context Menu",
             "Remove clutter from the right-click menu or restore the classic one.");
+        _startup = new StartupViewModel(_engine)
+        {
+            Title = "Startup Apps",
+            Subtitle = "Everything that starts with Windows: apps, shortcuts in your Startup folder and scheduled tasks. "
+                     + "Switching one off does not uninstall or delete anything - it flips the same switch Task Manager uses, and it takes effect right away.",
+            Main = this,
+        };
+        NavItems.Add(new NavItem { Label = "Startup", Glyph = "", Page = _startup });
+
         NavItems.Add(new NavItem
         {
             Label = "Repair", Glyph = "",
@@ -129,6 +139,7 @@ public sealed class MainViewModel : ObservableObject
             if (value.Page == _restore) LoadBackups();
             OnPropertyChanged();
             OnPropertyChanged(nameof(CurrentPage));
+            OnPropertyChanged(nameof(ApplyHint));   // the hint differs on the Startup page
         }
     }
 
@@ -158,9 +169,14 @@ public sealed class MainViewModel : ObservableObject
     private int _pendingCount;
     public int PendingCount { get => _pendingCount; set { if (Set(ref _pendingCount, value)) OnPropertyChanged(nameof(ApplyHint)); } }
 
-    public string ApplyHint => PendingCount == 0
-        ? "Changes will be applied after clicking Apply Changes."
-        : $"{PendingCount} pending change{(PendingCount == 1 ? "" : "s")} — a backup is created before applying.";
+    public string ApplyHint => CurrentPage is StartupViewModel
+        // The Startup page has no Apply step — promising one there would be a lie.
+        // Kept to roughly the length of the line below: the status bar shares this row with
+        // the scan result on the right, and a longer sentence overlaps it.
+        ? "Startup switches apply immediately and are backed up."
+        : PendingCount == 0
+            ? "Changes will be applied after clicking Apply Changes."
+            : $"{PendingCount} pending change{(PendingCount == 1 ? "" : "s")} — a backup is created before applying.";
 
     private PresetLevel? _activePreset;
     public PresetLevel? ActivePreset { get => _activePreset; set => Set(ref _activePreset, value); }
@@ -170,6 +186,9 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand SelectPresetCommand { get; }
 
     private void UpdatePendingCount() => PendingCount = AllTweaks.Count(t => t.IsDirty);
+
+    /// <summary>Startup toggles apply immediately, so the dashboard's backup count moves too.</summary>
+    internal void RefreshBackupCount() => _dashboard.BackupCount = _backupManager.ListSessions().Count;
 
     // ---------------------------------------------------------------- scan
 
@@ -184,6 +203,7 @@ public sealed class MainViewModel : ObservableObject
             _scanContext = ctx;
             foreach (var tweak in AllTweaks)
                 tweak.RefreshStatus(_engine, ctx);
+            _startup.Load(ctx);
             UpdatePendingCount();
             UpdateDashboard();
             int undetected = AllTweaks.Count(t => t.Status == TweakStatus.Unknown);

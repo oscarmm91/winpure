@@ -48,6 +48,9 @@ failures += CancellingReallyKillsTheProcess() ? 0 : 1;
 failures += OnlySafeRepairsOfferCancel() ? 0 : 1;
 failures += PresetKeepsManualSelections() ? 0 : 1;
 failures += EveryStaticResourceAndBindingPathExists() ? 0 : 1;
+failures += TogglingAStartupEntryIsByteExact() ? 0 : 1;
+failures += DisablingAnUntouchedEntryIsUndoneByDeleting() ? 0 : 1;
+failures += TheStartupScannerFindsWhatWindowsHas() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 
 Cleanup();
@@ -255,6 +258,116 @@ bool PresetKeepsManualSelections()
         kept && announced && presetRecorded,
         $"'{manual.Name}' still selected={kept}, status mentions it={announced}, " +
         $"ActivePreset={main.ActivePreset} (the old code cleared it without a word)");
+}
+
+// Startup entries are toggled through a 12-byte value Microsoft never documented, where only
+// the first byte is the on/off state and the rest is Windows' own timestamp. Turning an entry
+// off and undoing it has to give back those bytes EXACTLY — a plausible reconstruction would
+// quietly rewrite state that was never ours.
+// The toy mirror key below keeps this off the real startup entries of whoever runs the tests.
+bool TogglingAStartupEntryIsByteExact()
+{
+    const string approved = @"HKCU\Software\WinPureTests\StartupApproved\Run";
+    Reset();
+
+    // Enabled, and previously touched from Task Manager, so it carries a timestamp.
+    byte[] original = { 0x02, 0, 0, 0, 0xFC, 0x75, 0xCE, 0x86, 0xB4, 0x38, 0xDC, 0x01 };
+    WriteApproved(approved, "ToyApp", original);
+
+    var tweak = StartupTweak("startup-toy-1", approved, "ToyApp");
+    var backups = new BackupManager();
+    var engine = new TweakEngine(backups);
+
+    engine.ApplyChanges(new[] { (tweak, true) });      // turn the entry OFF
+    byte[]? afterDisable = StartupScanner.ReadApproved(approved, "ToyApp");
+    bool enabledAfterDisable = StartupScanner.IsEnabled(approved, "ToyApp");
+
+    // Undo it the way the Restore page does.
+    var session = backups.ListSessions().First(s => s.Entries.Any(e => e.TweakId == "startup-toy-1"));
+    backups.RestoreSession(session);
+    byte[]? afterRestore = StartupScanner.ReadApproved(approved, "ToyApp");
+
+    bool timestampKept = afterDisable is { Length: 12 } && afterDisable.Skip(4).SequenceEqual(original.Skip(4));
+    bool exact = afterRestore is not null && afterRestore.SequenceEqual(original);
+
+    Reset();
+    return Report("turning a startup entry off and back is byte-exact",
+        !enabledAfterDisable && timestampKept && exact,
+        $"disabled={!enabledAfterDisable}, Windows' timestamp kept while off={timestampKept}, " +
+        $"restored bytes identical={exact} ({(afterRestore is null ? "(deleted)" : Convert.ToHexString(afterRestore))} vs {Convert.ToHexString(original)})");
+}
+
+// An entry nobody ever toggled has no value in the mirror key at all — and that absence is
+// exactly what Windows reads as "enabled". Undoing must delete it again, not leave an
+// invented "enabled" value behind.
+bool DisablingAnUntouchedEntryIsUndoneByDeleting()
+{
+    const string approved = @"HKCU\Software\WinPureTests\StartupApproved\Run";
+    Reset();   // no value written: this is a fresh entry an installer just created
+
+    bool enabledBefore = StartupScanner.IsEnabled(approved, "FreshApp");
+
+    var tweak = StartupTweak("startup-toy-2", approved, "FreshApp");
+    var backups = new BackupManager();
+    var engine = new TweakEngine(backups);
+
+    engine.ApplyChanges(new[] { (tweak, true) });
+    byte[]? afterDisable = StartupScanner.ReadApproved(approved, "FreshApp");
+
+    var session = backups.ListSessions().First(s => s.Entries.Any(e => e.TweakId == "startup-toy-2"));
+    backups.RestoreSession(session);
+    byte[]? afterRestore = StartupScanner.ReadApproved(approved, "FreshApp");
+
+    Reset();
+    return Report("disabling an untouched entry is undone by deleting it",
+        enabledBefore && afterDisable is not null && afterRestore is null,
+        $"no value means enabled={enabledBefore}, value created when disabled={afterDisable is not null}, " +
+        $"value gone again after restore={afterRestore is null}");
+}
+
+// Reports what the scanner actually sees on this machine, and asserts the parts that must
+// hold anywhere: per-user Run entries exist, and every entry knows how to toggle itself.
+bool TheStartupScannerFindsWhatWindowsHas()
+{
+    var ctx = ScanContext.Gather();
+    var entries = StartupScanner.Scan(ctx);
+
+    var bySource = entries.GroupBy(e => e.SourceLabel)
+        .Select(g => $"{g.Key}: {g.Count()} ({g.Count(e => e.Enabled)} on)")
+        .ToList();
+
+    bool everyEntryToggleable = entries.All(e => e.ApprovedKeyPath is not null || e.TaskPath is not null);
+    bool foundSomething = entries.Any(e => e.Source == StartupSource.RegistryRun);
+
+    Console.WriteLine();
+    Console.WriteLine("Startup entries found on this machine:");
+    foreach (var e in entries)
+        Console.WriteLine($"  [{(e.Enabled ? "on " : "OFF")}] {e.SourceLabel,-15} {e.Scope,-18} {e.Name}" +
+                          (e.Publisher.Length > 0 ? $"  ({e.Publisher})" : "") + (e.IsOrphan ? "  <- file is gone" : ""));
+
+    return Report("the startup scanner finds what Windows has",
+        foundSomething && everyEntryToggleable,
+        $"{entries.Count} entries — {string.Join(", ", bySource)}; every one knows how to toggle itself={everyEntryToggleable}");
+}
+
+Tweak StartupTweak(string id, string approvedKeyPath, string entryName) => new()
+{
+    Id = id,
+    Category = TweakCategory.Apps,
+    Name = $"Disable {entryName}",
+    Description = "toy startup entry, tests only",
+    Icon = "",
+    Actions = new TweakAction[]
+    {
+        new StartupEntryAction { ApprovedKeyPath = approvedKeyPath, EntryName = entryName }
+    },
+};
+
+void WriteApproved(string keyPath, string valueName, byte[] bytes)
+{
+    string sub = keyPath[(keyPath.IndexOf('\\') + 1)..];
+    using var key = Registry.CurrentUser.CreateSubKey(sub, writable: true)!;
+    key.SetValue(valueName, bytes, RegistryValueKind.Binary);
 }
 
 // A WPF binding with a typo fails silently at runtime: no crash, no message, the control just

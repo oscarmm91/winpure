@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### New: Startup Apps
+
+A page that lists everything that starts with Windows and lets you switch any of it off without uninstalling anything:
+
+- Registry `Run` entries for this user, for all users, and the separate 32-bit ones most tools miss.
+- Shortcuts and scripts in both Startup folders (yours and All Users).
+- Third-party scheduled tasks that run at logon — a real source of startup apps that never shows up in the registry.
+- Friendly name, publisher and the actual command line for each entry, plus a **file missing** flag for entries pointing at something that no longer exists.
+- Switching an entry flips the same `StartupApproved` bit Task Manager uses, so WinPure and Task Manager always show the same thing. The original bytes are backed up verbatim, so Restore puts back exactly what was there — including entries that had no setting at all, which are removed again rather than left behind.
+- Changes here take effect immediately instead of waiting for Apply Changes, and the status bar says so.
+
 - **Fix (important):** turning a tweak off now restores the value **your machine actually had**, taken from the backup. It used to write a "stock default" hand-written in the catalog, which could switch on a setting you never had enabled.
 - **Fix:** turning a tweak off is now backed up too — previously only applying was.
 - **Fix:** the backup snapshot is written to disk *before* each change instead of once at the end of a batch, so force-closing WinPure (or a crash, or a power cut) mid-apply no longer leaves changes with no backup at all. If the backup cannot be written, nothing is changed.

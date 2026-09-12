@@ -415,6 +415,70 @@ public sealed class AppxRemoveAction : TweakAction
         throw new NotSupportedException("Removed Store apps must be reinstalled from the Microsoft Store.");
 }
 
+/// <summary>
+/// Turns one startup entry off (or back on) without deleting it, by flipping the same
+/// StartupApproved bit Task Manager uses. "Applied" means the entry is disabled.
+///
+/// The backup keeps the ORIGINAL 12 bytes verbatim, not just the bit: Windows also stores a
+/// timestamp in there, and restoring a reconstruction instead of what was really present
+/// would quietly rewrite state this app never owned. If no value existed at all, the backup
+/// records that, and restoring deletes it again — an absent value is what Windows reads as
+/// "enabled", so inventing one would not be the same thing.
+/// </summary>
+public sealed class StartupEntryAction : TweakAction
+{
+    /// <summary>The StartupApproved mirror key: ...\StartupApproved\Run | Run32 | StartupFolder.</summary>
+    public required string ApprovedKeyPath { get; init; }
+    /// <summary>Registry value name under Run, or the file name for a Startup-folder entry.</summary>
+    public required string EntryName { get; init; }
+
+    private const byte EnabledBit = 0x02;
+
+    public override bool? IsApplied(ScanContext ctx)
+    {
+        try { return !Services.StartupScanner.IsEnabled(ApprovedKeyPath, EntryName); }
+        catch { return null; }
+    }
+
+    public override void Capture(Tweak tweak, List<BackupEntry> backup)
+    {
+        var original = ReadBytes();
+        backup.Add(new BackupEntry
+        {
+            Type = "startup-entry",
+            TweakId = tweak.Id,
+            TweakName = tweak.Name,
+            KeyPath = ApprovedKeyPath,
+            ValueName = EntryName,
+            Existed = original is not null,
+            Kind = RegistryValueKind.Binary.ToString(),
+            Value = original is null ? null : Convert.ToHexString(original),
+        });
+    }
+
+    public override void Apply() => SetEnabled(ApprovedKeyPath, EntryName, false);
+
+    /// <summary>"Default" for a startup entry is on — an entry exists because something installed it.</summary>
+    public override void RevertToDefault() => SetEnabled(ApprovedKeyPath, EntryName, true);
+
+    private byte[]? ReadBytes() => Services.StartupScanner.ReadApproved(ApprovedKeyPath, EntryName);
+
+    internal static void SetEnabled(string approvedKeyPath, string entryName, bool enabled)
+    {
+        // Keep whatever Windows had in the remaining 11 bytes (its own timestamp); only the
+        // state byte is ours to change.
+        byte[] bytes = Services.StartupScanner.ReadApproved(approvedKeyPath, entryName) is { Length: 12 } existing
+            ? (byte[])existing.Clone()
+            : new byte[12];
+        bytes[0] = enabled ? EnabledBit : (byte)0x01;
+
+        var (root, sub) = ParseKey(approvedKeyPath);
+        using var key = root.CreateSubKey(sub, writable: true)
+            ?? throw new InvalidOperationException($"Cannot open or create {approvedKeyPath}");
+        key.SetValue(entryName, bytes, RegistryValueKind.Binary);
+    }
+}
+
 /// <summary>Arbitrary PowerShell apply/revert with detection delegated to the scan context.</summary>
 public sealed class CommandAction : TweakAction
 {

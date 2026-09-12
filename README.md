@@ -100,6 +100,14 @@ Restore the classic Windows 10 right-click menu, remove "Edit with Clipchamp / N
 </details>
 
 <details>
+<summary>🚦 <b>Startup Apps</b> — everything that starts with Windows</summary>
+<br/>
+Apps launched from the registry (per-user, machine-wide and 32-bit), shortcuts in both Startup folders, and third-party scheduled tasks that run at logon — in one list, with the publisher and the real command line. Switching one off <b>uninstalls nothing</b>: it flips the same switch Task Manager uses, so the two always agree, and the change is backed up like everything else. Entries whose file no longer exists are flagged.
+<br/><br/>
+<img src="docs/screenshots/startup.png" width="800"/>
+</details>
+
+<details>
 <summary>🔧 <b>Repair & Maintenance</b> — 5 tools</summary>
 <br/>
 Create a system restore point, repair system files (SFC + DISM), reset Windows Update components, reset the network stack, clean temporary files.

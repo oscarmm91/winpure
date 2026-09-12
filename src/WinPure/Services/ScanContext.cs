@@ -28,6 +28,17 @@ public sealed class ScanContext
     /// <summary>Human-readable list of what could not be determined, for the status bar.</summary>
     public List<string> Warnings { get; } = new();
 
+    /// <summary>A third-party scheduled task that runs at logon — i.e. a startup app.</summary>
+    public sealed record LogonTask(string Path, string Author, string Action, bool Enabled);
+
+    /// <summary>
+    /// Non-Microsoft tasks with a logon trigger, for the Startup Apps page. Tasks under
+    /// \Microsoft\ are left out on purpose: those are Windows' own, they are not what
+    /// someone opening a startup manager is looking for, and the tweak pages already
+    /// cover the handful that matter.
+    /// </summary>
+    public List<LogonTask> LogonTasks { get; } = new();
+
     public static readonly string[] WatchedTasks =
     {
         @"\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser",
@@ -68,6 +79,7 @@ public sealed class ScanContext
 
             $watched = @({{taskList}})
             $tasks = @{}
+            $logon = @()
             $r.tasksOk = $false
             try {
                 # One call for all of them: if it succeeds, a task missing from the result
@@ -75,12 +87,31 @@ public sealed class ScanContext
                 foreach ($t in Get-ScheduledTask) {
                     $full = [string]$t.TaskPath + [string]$t.TaskName
                     if ($watched -contains $full) { $tasks[$full] = ($t.State -ne 'Disabled') }
+
+                    # Same pass feeds the Startup Apps page: third-party logon-trigger tasks.
+                    if ($t.TaskPath -notlike '\Microsoft\*' -and $t.Triggers) {
+                        $isLogon = $false
+                        foreach ($trg in $t.Triggers) {
+                            if ($trg.CimClass.CimClassName -eq 'MSFT_TaskLogonTrigger') { $isLogon = $true }
+                        }
+                        if ($isLogon) {
+                            $exe = ''
+                            foreach ($a in $t.Actions) { if (-not $exe -and $a.Execute) { $exe = [string]$a.Execute } }
+                            $logon += [ordered]@{
+                                path    = $full
+                                author  = [string]$t.Author
+                                action  = $exe
+                                enabled = ($t.State -ne 'Disabled')
+                            }
+                        }
+                    }
                 }
                 $r.tasksOk = $true
             } catch {
                 $r.tasksError = $_.Exception.Message
             }
             $r.tasks = $tasks
+            $r.logonTasks = @($logon)
 
             try {
                 $power = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power'
@@ -121,6 +152,16 @@ public sealed class ScanContext
             if (root.TryGetProperty("tasks", out var tasks) && tasks.ValueKind == JsonValueKind.Object)
                 foreach (var prop in tasks.EnumerateObject())
                     ctx.TaskEnabled[prop.Name] = prop.Value.GetBoolean();
+
+            if (root.TryGetProperty("logonTasks", out var logon) && logon.ValueKind == JsonValueKind.Array)
+                foreach (var t in logon.EnumerateArray())
+                {
+                    string path = Text(t, "path");
+                    if (path.Length == 0) continue;
+                    ctx.LogonTasks.Add(new LogonTask(
+                        path, Text(t, "author"), Text(t, "action"),
+                        t.TryGetProperty("enabled", out var en) && en.GetBoolean()));
+                }
 
             foreach (var key in new[] { "hibernate", "powerplan" })
                 if (root.TryGetProperty(key, out var v) && v.GetString() is { } s) ctx.Extras[key] = s;

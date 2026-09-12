@@ -16,6 +16,7 @@ public sealed class TweakViewModel : ObservableObject
     public TweakCategory Category => Tweak.Category;
     public PresetLevel Preset => Tweak.Preset;
     public bool FullyReversible => Tweak.FullyReversible;
+    public bool RequiresRestart => Tweak.RequiresRestart;
 
     private TweakStatus _status = TweakStatus.Unknown;
     public TweakStatus Status

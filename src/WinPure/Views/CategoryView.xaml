@@ -148,6 +148,14 @@
                                                 <TextBlock Text="Undo requires reinstalling from the Microsoft Store." TextWrapping="Wrap"/>
                                             </TextBlock.ToolTip>
                                         </TextBlock>
+                                        <TextBlock Text="&#xE777;" FontFamily="{StaticResource Font.Icon}" FontSize="12"
+                                                   Margin="6,1,0,0" Foreground="{StaticResource Brush.TextTertiary}"
+                                                   VerticalAlignment="Center"
+                                                   Visibility="{Binding RequiresRestart, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock.ToolTip>
+                                                <TextBlock Text="Takes full effect after a restart." TextWrapping="Wrap"/>
+                                            </TextBlock.ToolTip>
+                                        </TextBlock>
                                     </StackPanel>
                                     <TextBlock Text="{Binding Description}" FontSize="12" Margin="0,4,0,0"
                                                TextWrapping="Wrap" Foreground="{StaticResource Brush.TextSecondary}"/>

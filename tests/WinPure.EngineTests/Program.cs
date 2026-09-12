@@ -82,6 +82,8 @@ failures += RevertingAFeatureRestoresItsRecordedState() ? 0 : 1;
 failures += ATamperedFeatureInABackupIsRefused() ? 0 : 1;
 failures += AConfigFileRoundTripsAndRejectsForeignFiles() ? 0 : 1;
 failures += ImportingTicksButNeverUnticksOrApplies() ? 0 : 1;
+failures += SearchFindsTweaksInEveryCategory() ? 0 : 1;
+failures += EachCategoryShowsItsPendingCount() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
 
@@ -849,6 +851,56 @@ bool ImportingTicksButNeverUnticksOrApplies()
         $"backups written={backupsAfter - backupsBefore} (expected 0)");
 }
 
+// Search looks in every category, replaces the page while it has text, and shows the same tweaks
+// as their own pages: ticking a result is the same toggle. Clearing it goes back where you were.
+bool SearchFindsTweaksInEveryCategory()
+{
+    var main = new WinPure.ViewModels.MainViewModel();
+    var start = main.CurrentPage;
+
+    main.SearchText = "GAME";
+    var page = main.CurrentPage as WinPure.ViewModels.CategoryPageViewModel;
+    var results = page?.Tweaks.ToList() ?? new List<WinPure.ViewModels.TweakViewModel>();
+    bool allMatch = results.Count > 0 && results.All(t =>
+        (t.Name + " " + t.Description + " " + t.Tweak.Help).Contains("game", StringComparison.OrdinalIgnoreCase));
+    bool narrowed = results.Count < main.AllTweaks.Count;
+    int categories = results.Select(t => t.Category).Distinct().Count();
+
+    if (results.Count > 0) results[0].IsSelected = !results[0].IsSelected;
+    bool sameToggle = main.PendingCount == 1;
+
+    main.SearchText = "";
+    bool backToStart = ReferenceEquals(main.CurrentPage, start);
+
+    return Report("search finds tweaks in every category",
+        page is not null && allMatch && narrowed && categories >= 2 && sameToggle && backToStart,
+        $"'GAME' => {results.Count} of {main.AllTweaks.Count} tweaks from {categories} categories, all mention it={allMatch}, " +
+        $"ticking a result counts as pending={sameToggle}, cleared search returns to the start page={backToStart}");
+}
+
+// Each category in the sidebar shows how many of its tweaks are waiting for Apply Changes.
+bool EachCategoryShowsItsPendingCount()
+{
+    var main = new WinPure.ViewModels.MainViewModel();
+    WinPure.ViewModels.NavItem Nav(TweakCategory category) => main.NavItems.First(n =>
+        n.Page is WinPure.ViewModels.CategoryPageViewModel p && p.Category == category);
+
+    var privacy = main.AllTweaks.Where(t => t.Category == TweakCategory.Privacy).Take(2).ToList();
+    foreach (var tweak in privacy) tweak.IsSelected = true;
+    main.AllTweaks.First(t => t.Category == TweakCategory.Performance).IsSelected = true;
+    int privacyCount = Nav(TweakCategory.Privacy).PendingCount;
+    int performanceCount = Nav(TweakCategory.Performance).PendingCount;
+    int appsCount = Nav(TweakCategory.Apps).PendingCount;
+
+    privacy[0].IsSelected = false;
+    int privacyAfterUntick = Nav(TweakCategory.Privacy).PendingCount;
+
+    return Report("each category shows its pending count",
+        privacyCount == 2 && performanceCount == 1 && appsCount == 0 && privacyAfterUntick == 1 && Nav(TweakCategory.Privacy).HasPending,
+        $"privacy={privacyCount} (expected 2), performance={performanceCount} (expected 1), apps={appsCount} (expected 0), " +
+        $"privacy after unticking one={privacyAfterUntick} (expected 1)");
+}
+
 // The forgiveness granted to an optional action must never extend to the backup itself.
 // Both failures arrive as an exception on the same action, and the first version of this
 // feature could not tell them apart: with the snapshot flush inside the guard, a full disk
@@ -1207,6 +1259,31 @@ bool EveryStaticResourceAndBindingPathExists()
             string member = m.Groups[1].Value;
             if (typeof(WinPure.ViewModels.MainViewModel).GetProperty(member) is null)
                 problems.Add($"{name}: MainViewModel has no '{member}'");
+        }
+    }
+
+    // Defined somewhere is not enough. A dictionary merged into App.xaml can only see its own keys and
+    // those of dictionaries merged before it, not App.xaml's own resources, and the failure comes at
+    // startup rather than at build time. The sidebar badge asked Styles.xaml for BoolToVisibility,
+    // declared in App.xaml, and the app died on launch while this test was green.
+    string appXaml = Path.Combine(srcDir, "App.xaml");
+    if (File.Exists(appXaml))
+    {
+        var visible = new HashSet<string>(StringComparer.Ordinal);
+        foreach (Match merged in Regex.Matches(File.ReadAllText(appXaml), @"ResourceDictionary\s+Source=""([^""]+)"""))
+        {
+            string source = merged.Groups[1].Value;
+            string path = Path.Combine(srcDir, source.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(path))
+            {
+                problems.Add($"App.xaml merges a dictionary that does not exist: '{source}'");
+                continue;
+            }
+            string text = File.ReadAllText(path);
+            foreach (Match k in Regex.Matches(text, @"x:Key=""([^""]+)""")) visible.Add(k.Groups[1].Value);
+            foreach (Match m in Regex.Matches(text, @"\{StaticResource\s+([^}\s,]+)\s*\}"))
+                if (!visible.Contains(m.Groups[1].Value))
+                    problems.Add($"{Path.GetFileName(path)}: '{m.Groups[1].Value}' is not defined in it or in a dictionary merged before it, so the app fails when it starts");
         }
     }
 

@@ -50,6 +50,12 @@ WinPure now looks at the state of the system on every scan and, if something is 
 - New: **Disable Reserved Storage** (in no preset), with the same record-and-restore undo.
 - A setting read back from a backup file is checked before anything runs, so an edited backup cannot make WinPure — which runs as administrator — execute something else.
 
+### Finding your way around
+
+- **Search** at the top of the sidebar looks through every tweak's name, description and help, across all categories. Case and accents are ignored; clicking any page in the sidebar leaves the results.
+- Each category in the sidebar shows **how many changes are waiting** for Apply Changes.
+- Tweaks that only take full effect after a restart now say so with an icon on their card, next to the existing one for app removals.
+
 ### New: export and import your configuration
 
 Two buttons on the Dashboard save which tweaks are switched on to a small JSON file, and tick the same ones on another PC.

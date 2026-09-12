@@ -43,6 +43,20 @@
                     </StackPanel>
                 </StackPanel>
 
+                <!-- search across every tweak -->
+                <Grid DockPanel.Dock="Top" Margin="16,0,16,10">
+                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             Padding="30,7,8,7" FontSize="12.5" BorderThickness="1"
+                             Background="#1B2233" Foreground="{StaticResource Brush.TextPrimary}"
+                             BorderBrush="{StaticResource Brush.Divider}" CaretBrush="{StaticResource Brush.TextPrimary}"/>
+                    <TextBlock Text="&#xE721;" FontFamily="{StaticResource Font.Icon}" FontSize="12" Margin="11,0,0,0"
+                               VerticalAlignment="Center" IsHitTestVisible="False"
+                               Foreground="{StaticResource Brush.TextTertiary}"/>
+                    <TextBlock Text="Search tweaks" FontSize="12.5" Margin="31,0,0,0" VerticalAlignment="Center"
+                               IsHitTestVisible="False" Foreground="{StaticResource Brush.TextTertiary}"
+                               Visibility="{Binding IsSearching, Converter={StaticResource InverseBoolToVisibility}}"/>
+                </Grid>
+
                 <!-- footer: OS info -->
                 <StackPanel DockPanel.Dock="Bottom" Margin="16,8,16,16">
                     <Separator Background="{StaticResource Brush.Divider}" Margin="0,0,0,10"/>

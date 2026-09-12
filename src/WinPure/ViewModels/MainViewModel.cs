@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using Microsoft.Win32;
@@ -31,6 +32,15 @@ public sealed class NavItem : ObservableObject
         _isCurrent = value;
         OnPropertyChanged(nameof(IsCurrent));
     }
+
+    private int _pendingCount;
+    /// <summary>Tweaks on this page whose toggle differs from the system, shown as a badge in the sidebar.</summary>
+    public int PendingCount
+    {
+        get => _pendingCount;
+        set { if (Set(ref _pendingCount, value)) OnPropertyChanged(nameof(HasPending)); }
+    }
+    public bool HasPending => PendingCount > 0;
 }
 
 public sealed class MainViewModel : ObservableObject
@@ -136,6 +146,22 @@ public sealed class MainViewModel : ObservableObject
         get => _currentNav;
         set
         {
+            if (IsSearching)
+            {
+                // Picking a page in the sidebar leaves the search results — including the page
+                // the search started from, whose button was unchecked while searching.
+                _searchText = "";
+                _searchPage = null;
+                OnPropertyChanged(nameof(SearchText));
+                OnPropertyChanged(nameof(IsSearching));
+                if (value == _currentNav)
+                {
+                    value.SetCurrentSilently(true);
+                    OnPropertyChanged(nameof(CurrentPage));
+                    OnPropertyChanged(nameof(ApplyHint));
+                    return;
+                }
+            }
             if (value == _currentNav) return;
             var old = _currentNav;
             _currentNav = value;
@@ -150,7 +176,59 @@ public sealed class MainViewModel : ObservableObject
 
     public string OsInfo { get; } = GetOsInfo();
 
-    public PageViewModel CurrentPage => CurrentNav.Page;
+    public PageViewModel CurrentPage => _searchPage ?? CurrentNav.Page;
+
+    // ---------------------------------------------------------------- search
+
+    private string _searchText = "";
+    private CategoryPageViewModel? _searchPage;
+
+    /// <summary>
+    /// Looks through every tweak's name, description and help. While it holds text, the results
+    /// replace the current page; clearing it or clicking the sidebar goes back. With over a hundred
+    /// tweaks, browsing category by category stops being a way to find one.
+    /// </summary>
+    public string SearchText
+    {
+        get => _searchText;
+        set
+        {
+            if (!Set(ref _searchText, value ?? "")) return;
+            _currentNav.SetCurrentSilently(!IsSearching);
+            _searchPage = IsSearching ? BuildSearchPage(_searchText.Trim()) : null;
+            OnPropertyChanged(nameof(IsSearching));
+            OnPropertyChanged(nameof(CurrentPage));
+            OnPropertyChanged(nameof(ApplyHint));
+        }
+    }
+
+    public bool IsSearching => !string.IsNullOrWhiteSpace(_searchText);
+
+    private CategoryPageViewModel BuildSearchPage(string query)
+    {
+        var matches = AllTweaks.Where(t => MatchesSearch(t, query)).ToList();
+        var page = new CategoryPageViewModel
+        {
+            Title = "Search",
+            Subtitle = matches.Count == 0
+                ? $"No tweak mentions \"{query}\". Try a single word, such as an app or a Windows feature."
+                : $"{matches.Count} tweak{(matches.Count == 1 ? "" : "s")} mentioning \"{query}\", from every category.",
+            Main = this,
+        };
+        // The same TweakViewModel objects as on their own pages: a toggle here is the same toggle.
+        foreach (var tweak in matches) page.Tweaks.Add(tweak);
+        return page;
+    }
+
+    private static bool MatchesSearch(TweakViewModel tweak, string query)
+    {
+        // Case and accents ignored: an accent typed by habit on a Spanish keyboard still finds it.
+        var compare = CultureInfo.InvariantCulture.CompareInfo;
+        const CompareOptions options = CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace;
+        return compare.IndexOf(tweak.Name, query, options) >= 0
+            || compare.IndexOf(tweak.Description, query, options) >= 0
+            || compare.IndexOf(tweak.Tweak.Help, query, options) >= 0;
+    }
 
     private bool _isBusy;
     public bool IsBusy
@@ -192,7 +270,13 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand ExportConfigCommand { get; }
     public RelayCommand ImportConfigCommand { get; }
 
-    private void UpdatePendingCount() => PendingCount = AllTweaks.Count(t => t.IsDirty);
+    private void UpdatePendingCount()
+    {
+        PendingCount = AllTweaks.Count(t => t.IsDirty);
+        foreach (var item in NavItems)
+            if (item.Page is CategoryPageViewModel page)
+                item.PendingCount = page.Tweaks.Count(t => t.IsDirty);
+    }
 
     /// <summary>Startup toggles apply immediately, so the dashboard's backup count moves too.</summary>
     internal void RefreshBackupCount() => _dashboard.BackupCount = _backupManager.ListSessions().Count;

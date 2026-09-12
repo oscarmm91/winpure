@@ -10,10 +10,10 @@ public abstract class PageViewModel : ObservableObject
     public required string Subtitle { get; init; }
 }
 
-/// <summary>One of the six tweak category pages (Privacy, Apps, Services, …).</summary>
+/// <summary>A page of tweak cards: one category, or the search results (no category).</summary>
 public sealed class CategoryPageViewModel : PageViewModel
 {
-    public required TweakCategory Category { get; init; }
+    public TweakCategory? Category { get; init; }
     public required MainViewModel Main { get; init; }
     public ObservableCollection<TweakViewModel> Tweaks { get; } = new();
 }

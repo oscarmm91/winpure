@@ -76,9 +76,9 @@ SysMain (SuperFetch), Windows Search indexing, Print Spooler, Remote Registry, E
 </details>
 
 <details>
-<summary>🚀 <b>Performance</b> — 14 tweaks</summary>
+<summary>🚀 <b>Performance</b> — 15 tweaks</summary>
 <br/>
-Faster app timeouts & shutdown, foreground-app priority, window animations, hibernation, High Performance power plan, fullscreen optimizations, mouse acceleration, long paths, Remote Desktop, Fast Startup, early optional updates, daily registry backup, NTP time server.
+Faster app timeouts & shutdown, foreground-app priority, window animations, hibernation, High Performance power plan, fullscreen optimizations, mouse acceleration, long paths, Remote Desktop, Fast Startup, early optional updates, daily registry backup, NTP time server, Reserved Storage.
 <br/><br/>
 <img src="docs/screenshots/performance.png" width="800"/>
 </details>

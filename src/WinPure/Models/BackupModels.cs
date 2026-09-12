@@ -5,7 +5,10 @@ namespace WinPure.Models;
 /// <summary>One reversible unit of system state captured before a change.</summary>
 public sealed class BackupEntry
 {
-    /// <summary>registry-value | registry-key | service | scheduled-task</summary>
+    /// <summary>
+    /// registry-value | registry-key | service | scheduled-task | startup-entry | system-state.
+    /// For system-state, ValueName is the SystemStateKind and Value the measured state.
+    /// </summary>
     public required string Type { get; set; }
     public required string TweakId { get; set; }
     public string TweakName { get; set; } = "";

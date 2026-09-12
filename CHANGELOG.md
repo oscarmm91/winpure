@@ -44,6 +44,12 @@ WinPure now looks at the state of the system on every scan and, if something is 
 - Buttons no longer stay greyed out after a long operation finishes until you move the mouse.
 - Eight tweaks — the ones ported from WinUtil — showed a blank square where their icon should be.
 
+### Undo puts back what you had — power settings too
+
+- **High Performance Power Plan** was undone with a fixed command that always switched to Balanced, even if you had been on a custom plan. **Disable Hibernation** was undone by turning hibernation on, even on PCs where it had been off. Both now record the setting before changing it, and undo puts that back.
+- New: **Disable Reserved Storage** (in no preset), with the same record-and-restore undo.
+- A setting read back from a backup file is checked before anything runs, so an edited backup cannot make WinPure — which runs as administrator — execute something else.
+
 ### 17 new tweaks
 
 Registry keys, scheduled tasks and policies were checked against a real Windows 11 25H2 machine (build 26200) before being added, and every one reverts to the value the machine actually had.

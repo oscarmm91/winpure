@@ -73,6 +73,9 @@ failures += AnAbsentValueCanAlreadyBeTheWantedState() ? 0 : 1;
 failures += AQueryDiesWithTheAppButASystemChangeDoesNot() ? 0 : 1;
 failures += AHungAccountLookupCannotStallTheScan() ? 0 : 1;
 failures += EveryTweakHasAnIcon() ? 0 : 1;
+failures += RevertingAPowerPlanRestoresTheOneThatWasActive() ? 0 : 1;
+failures += RevertingHibernationKeepsItOffIfItWasOff() ? 0 : 1;
+failures += ATamperedSettingInABackupIsRefused() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
 
@@ -594,6 +597,95 @@ bool EveryTweakHasAnIcon()
     return Report("every tweak has an icon", blank.Count == 0,
         blank.Count == 0 ? "every tweak has one Segoe Fluent glyph" : $"no glyph: {string.Join(", ", blank)}");
 }
+
+// Settings changed through a command used to be undone with a hand-written "stock" command:
+// undoing High Performance switched a custom plan to Balanced. Undo must put back the plan that
+// was really active.
+bool RevertingAPowerPlanRestoresTheOneThatWasActive()
+{
+    Reset();
+    const string custom = "24b961a2-1b54-42c5-b443-20ec5ec4cfee";
+    const string high = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c";
+    const string balanced = "381b4222-f694-41f0-9685-ff5bb260df2e";
+    var plan = new FakeSetting(custom, new PowerPlanState());
+    var real = SystemState.Swap(SystemStateKind.PowerPlan, plan);
+    try
+    {
+        var tweak = StateTweak("test-power-plan",
+            new SystemStateAction { Kind = SystemStateKind.PowerPlan, AppliedState = high, DefaultState = balanced });
+        var engine = new TweakEngine(new BackupManager());
+        engine.ApplyChanges(new[] { (tweak, true) });
+        string afterApply = plan.Current;
+        engine.ApplyChanges(new[] { (tweak, false) });
+
+        return Report("reverting a power plan restores the one that was active",
+            afterApply == high && plan.Current == custom,
+            $"was {Short(custom)} (custom), applied={Short(afterApply)}, reverted={Short(plan.Current)} " +
+            $"(expected {Short(custom)}; the old action switched to Balanced {Short(balanced)})");
+    }
+    finally { SystemState.Swap(SystemStateKind.PowerPlan, real); }
+}
+
+// The same bug from the other side: undoing Disable Hibernation turned hibernation ON, even on a
+// PC where it had been off before WinPure ever touched it.
+bool RevertingHibernationKeepsItOffIfItWasOff()
+{
+    Reset();
+    var hibernation = new FakeSetting("off", new HibernationState());
+    var real = SystemState.Swap(SystemStateKind.Hibernation, hibernation);
+    try
+    {
+        var tweak = StateTweak("test-hibernation",
+            new SystemStateAction { Kind = SystemStateKind.Hibernation, AppliedState = "off", DefaultState = "on" });
+        var engine = new TweakEngine(new BackupManager());
+        engine.ApplyChanges(new[] { (tweak, true) });
+        engine.ApplyChanges(new[] { (tweak, false) });
+
+        return Report("reverting hibernation keeps it off if it was off",
+            hibernation.Current == "off" && !hibernation.Writes.Contains("on"),
+            $"was off, writes=[{string.Join(",", hibernation.Writes)}], now={hibernation.Current} " +
+            "(expected off and never on; the old action ran powercfg /hibernate on)");
+    }
+    finally { SystemState.Swap(SystemStateKind.Hibernation, real); }
+}
+
+// Backups are plain JSON in the user's own profile, and WinPure runs elevated. A setting read back
+// from one must never decide what runs: it is checked against what could really have been recorded.
+bool ATamperedSettingInABackupIsRefused()
+{
+    var plan = new FakeSetting("381b4222-f694-41f0-9685-ff5bb260df2e", new PowerPlanState());
+    var real = SystemState.Swap(SystemStateKind.PowerPlan, plan);
+    try
+    {
+        var tampered = new BackupEntry
+        {
+            Type = "system-state", TweakId = "test-tamper", ValueName = "PowerPlan", Existed = true,
+            Value = "381b4222-f694-41f0-9685-ff5bb260df2e; Remove-Item $env:TEMP -Recurse",
+        };
+        var unknownSetting = new BackupEntry
+        {
+            Type = "system-state", TweakId = "test-tamper", ValueName = "SomethingElse", Existed = true, Value = "on",
+        };
+        int failures = new BackupManager().RestoreEntries(new[] { tampered, unknownSetting });
+
+        return Report("a tampered setting in a backup is refused",
+            failures == 2 && plan.Writes.Count == 0,
+            $"failures={failures} (expected 2), writes that reached the setting={plan.Writes.Count} (expected 0)");
+    }
+    finally { SystemState.Swap(SystemStateKind.PowerPlan, real); }
+}
+
+Tweak StateTweak(string id, SystemStateAction action) => new()
+{
+    Id = id,
+    Category = TweakCategory.Performance,
+    Name = $"Test tweak {id}",
+    Description = "toy tweak, tests only",
+    Icon = "x",
+    Actions = new TweakAction[] { action },
+};
+
+static string Short(string guid) => guid.Length > 8 ? guid[..8] : guid;
 
 // The forgiveness granted to an optional action must never extend to the backup itself.
 // Both failures arrive as an exception on the same action, and the first version of this
@@ -1226,4 +1318,30 @@ bool Report(string name, bool ok, string detail)
     Console.WriteLine($"[{(ok ? "PASS" : "FAIL")}] {name}");
     Console.WriteLine($"       {detail}");
     return ok;
+}
+
+/// <summary>A command-driven setting held in memory, so tests never run powercfg or DISM.</summary>
+sealed class FakeSetting : ISystemStateHandler
+{
+    private readonly ISystemStateHandler _real;
+
+    public FakeSetting(string initial, ISystemStateHandler real)
+    {
+        Current = initial;
+        _real = real;
+    }
+
+    public string Current { get; private set; }
+    public List<string> Writes { get; } = new();
+
+    public string? Read() => Current;
+
+    // The real handler's check, so a test also catches a broken validator.
+    public bool IsValid(string state) => _real.IsValid(state);
+
+    public void Write(string state)
+    {
+        Writes.Add(state);
+        Current = state;
+    }
 }

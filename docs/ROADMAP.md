@@ -27,6 +27,14 @@ That is the product's position, and everything below has to protect it:
    be undone lives in its own clearly-marked section, never inside a preset.
 2. **Zero NuGet dependencies.** A good idea that needs a library needs a different design.
 
+## Status
+
+Phases 1, 2 and 3 are built, each followed by a separate commit applying its review — `git log
+--oneline` is the record, not this paragraph. Phase 3 also turned up a bug this roadmap had not
+listed: the power plan and hibernation tweaks were undone with hand-written defaults. Fixed as
+Phase 3b (`SystemStateAction`), together with Reserved Storage. Still open from Phase 3: **Edge's
+new-tab policies**, waiting on the product decision described there.
+
 ---
 
 ## Phase 1 — Fix what we already ship
@@ -82,7 +90,7 @@ value; it is a product decision because it configures another vendor's app.
 - **OEM bloatware** (Dell, HP, Lenovo, Samsung). ~20 verified AppIds. The honest caveat: none of
   it can be tested here, and some of those apps deliver real driver updates, so they never go in
   a preset.
-- **Diagnostic scheduled tasks.**
+- ~~**Diagnostic scheduled tasks.**~~ Done in Phase 3 (`privacy-diagnostic-tasks`).
 
 ## Phase 5 — The big features you approved
 

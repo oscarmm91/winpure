@@ -500,6 +500,53 @@ public sealed class StartupEntryAction : TweakAction
     }
 }
 
+/// <summary>
+/// A setting changed through a command (powercfg, DISM) whose undo must put back what this machine
+/// had. These used to be CommandActions that captured nothing and reverted with a hand-written
+/// "stock" command: undoing High Performance switched a custom plan to Balanced, and undoing
+/// Disable Hibernation turned hibernation ON on PCs where it had been off.
+/// </summary>
+public sealed class SystemStateAction : TweakAction
+{
+    public required SystemStateKind Kind { get; init; }
+    public required string AppliedState { get; init; }
+    /// <summary>What a stock machine has. Only used when no backup of this tweak exists.</summary>
+    public required string DefaultState { get; init; }
+    /// <summary>
+    /// Takes the state from the scan instead of asking again, for settings that cost a PowerShell
+    /// call. Without it the state is read directly, which is cheap for registry-backed settings.
+    /// </summary>
+    public Func<ScanContext, string?>? FromScan { get; init; }
+
+    public override bool? IsApplied(ScanContext ctx)
+    {
+        string? state = FromScan is null ? SystemState.Handler(Kind).Read()
+            : ctx.Loaded ? FromScan(ctx) : null;
+        return state is null ? null : state.Equals(AppliedState, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public override void Capture(Tweak tweak, List<BackupEntry> backup)
+    {
+        // Unreadable means no backup, and no backup means no change.
+        string state = SystemState.Handler(Kind).Read()
+            ?? throw new InvalidOperationException($"Could not read the current {Kind} setting, so it was not changed.");
+        backup.Add(new BackupEntry
+        {
+            Type = "system-state",
+            TweakId = tweak.Id,
+            TweakName = tweak.Name,
+            ValueName = Kind.ToString(),
+            Value = state,
+            Existed = true,
+            Optional = Optional,
+        });
+    }
+
+    public override void Apply() => SystemState.Handler(Kind).Write(AppliedState);
+
+    public override void RevertToDefault() => SystemState.Handler(Kind).Write(DefaultState);
+}
+
 /// <summary>Arbitrary PowerShell apply/revert with detection delegated to the scan context.</summary>
 public sealed class CommandAction : TweakAction
 {

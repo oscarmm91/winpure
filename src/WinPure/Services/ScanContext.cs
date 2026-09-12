@@ -125,12 +125,10 @@ public sealed class ScanContext
             $r.tasks = $tasks
             $r.logonTasks = @($logon)
 
-            try {
-                $power = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power'
-                $r.hibernate = if ($null -ne $power.HibernateEnabled) { [string]$power.HibernateEnabled } else { '1' }
-            } catch { }
-
-            try { $r.powerplan = [string](powercfg /getactivescheme) } catch { }
+            # Hibernation and the power plan are read straight from the registry by their actions.
+            # Reserved storage has no registry value that reflects it, only DISM's enum name; it needs
+            # elevation, so unelevated this throws and that tweak reads Unknown.
+            try { $r.reservedStorage = [string](Get-WindowsReservedStorageState -ErrorAction Stop).ReservedStorageState } catch { }
             try { $r.fwTelemetryBlock = [bool](Get-NetFirewallRule -DisplayName 'WinPure - Block Telemetry Client' -ErrorAction SilentlyContinue) } catch { }
             try {
                 $r.onedrive = [bool]((Test-Path "$env:ProgramFiles\Microsoft OneDrive\OneDrive.exe") -or (Test-Path "$env:LOCALAPPDATA\Microsoft\OneDrive\OneDrive.exe"))
@@ -180,7 +178,7 @@ public sealed class ScanContext
                         t.TryGetProperty("enabled", out var en) && en.GetBoolean()));
                 }
 
-            foreach (var key in new[] { "hibernate", "powerplan", "eventLog" })
+            foreach (var key in new[] { "reservedStorage", "eventLog" })
                 if (root.TryGetProperty(key, out var v) && v.GetString() is { } s) ctx.Extras[key] = s;
             if (root.TryGetProperty("fwTelemetryBlock", out var fw)) ctx.Extras["fwTelemetryBlock"] = fw.GetBoolean() ? "1" : "0";
             if (root.TryGetProperty("onedrive", out var od)) ctx.Extras["onedrive"] = od.GetBoolean() ? "1" : "0";

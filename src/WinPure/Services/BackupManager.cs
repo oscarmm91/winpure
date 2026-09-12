@@ -184,6 +184,12 @@ public sealed class BackupManager
                 ScheduledTaskAction.SetEnabled(entry.TaskPath, entry.TaskWasEnabled ?? true);
                 break;
             }
+            case "system-state":
+            {
+                // Checked before anything runs — see SystemState.Restore.
+                SystemState.Restore(entry.ValueName, entry.Value);
+                break;
+            }
         }
     }
 
@@ -211,6 +217,7 @@ public sealed class BackupManager
             "registry-key" => e.KeyPath ?? "?",
             "service" => $"service {e.ServiceName}",
             "scheduled-task" => $"task {e.TaskPath}",
+            "system-state" => $"{e.ValueName} setting",
             _ => e.Type
         };
 }

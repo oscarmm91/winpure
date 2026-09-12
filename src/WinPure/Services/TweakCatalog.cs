@@ -656,16 +656,11 @@ public static class TweakCatalog
             Id = "perf-hibernation", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
             Name = "Disable Hibernation",
             Description = "Turn off hibernation and delete hiberfil.sys to free disk space.",
-            Help = "Frees several GB (hiberfil.sys) but disables Fast Startup and hibernate. Revert turns it back on.",
+            Help = "Frees several GB (hiberfil.sys), but also turns off Fast Startup and the Hibernate option. Undo puts back the setting this PC had before.",
             Icon = "",
             Actions = new TweakAction[]
             {
-                new CommandAction
-                {
-                    ApplyScript = "powercfg /hibernate off",
-                    RevertScript = "powercfg /hibernate on",
-                    Detect = ctx => ctx.Extras.TryGetValue("hibernate", out var v) ? v == "0" : null,
-                },
+                new SystemStateAction { Kind = SystemStateKind.Hibernation, AppliedState = "off", DefaultState = "on" },
             },
         };
 
@@ -674,17 +669,33 @@ public static class TweakCatalog
             Id = "perf-power-plan", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
             Name = "High Performance Power Plan",
             Description = "Switch the active power plan to High Performance.",
-            Help = "Best for desktops. On laptops this reduces battery life; the Balanced plan is restored on revert.",
+            Help = "Best for desktops. On laptops this reduces battery life. Undo switches back to the plan that was active before, custom plans included.",
             Icon = "",
             Actions = new TweakAction[]
             {
-                new CommandAction
+                new SystemStateAction
                 {
-                    ApplyScript = "powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
-                    RevertScript = "powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e",
-                    Detect = ctx => ctx.Extras.TryGetValue("powerplan", out var v)
-                        ? v.Contains("8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", StringComparison.OrdinalIgnoreCase)
-                        : null,
+                    Kind = SystemStateKind.PowerPlan,
+                    AppliedState = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", // High performance
+                    DefaultState = "381b4222-f694-41f0-9685-ff5bb260df2e", // Balanced — only when there is no backup
+                },
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "perf-reserved-storage", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
+            Name = "Disable Reserved Storage",
+            Description = "Give back the several GB Windows sets aside so that updates always have room to install.",
+            Help = "Without the reserve, a nearly full disk can make an update fail until you free up space yourself. Windows refuses the change while an update is using the reserve; try again after restarting. Undo turns the reserve back on only if this PC had it.",
+            Icon = "",
+            Actions = new TweakAction[]
+            {
+                // Read by the scan because it costs a PowerShell call.
+                new SystemStateAction
+                {
+                    Kind = SystemStateKind.ReservedStorage, AppliedState = "Disabled", DefaultState = "Enabled",
+                    FromScan = ctx => ctx.Extras.TryGetValue("reservedStorage", out var v) && v.Length > 0 ? v : null,
                 },
             },
         };

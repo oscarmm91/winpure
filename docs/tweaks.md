@@ -84,8 +84,9 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Faster System Shutdown | Balanced | `WaitToKillServiceTimeout 5000→2000` |
 | Disable Window Animations | Manual | `MinAnimate = 0`, taskbar animations off |
 | Prioritize Foreground Apps | Balanced | `Win32PrioritySeparation = 38` |
-| Disable Hibernation | Manual | `powercfg /hibernate off` (frees hiberfil.sys) |
-| High Performance Power Plan | Manual | `powercfg /setactive` High Performance (not for laptops) |
+| Disable Hibernation | Manual | `powercfg /hibernate off` (frees hiberfil.sys); undo restores the setting this PC had |
+| High Performance Power Plan | Manual | `powercfg /setactive` High Performance (not for laptops); undo returns to the plan that was active |
+| Disable Reserved Storage | Manual | `Set-WindowsReservedStorageState -State Disabled` (frees the update reserve) |
 | Disable Fullscreen Optimizations | Manual | `GameDVR_DXGIHonorFSEWindowsCompatible = 1` |
 | Disable Mouse Acceleration | Manual | `MouseSpeed/Threshold1/Threshold2 = 0` |
 | Enable Long Paths | Manual | `FileSystem!LongPathsEnabled = 1` |

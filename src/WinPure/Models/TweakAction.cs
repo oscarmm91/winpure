@@ -282,7 +282,7 @@ public sealed class ServiceAction : TweakAction
         // The start mode above is what actually sticks across reboots. Stopping it now is
         // best-effort: a busy service with dependents may refuse, and that is not a failure
         // of the tweak — but it must not be swallowed either.
-        var stop = PowerShellRunner.Run($"Stop-Service -Name '{ServiceName}' -Force -ErrorAction Stop", 60_000);
+        var stop = PowerShellRunner.Run($"Stop-Service -Name {PowerShellRunner.Quote(ServiceName)} -Force -ErrorAction Stop", 60_000);
         if (!stop.Success)
             LogService.Log($"Service {ServiceName} set to Disabled but could not be stopped now (takes effect on reboot): {stop.Error}");
     }
@@ -296,7 +296,7 @@ public sealed class ServiceAction : TweakAction
         // Only Automatic (2) gets started back up; Manual (3) is on-demand by definition.
         if (startMode == 2)
         {
-            var start = PowerShellRunner.Run($"Start-Service -Name '{serviceName}' -ErrorAction Stop", 60_000);
+            var start = PowerShellRunner.Run($"Start-Service -Name {PowerShellRunner.Quote(serviceName)} -ErrorAction Stop", 60_000);
             if (!start.Success)
                 LogService.Log($"Service {serviceName} restored to start mode {startMode} but could not be started now: {start.Error}");
         }
@@ -345,7 +345,7 @@ public sealed class ScheduledTaskAction : TweakAction
         var (dir, name) = Split(taskPath);
         // $$ raw string: {{x}} interpolates, single braces stay literal for PowerShell.
         var result = PowerShellRunner.Run($$"""
-            $t = Get-ScheduledTask -TaskPath '{{dir}}' -TaskName '{{name}}' -ErrorAction SilentlyContinue
+            $t = Get-ScheduledTask -TaskPath {{PowerShellRunner.Quote(dir)}} -TaskName {{PowerShellRunner.Quote(name)}} -ErrorAction SilentlyContinue
             if (-not $t) { 'missing' } else { $t.State.ToString() }
             """, 30_000, dieWithApp: true);
         string state = result.Output.Trim();
@@ -361,9 +361,9 @@ public sealed class ScheduledTaskAction : TweakAction
         // a task that exists and refuses to change IS one, and must not be reported as success.
         PowerShellRunner.RunOrThrow($$"""
             $ErrorActionPreference = 'Stop'
-            $t = Get-ScheduledTask -TaskPath '{{dir}}' -TaskName '{{name}}' -ErrorAction SilentlyContinue
+            $t = Get-ScheduledTask -TaskPath {{PowerShellRunner.Quote(dir)}} -TaskName {{PowerShellRunner.Quote(name)}} -ErrorAction SilentlyContinue
             if (-not $t) { exit 0 }
-            {{verb}} -TaskPath '{{dir}}' -TaskName '{{name}}' | Out-Null
+            {{verb}} -TaskPath {{PowerShellRunner.Quote(dir)}} -TaskName {{PowerShellRunner.Quote(name)}} | Out-Null
             """, $"{(enabled ? "Enabling" : "Disabling")} task {taskPath}", 60_000);
     }
 

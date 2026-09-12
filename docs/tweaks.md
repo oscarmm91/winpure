@@ -139,7 +139,7 @@ Switched with DISM (`Enable-` / `Disable-WindowsOptionalFeature -NoRestart`, nev
 
 | Tweak | Preset | Feature |
 |---|---|---|
-| Remove PowerShell 2.0 | Balanced | `MicrosoftWindowsPowerShellV2`, `MicrosoftWindowsPowerShellV2Root` (already gone on current 25H2) |
+| Remove PowerShell 2.0 | Balanced | `MicrosoftWindowsPowerShellV2Root`, which takes `MicrosoftWindowsPowerShellV2` with it (already gone on current 25H2) |
 | Turn Off SMB 1.0 | Manual | `SMB1Protocol` |
 | Remove the XPS Document Writer | Manual | `Printing-XPSServices-Features` |
 | Remove Windows Media Player Legacy | Manual | `WindowsMediaPlayer` (Media Features stay on) |

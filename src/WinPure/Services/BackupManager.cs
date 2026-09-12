@@ -125,6 +125,10 @@ public sealed class BackupManager
 
     private static void RestoreEntry(BackupEntry entry)
     {
+        // Checked before anything runs: backups can be edited without elevation, and this runs elevated.
+        if (!BackupEntryPolicy.IsAllowed(entry, out string why))
+            throw new InvalidOperationException($"Refused: {why}.");
+
         switch (entry.Type)
         {
             case "registry-value":

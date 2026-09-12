@@ -50,6 +50,14 @@ WinPure now looks at the state of the system on every scan and, if something is 
 - New: **Disable Reserved Storage** (in no preset), with the same record-and-restore undo.
 - A setting read back from a backup file is checked before anything runs, so an edited backup cannot make WinPure — which runs as administrator — execute something else.
 
+### Security: a backup file can no longer make WinPure run something else
+
+Backups are plain files in your profile, which any program you run can edit without administrator rights, while WinPure restores them as administrator. A review found that a hand-edited backup could have turned that into a way to run commands or write anywhere in the registry as administrator: service names and scheduled-task paths went straight into PowerShell, and registry values were restored wherever the file pointed.
+
+- A restored entry may now only touch what WinPure itself changes: the registry values, keys, services, scheduled tasks and Windows features in its catalog, and the Startup page's own switches. Anything else is refused and logged.
+- Every service and task name is quoted before it reaches PowerShell, including the typographic quotes PowerShell also accepts.
+- A backup made by an older version that restores a value this version no longer changes is refused too, and listed in the log.
+
 ### Finding your way around
 
 - **Search** at the top of the sidebar looks through every tweak's name, description and help, across all categories. Case and accents are ignored; clicking any page in the sidebar leaves the results.

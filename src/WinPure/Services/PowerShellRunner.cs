@@ -97,6 +97,22 @@ public static class PowerShellRunner
         }
     }
 
+    /// <summary>
+    /// A PowerShell single-quoted string literal. Inside one only a quote is special, and PowerShell also
+    /// accepts the typographic single quotes as quotes, so each of them is doubled. Every name that goes
+    /// into a script — a service, a task — goes through here, even when it came from the catalog.
+    /// </summary>
+    internal static string Quote(string value)
+    {
+        var quoted = new StringBuilder(value.Length + 2).Append((char)39);
+        foreach (char c in value)
+        {
+            if (c is (char)39 or (char)0x2018 or (char)0x2019 or (char)0x201A or (char)0x201B) quoted.Append(c);
+            quoted.Append(c);
+        }
+        return quoted.Append((char)39).ToString();
+    }
+
     /// <summary>Runs a script and throws with the real error text when it fails.</summary>
     public static void RunOrThrow(string script, string what, int timeoutMs = 120_000)
     {

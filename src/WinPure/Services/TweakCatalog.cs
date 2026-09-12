@@ -659,7 +659,7 @@ public static class TweakCatalog
             Id = "perf-hibernation", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
             Name = "Disable Hibernation",
             Description = "Turn off hibernation and delete hiberfil.sys to free disk space.",
-            Help = "Frees several GB (hiberfil.sys), but also turns off Fast Startup and the Hibernate option. Undo puts back the setting this PC had before.",
+            Help = "Frees several GB (hiberfil.sys), but also turns off Fast Startup and the Hibernate option. Undo puts back the setting this PC had before; on a PC whose firmware cannot hibernate, it reports an error rather than pretending.",
             Icon = "",
             Actions = new TweakAction[]
             {
@@ -672,7 +672,7 @@ public static class TweakCatalog
             Id = "perf-power-plan", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
             Name = "High Performance Power Plan",
             Description = "Switch the active power plan to High Performance.",
-            Help = "Best for desktops. On laptops this reduces battery life. Undo switches back to the plan that was active before, custom plans included.",
+            Help = "Best for desktops. On laptops this reduces battery life. Undo switches back to the plan that was active before, custom plans included. Laptops with Modern Standby usually offer only Balanced; there Windows may refuse the switch or quietly return to Balanced.",
             Icon = "",
             Actions = new TweakAction[]
             {
@@ -689,8 +689,8 @@ public static class TweakCatalog
         {
             Id = "perf-reserved-storage", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
             Name = "Disable Reserved Storage",
-            Description = "Give back the several GB Windows sets aside so that updates always have room to install.",
-            Help = "Without the reserve, a nearly full disk can make an update fail until you free up space yourself. Windows refuses the change while an update is using the reserve; try again after restarting. Undo turns the reserve back on only if this PC had it.",
+            Description = "Stop Windows from setting aside several GB so that updates always have room to install.",
+            Help = "Without the reserve, a nearly full disk can make an update fail until you free up space yourself. Windows refuses the change while an update is using the reserve; try again once it has finished. Undo turns the reserve back on only if this PC had it.",
             Icon = "",
             Actions = new TweakAction[]
             {
@@ -1093,8 +1093,9 @@ public static class TweakCatalog
             Icon = "", RequiresRestart = true,
             Actions = new TweakAction[]
             {
-                // Both absent on 26200 (measured); names as in Sophia Script's feature list.
-                new FeatureAction { FeatureName = "MicrosoftWindowsPowerShellV2", DefaultEnabled = true },
+                // Only the root feature, as Microsoft's documented removal command does: turning it off takes
+                // MicrosoftWindowsPowerShellV2 with it, and a second action for the child would capture a state
+                // the first one had already changed, then restore child before parent. Absent on 26200 (measured).
                 new FeatureAction { FeatureName = "MicrosoftWindowsPowerShellV2Root", DefaultEnabled = true },
             },
         };
@@ -1157,7 +1158,7 @@ public static class TweakCatalog
             Id = "features-sandbox", Category = TweakCategory.Features, Preset = PresetLevel.Manual,
             Name = "Turn On Windows Sandbox",
             Description = "Add Windows Sandbox: a throwaway desktop for trying unknown programs, wiped when you close it.",
-            Help = "Needs Windows 11 Pro, Enterprise or Education, and virtualization enabled in the BIOS/UEFI. On Home the feature does not exist, so this shows as unknown.",
+            Help = "Needs Windows 11 Pro, Enterprise or Education, and virtualization enabled in the BIOS/UEFI. On Home the feature does not exist, so this shows as unknown. Microsoft's own instructions also switch on any parent features it needs; WinPure switches only this one so that undo is exact, so if turning it on fails, use 'Turn Windows features on or off'.",
             Icon = "", RequiresRestart = true,
             Actions = new TweakAction[]
             {
@@ -1170,7 +1171,7 @@ public static class TweakCatalog
             Id = "features-wsl", Category = TweakCategory.Features, Preset = PresetLevel.Manual,
             Name = "Turn On Windows Subsystem for Linux",
             Description = "Add the two Windows features WSL needs to run Linux distributions.",
-            Help = "Adds the Windows side only: choose a distribution afterwards with 'wsl --install' or from the Microsoft Store. It uses virtualization, like Hyper-V.",
+            Help = "Adds the Windows side only: choose a distribution afterwards with 'wsl --install' or from the Microsoft Store. It uses virtualization, like Hyper-V. If turning it on fails, 'wsl --install' sets up everything Windows needs in one step.",
             Icon = "", RequiresRestart = true,
             Actions = new TweakAction[]
             {

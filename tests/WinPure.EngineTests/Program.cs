@@ -24,6 +24,8 @@ const string ToySub = @"Software\WinPureTests";
 
 string scratch = Path.Combine(Path.GetTempPath(), "winpure-engine-tests");
 BackupManager.BackupDirectory = scratch;
+// Toy tweaks restore under ToyKey, which no real tweak touches; the app itself never sets this.
+BackupEntryPolicy.TestKeyPrefix = ToyKey;
 
 if (args.Length > 0 && args[0] == "crash-child")
 {
@@ -84,6 +86,8 @@ failures += AConfigFileRoundTripsAndRejectsForeignFiles() ? 0 : 1;
 failures += ImportingTicksButNeverUnticksOrApplies() ? 0 : 1;
 failures += SearchFindsTweaksInEveryCategory() ? 0 : 1;
 failures += EachCategoryShowsItsPendingCount() ? 0 : 1;
+failures += AForgedBackupCannotReachBeyondWhatWinPureChanges() ? 0 : 1;
+failures += PowerShellQuotingDoublesEveryQuote() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
 
@@ -899,6 +903,59 @@ bool EachCategoryShowsItsPendingCount()
         privacyCount == 2 && performanceCount == 1 && appsCount == 0 && privacyAfterUntick == 1 && Nav(TweakCategory.Privacy).HasPending,
         $"privacy={privacyCount} (expected 2), performance={performanceCount} (expected 1), apps={appsCount} (expected 0), " +
         $"privacy after unticking one={privacyAfterUntick} (expected 1)");
+}
+
+// Backups are plain JSON that any program can edit without elevation, and WinPure restores them
+// elevated. A review found service names and task paths going straight into PowerShell, and registry
+// paths restored wherever the file pointed. An entry may now only touch what WinPure changes itself.
+bool AForgedBackupCannotReachBeyondWhatWinPureChanges()
+{
+    const string forgedKey = @"HKCU\Software\WinPureForgedTest";
+    const string forgedSub = @"Software\WinPureForgedTest";
+    try { Registry.CurrentUser.DeleteSubKeyTree(forgedSub, throwOnMissingSubKey: false); } catch { }
+
+    var forged = new[]
+    {
+        new BackupEntry { Type = "registry-value", TweakId = "forged", KeyPath = forgedKey, ValueName = "Userinit", Kind = "String", Value = "evil.exe", Existed = true },
+        new BackupEntry { Type = "registry-key", TweakId = "forged", KeyPath = forgedKey + @"\Created", Existed = true, Value = "x" },
+        new BackupEntry { Type = "startup-entry", TweakId = "forged", KeyPath = forgedKey, ValueName = "NotASwitch", Value = "020000000000000000000000", Existed = true },
+        new BackupEntry { Type = "service", TweakId = "forged", ServiceName = "Spooler'; exit 0; '", StartMode = 3 },
+        new BackupEntry { Type = "scheduled-task", TweakId = "forged", TaskPath = @"\Vendor\Task'; exit 0; '", TaskWasEnabled = true, Existed = true },
+    };
+    int failures = new BackupManager().RestoreEntries(forged);
+
+    bool touched;
+    using (var key = Registry.CurrentUser.OpenSubKey(forgedSub)) touched = key is not null;
+    try { Registry.CurrentUser.DeleteSubKeyTree(forgedSub, throwOnMissingSubKey: false); } catch { }
+
+    // What WinPure really writes must still restore.
+    var real = TweakCatalog.Build().SelectMany(t => t.Actions).OfType<RegistryValueAction>().First();
+    bool genuineAllowed =
+        BackupEntryPolicy.IsAllowed(new BackupEntry { Type = "registry-value", TweakId = "t", KeyPath = real.KeyPath, ValueName = real.ValueName }, out _) &&
+        BackupEntryPolicy.IsAllowed(new BackupEntry
+        {
+            Type = "startup-entry", TweakId = "t", ValueName = "Discord", Value = "030000000000000000000000", Existed = true,
+            KeyPath = @"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run",
+        }, out _) &&
+        BackupEntryPolicy.IsAllowed(new BackupEntry { Type = "scheduled-task", TweakId = "t", TaskPath = @"\GoogleUpdateTaskMachineUA{1B2C3D4E}", Existed = true }, out _);
+
+    return Report("a forged backup cannot reach beyond what WinPure changes",
+        failures == forged.Length && !touched && genuineAllowed,
+        $"refused {failures} of {forged.Length} forged entries (expected all), forged registry key created={touched} (expected False), " +
+        $"genuine catalog value, Startup switch and third-party logon task still allowed={genuineAllowed}");
+}
+
+// Every service and task name reaches PowerShell inside single quotes. PowerShell treats the typographic
+// single quotes as quotes too, so all of them must be doubled, or a name can close the string early.
+bool PowerShellQuotingDoublesEveryQuote()
+{
+    char q = (char)39, left = (char)0x2018, right = (char)0x2019;
+    string name = "it" + q + "s " + left + "x" + right;
+    string expected = q + "it" + q + q + "s " + left + left + "x" + right + right + q;
+    string actual = PowerShellRunner.Quote(name);
+    return Report("PowerShell quoting doubles every kind of quote",
+        actual == expected,
+        $"quoted length {actual.Length} (expected {expected.Length}), exact={actual == expected}");
 }
 
 // The forgiveness granted to an optional action must never extend to the backup itself.

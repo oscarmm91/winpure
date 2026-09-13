@@ -20,14 +20,21 @@ public sealed class BackupManager
     private static bool _storePrepared;
 
     /// <summary>
-    /// The real backup folder is protected and the old per-user backups copied in, once per run, before
-    /// anything is read or written. Tests point BackupDirectory at a scratch folder and skip this.
+    /// True only for the real store. Tests point BackupDirectory at a scratch folder, where the
+    /// administrator-owned protection and migration do not apply and plain reads and writes are used.
+    /// </summary>
+    private static bool Guarded => BackupDirectory == BackupStore.DefaultDirectory;
+
+    /// <summary>
+    /// The real backup folder is made administrator-owned and protected, and the old per-user backups
+    /// copied in, once per run, before anything is read or written. Throws if it cannot be protected, so
+    /// SaveSession and ListSessions refuse rather than fall back to an unprotected folder.
     /// </summary>
     private static void PrepareStore()
     {
-        if (_storePrepared || BackupDirectory != BackupStore.DefaultDirectory) return;
+        if (_storePrepared || !Guarded) return;
         BackupStore.EnsureProtected(BackupDirectory);
-        BackupStore.MigrateLegacy(BackupStore.LegacyDirectory, BackupDirectory);
+        BackupStore.MigrateLegacy(BackupStore.LegacyDirectory, BackupDirectory, protectedWrites: true);
         _storePrepared = true;
     }
 
@@ -48,11 +55,21 @@ public sealed class BackupManager
     {
         if (session.Entries.Count == 0 && session.TweakNames.Count == 0) return;
         PrepareStore();   // throws if the folder cannot be protected: then nothing is written, and nothing changed
-        Directory.CreateDirectory(BackupDirectory);
         string path = Path.Combine(BackupDirectory, session.Id + ".json");
-        string tmp = path + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(session, JsonOptions));
-        File.Move(tmp, path, overwrite: true);
+        string json = JsonSerializer.Serialize(session, JsonOptions);
+        if (Guarded)
+        {
+            // PrepareStore has ensured the store exists and is administrator-owned; write into it owned by
+            // Administrators too. A missing folder must throw here, never be recreated unprotected.
+            BackupStore.WriteProtected(path, json);
+        }
+        else
+        {
+            Directory.CreateDirectory(BackupDirectory);
+            string tmp = path + ".tmp";
+            File.WriteAllText(tmp, json);
+            File.Move(tmp, path, overwrite: true);
+        }
         bool isNew = session.FilePath is null;
         session.FilePath = path;
         if (isNew) LogService.Log($"Backup opened: {path}");
@@ -111,12 +128,29 @@ public sealed class BackupManager
             return sessions;
         }
         if (!Directory.Exists(BackupDirectory)) return sessions;
-        int unreadable = 0;
+        int unreadable = 0, notWinPure = 0;
         foreach (var file in Directory.EnumerateFiles(BackupDirectory, "backup_*.json"))
         {
             try
             {
-                var session = JsonSerializer.Deserialize<BackupSession>(File.ReadAllText(file));
+                string text;
+                if (Guarded)
+                {
+                    // A file WinPure did not write (wrong owner, or a writer other than SYSTEM/Administrators)
+                    // is not read at all, judged from the same handle its content would come from.
+                    string? why = BackupStore.TryReadTrusted(file, out text);
+                    if (why is not null)
+                    {
+                        notWinPure++;
+                        LogService.Log($"Backup {Path.GetFileName(file)} was not written by WinPure ({why}); not listed.");
+                        continue;
+                    }
+                }
+                else
+                {
+                    text = File.ReadAllText(file);
+                }
+                var session = JsonSerializer.Deserialize<BackupSession>(text);
                 if (session is null) { unreadable++; continue; }
                 session.FilePath = file;
                 sessions.Add(session);
@@ -130,6 +164,7 @@ public sealed class BackupManager
             }
         }
         if (unreadable > 0) LogService.Log($"{unreadable} backup file(s) could not be read and are not listed.");
+        if (notWinPure > 0) LogService.Log($"{notWinPure} backup file(s) were not written by WinPure and are not listed.");
         return sessions.OrderByDescending(s => s.CreatedUtc).ToList();
     }
 

@@ -3,16 +3,16 @@ using WinPure.Models;
 namespace WinPure.Services;
 
 /// <summary>
-/// What a restored backup entry may touch. Backups are plain JSON in the user's profile, which any
-/// program the user runs can edit without elevation, while WinPure restores them elevated. So an entry
-/// may only reach what this version of WinPure changes itself: the catalog's own registry values, keys,
-/// services, scheduled tasks and Windows features, plus the Startup page's switches. A forged entry that
-/// points anywhere else — Winlogon, a service nobody tweaks, a quote smuggled into a task name — is
-/// refused before anything runs.
+/// What a restored backup entry may touch. So an entry may only reach what this version of WinPure
+/// changes itself: the catalog's own registry values, keys, services, scheduled tasks and Windows
+/// features, plus the Startup page's switches. A forged entry that points anywhere else — Winlogon, a
+/// service nobody tweaks, a quote smuggled into a task name — is refused before anything runs.
 ///
 /// This is the second layer. A second review showed its limit: the data of a genuine undo — SMB 1.0 back
 /// on, a service back to Automatic — is exactly what a forged file would ask for, so no list can tell
-/// them apart. The first layer is that backups live where only administrators can write (BackupStore).
+/// them apart. The first layer is origin: WinPure reads only backups it wrote, owned by Administrators in
+/// a folder only administrators can write (BackupStore). This layer still matters for backups copied in
+/// from %AppData% by an older version, or carried over from another machine, whose origin is not proven.
 /// </summary>
 internal static class BackupEntryPolicy
 {

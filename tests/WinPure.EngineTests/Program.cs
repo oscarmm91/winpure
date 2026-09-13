@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.IO;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
 using WinPure.Models;
@@ -42,6 +44,7 @@ if (args.Length > 1 && args[0] == "orphan-child")
 }
 
 int failures = 0;
+int notMeasured = 0;
 Console.WriteLine("=== WinPure engine tests ===");
 Console.WriteLine($"scratch backups: {scratch}");
 Console.WriteLine();
@@ -91,8 +94,11 @@ failures += EachCategoryShowsItsPendingCount() ? 0 : 1;
 failures += ClickingTheSidebarLeavesSearch() ? 0 : 1;
 failures += AForgedBackupCannotReachBeyondWhatWinPureChanges() ? 0 : 1;
 failures += PowerShellQuotingDoublesEveryQuote() ? 0 : 1;
-failures += BackupsLiveWhereOnlyAdministratorsCanWrite() ? 0 : 1;
+failures += OnlyAnAdministratorCanStampABackupAsWinPures() ? 0 : 1;
+failures += APlantedBackupStoreIsNeverRead() ? 0 : 1;
+failures += AStoreWinPureMakesIsTrustedAndStaysShut() ? 0 : 1;
 failures += OldBackupsAreCopiedOnceAndLeftInPlace() ? 0 : 1;
+failures += ALockedLegacyBackupDoesNotBrickMigration() ? 0 : 1;
 failures += WingetIdsAreCheckedAndTheExportIsReadExactly() ? 0 : 1;
 failures += AnInstallIsJudgedByWhatWingetSeesAfterwards() ? 0 : 1;
 failures += EveryVisibleTextHasASpanishTranslation() ? 0 : 1;
@@ -109,8 +115,21 @@ ReportPolicyWritesNotBackedByAnAdmx();
 
 Cleanup();
 Console.WriteLine();
-Console.WriteLine(failures == 0 ? "All green." : $"{failures} test(s) FAILED.");
+Console.WriteLine(failures == 0
+    ? (notMeasured == 0 ? "All green." : $"All green, but {notMeasured} check(s) were NOT MEASURED — run the tests from an elevated terminal to measure them.")
+    : $"{failures} test(s) FAILED.");
 return failures;
+
+// A check that this environment could not exercise (the elevated store path only runs elevated). It is
+// NOT a pass: locally it prints and lets a green run say so; on CI, where the elevated path must run, it
+// is a failure — CI must never go green on something it silently skipped. Third state, never "safe".
+bool NotMeasured(string name, string why)
+{
+    notMeasured++;
+    Console.WriteLine($"[NOT MEASURED] {name}");
+    Console.WriteLine($"       {why}");
+    return Environment.GetEnvironmentVariable("CI") != "true";
+}
 
 // ---------------------------------------------------------------- tests
 
@@ -1008,68 +1027,49 @@ bool AForgedBackupCannotReachBeyondWhatWinPureChanges()
         $"forged registry key created={touched} (expected False), genuine catalog value, Startup switch and third-party logon task still allowed={genuineAllowed}");
 }
 
-// The real defence against forged backups: only SYSTEM and Administrators can write the folder, and the
-// owner cannot rewrite its permissions. Checked by effect on a real folder, as this user without the Administrators
-// group: exactly the kind of program that must not be able to plant a backup. The attempts go through ReducedToken
-// because CI runs elevated, where this process itself may write anywhere. A folder of its own that the same token
-// must be able to write proves a refusal comes from the permissions, not from a token that can write nothing. The
-// probe folder stays behind in %TEMP%: once locked, an unelevated test can no longer delete it, which is the point.
-bool BackupsLiveWhereOnlyAdministratorsCanWrite()
+// WinPure knows a backup is its own by ORIGIN: the folder and the file are owned by Administrators, which
+// an unelevated program cannot forge. This one measures that load-bearing OS fact, by effect, as this user
+// WITHOUT the Administrators group (ReducedToken, because CI runs elevated and would otherwise write
+// anywhere). Controls under the same token — it is not an administrator, yet can create and re-own a folder
+// of its own — keep a refusal from being an artefact of a token that can do nothing at all.
+bool OnlyAnAdministratorCanStampABackupAsWinPures()
 {
-    var problems = new List<string>();
-
-    if (!BackupStore.IsProtected(BackupStore.ProtectedSecurity()))
-        problems.Add("the permissions WinPure sets are not judged protected");
-    var open = new System.Security.AccessControl.DirectorySecurity();
-    open.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
-        new System.Security.Principal.SecurityIdentifier(System.Security.Principal.WellKnownSidType.BuiltinUsersSid, null),
-        System.Security.AccessControl.FileSystemRights.Modify, System.Security.AccessControl.AccessControlType.Allow));
-    if (BackupStore.IsProtected(open)) problems.Add("a folder any user can modify is judged protected");
+    var me = WindowsIdentity.GetCurrent().User!;
+    var admins = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
+    var system = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
     if (!BackupStore.DefaultDirectory.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), StringComparison.OrdinalIgnoreCase))
-        problems.Add($"backups default to {BackupStore.DefaultDirectory}, not under ProgramData");
+        return Report("only an administrator can stamp a backup as WinPure's", false,
+            $"backups default to {BackupStore.DefaultDirectory}, not under ProgramData");
 
-    string probe = Path.Combine(Path.GetTempPath(), "winpure-acl-probe");
-    var info = new DirectoryInfo(probe);
-    if (info.Exists)
-    {
-        try { info.Delete(recursive: true); info.Refresh(); } catch { /* locked by an earlier run: reuse it */ }
-    }
-    if (!info.Exists) info.Create(BackupStore.ProtectedSecurity());
-
-    // The attack modelled is a folder owned by the user's own account. Created unelevated it already is. Created
-    // elevated its owner is Administrators, which the reduced token cannot use, and the owner half would pass untested.
-    var me = System.Security.Principal.WindowsIdentity.GetCurrent().User!;
-    var ownerSection = info.GetAccessControl(System.Security.AccessControl.AccessControlSections.Owner);
-    if (!me.Equals(ownerSection.GetOwner(typeof(System.Security.Principal.SecurityIdentifier))))
-    {
-        try
-        {
-            ownerSection.SetOwner(me);
-            info.SetAccessControl(ownerSection);
-        }
-        catch (Exception ex) when (ex is UnauthorizedAccessException or InvalidOperationException) { }
-    }
-    var owner = info.GetAccessControl(System.Security.AccessControl.AccessControlSections.Owner).GetOwner(typeof(System.Security.Principal.SecurityIdentifier));
-    if (!me.Equals(owner)) problems.Add($"the protected folder is owned by {owner}, not by this user, so the owner was not tested");
-
-    string control = Path.Combine(Path.GetTempPath(), "winpure-acl-control");
-    if (Directory.Exists(control)) Directory.Delete(control, recursive: true);
-    Directory.CreateDirectory(control);
-
-    bool elevated = new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent())
-        .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+    string root = Path.Combine(Path.GetTempPath(), "winpure-stamp-" + Guid.NewGuid().ToString("N")[..8]);
+    Directory.CreateDirectory(root);
+    var problems = new List<string>();
     try
     {
-        var (stillAdministrator, controlWrote, controlRewrote, wrote, rewrotePermissions) = ReducedToken.Run(() => (
-            new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent())
-                .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator),
-            TryWrite(control), TryGrantMyself(control), TryWrite(probe), TryGrantMyself(probe)));
+        ReducedToken.Run(() =>
+        {
+            bool stillAdmin = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
+            if (stillAdmin) problems.Add("the reduced token still counts as an administrator");
 
-        if (stillAdministrator) problems.Add("the reduced token still counts as an administrator");
-        if (!controlWrote || !controlRewrote)
-            problems.Add($"without Administrators this user could not even change a folder of its own (write={controlWrote}, permissions={controlRewrote}), so a refusal proves nothing");
-        if (wrote) problems.Add("this user without Administrators wrote a file into the protected folder");
-        if (rewrotePermissions) problems.Add("this user without Administrators, as owner, granted itself access to the protected folder");
+            // Control: without Administrators this user can still make and re-own a folder of its own.
+            string mine = Path.Combine(root, "mine");
+            bool madeMine = false, ownedMine = false;
+            try { Directory.CreateDirectory(mine); madeMine = Directory.Exists(mine); } catch { }
+            ownedMine = TrySetOwner(mine, me);
+            if (!madeMine || !ownedMine)
+                problems.Add($"without Administrators this user could not make and own a folder of its own (made={madeMine}, owned={ownedMine}), so a refusal proves nothing");
+
+            // The attack: creating the store folder or a backup file owned by Administrators must be refused.
+            string forgedDir = Path.Combine(root, "forged-dir");
+            if (TryCreateProtectedDir(forgedDir)) problems.Add("this user without Administrators created a folder owned by Administrators");
+            string forgedFile = Path.Combine(root, "forged.json");
+            if (TryCreateProtectedFile(forgedFile)) problems.Add("this user without Administrators created a file owned by Administrators");
+
+            // Nor re-own a folder it made to Administrators or SYSTEM.
+            if (madeMine && TrySetOwner(mine, admins)) problems.Add("this user without Administrators re-owned a folder to Administrators");
+            if (madeMine && TrySetOwner(mine, system)) problems.Add("this user without Administrators re-owned a folder to SYSTEM");
+            return true;
+        });
     }
     catch (Exception ex)
     {
@@ -1077,35 +1077,275 @@ bool BackupsLiveWhereOnlyAdministratorsCanWrite()
     }
     finally
     {
-        try { Directory.Delete(control, recursive: true); } catch { }
+        try { Directory.Delete(root, recursive: true); } catch { }
     }
 
-    return Report("backups live where only administrators can write",
+    return Report("only an administrator can stamp a backup as WinPure's",
         problems.Count == 0,
         problems.Count == 0
-            ? $"ProgramData by default; as this user without Administrators (test elevated={elevated}), a folder of its own could be changed and the protected one could neither be written nor have its permissions changed"
+            ? "as this user without Administrators: a folder of its own could be made and re-owned, but neither the store folder nor a backup file could be created owned by Administrators, and neither Administrators nor SYSTEM could be set as owner"
             : string.Join(" | ", problems));
+}
 
-    static bool TryWrite(string folder)
+// A folder or file a non-administrator prepared — the F5 attack: create a subfolder under ProgramData
+// (allowed there), lock it with WinPure's exact permissions and plant a backup — is never read, because it
+// is owned by that user, not by Administrators. The pure half judges known-good and known-bad descriptors;
+// the on-disk half reproduces the attack as this user without Administrators and shows EnsureProtected sets
+// it aside before anything is read.
+bool APlantedBackupStoreIsNeverRead()
+{
+    var problems = new List<string>();
+    string meSid = WindowsIdentity.GetCurrent().User!.Value;
+
+    // Pure: descriptors that must be UNTRUSTED (a non-null reason).
+    (string label, string sddl, bool folder)[] untrusted =
     {
-        try { File.WriteAllText(Path.Combine(folder, "backup_planted.json"), "{}"); return true; }
-        catch (UnauthorizedAccessException) { return false; }
+        ("F5 user-owned, WinPure's shape", $"O:{meSid}D:P(A;OICI;0x1200a9;;;OW)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)", true),
+        ("F2 user-owned, inherit-only OWNER RIGHTS cap", $"O:{meSid}D:P(A;OICIIO;0x1200a9;;;OW)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)", true),
+        ("admin-owned but CREATOR OWNER has GENERIC_ALL", "O:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICIIO;GA;;;CO)", true),
+        ("admin-owned but Users have GENERIC_WRITE", "O:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICIIO;GW;;;BU)", true),
+        ("null DACL (everyone)", "O:BAD:NO_ACCESS_CONTROL", true),
+        ("admin-owned but permissions inherited", "O:BAD:AI(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)", true),
+    };
+    foreach (var (label, sddl, _) in untrusted)
+    {
+        var ds = new DirectorySecurity();
+        ds.SetSecurityDescriptorSddlForm(sddl);
+        if (BackupStore.Distrust(ds, requireProtected: true) is null)
+            problems.Add($"trusted a folder it should refuse: {label}");
     }
 
-    static bool TryGrantMyself(string folder)
+    // Pure controls: descriptors that must be TRUSTED (null), so a judge that refuses everything fails here.
+    if (BackupStore.Distrust(BackupStore.ProtectedSecurity(), requireProtected: true) is { } w1)
+        problems.Add($"refused the permissions WinPure itself sets: {w1}");
+    var readOnlyUsers = new DirectorySecurity();
+    readOnlyUsers.SetSecurityDescriptorSddlForm("O:SYD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1200a9;;;BU)");
+    if (BackupStore.Distrust(readOnlyUsers, requireProtected: true) is { } w2)
+        problems.Add($"refused an administrator-owned folder where Users only read: {w2}");
+
+    // On-disk: reproduce F5 as this user WITHOUT Administrators, so the planted tree is user-owned on CI too.
+    string root = Path.Combine(Path.GetTempPath(), "winpure-planted-" + Guid.NewGuid().ToString("N")[..8]);
+    Directory.CreateDirectory(root);
+    try
     {
+        ReducedToken.Run(() =>
+        {
+            var me = WindowsIdentity.GetCurrent().User!;
+            var system = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+            var admins = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
+            var ownerRights = new SecurityIdentifier("S-1-3-4");
+            var inherit = InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
+
+            string winpure = Path.Combine(root, "WinPure");
+            string backups = Path.Combine(winpure, "Backups");
+            Directory.CreateDirectory(backups);
+
+            // Plant the backup first, while the folder is still writable, and give it an explicit ACE for
+            // the user so it stays writable after the lock (proves the file is genuinely the attacker's).
+            string planted = Path.Combine(backups, "backup_20260101_000000.json");
+            File.WriteAllText(planted, "{\"Id\":\"backup_20260101_000000\",\"Entries\":[],\"TweakNames\":[\"forged\"]}");
+            var fsec = new FileInfo(planted).GetAccessControl(AccessControlSections.Access);
+            fsec.AddAccessRule(new FileSystemAccessRule(me, FileSystemRights.FullControl, AccessControlType.Allow));
+            new FileInfo(planted).SetAccessControl(fsec);
+
+            // Lock Backups to WinPure's exact DACL (OWNER RIGHTS cap included, the shape the old code trusted)
+            // but the attacker's own owner, all it can produce. Persist the Access section only, so no
+            // SeSecurityPrivilege is needed — the same way an unelevated program would do it.
+            var dsec = new DirectoryInfo(backups).GetAccessControl(AccessControlSections.Access);
+            dsec.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+            foreach (FileSystemAccessRule r in dsec.GetAccessRules(true, false, typeof(SecurityIdentifier)))
+                dsec.RemoveAccessRuleSpecific(r);
+            dsec.AddAccessRule(new FileSystemAccessRule(system, FileSystemRights.FullControl, inherit, PropagationFlags.None, AccessControlType.Allow));
+            dsec.AddAccessRule(new FileSystemAccessRule(admins, FileSystemRights.FullControl, inherit, PropagationFlags.None, AccessControlType.Allow));
+            dsec.AddAccessRule(new FileSystemAccessRule(ownerRights, FileSystemRights.ReadAndExecute, inherit, PropagationFlags.None, AccessControlType.Allow));
+            new DirectoryInfo(backups).SetAccessControl(dsec);
+
+            // Attack control: the F5 shape really was produced — the user owns it and can still write the file.
+            var backupOwner = new DirectoryInfo(backups).GetAccessControl(AccessControlSections.Owner)
+                .GetOwner(typeof(SecurityIdentifier));
+            bool canWritePlanted = false;
+            try { File.AppendAllText(planted, ""); canWritePlanted = true; } catch { }
+            if (!meSid.Equals(backupOwner?.ToString()) || !canWritePlanted)
+                problems.Add($"F5 not reproduced (owner={backupOwner}, canWrite={canWritePlanted}), nothing measured");
+
+            // Judged as WinPure would: the planted folder and file are untrusted.
+            if (BackupStore.Distrust(new DirectoryInfo(backups).GetAccessControl(AccessControlSections.Owner | AccessControlSections.Access), true) is null)
+                problems.Add("the planted Backups folder was judged trusted");
+            if (BackupStore.TryReadTrusted(planted, out _) is null)
+                problems.Add("the planted backup file was read as trusted");
+
+            // EnsureProtected sets the planted tree aside. It then tries to create an administrator-owned
+            // folder, which this token cannot, so it throws — but the set-aside has already happened.
+            try { BackupStore.EnsureProtected(backups); } catch { }
+            bool asideExists = Directory.GetDirectories(root, "WinPure.untrusted-*").Length == 1;
+            bool plantedGone = !File.Exists(planted);
+            bool plantedPreserved = Directory.GetDirectories(root, "WinPure.untrusted-*")
+                .SelectMany(d => Directory.GetFiles(d, "backup_*.json", SearchOption.AllDirectories)).Any();
+            if (!asideExists) problems.Add("EnsureProtected did not set the planted store aside");
+            if (!plantedGone) problems.Add("the planted backup is still at the store path after EnsureProtected");
+            if (!plantedPreserved) problems.Add("the set-aside folder does not still contain the planted backup (nothing should be deleted)");
+            return true;
+        });
+    }
+    catch (Exception ex)
+    {
+        problems.Add($"could not reproduce the attack as this user without Administrators: {ex.GetType().Name}: {ex.Message}");
+    }
+    finally
+    {
+        try { Directory.Delete(root, recursive: true); } catch { }
+    }
+
+    return Report("a planted backup store is never read",
+        problems.Count == 0,
+        problems.Count == 0
+            ? "every user-owned or open descriptor was refused, WinPure's own was trusted, and the planted F5 store was set aside (its file preserved) before anything was read"
+            : string.Join(" | ", problems));
+}
+
+// The other half, measurable only with elevation: WinPure, elevated, makes an administrator-owned store
+// that it trusts and that a non-administrator cannot touch. On CI (elevated) this runs every time; locally
+// it is NOT MEASURED unless the tests are run from an elevated terminal, and on CI a NOT MEASURED counts as
+// a failure — the elevated path must not go silently green.
+bool AStoreWinPureMakesIsTrustedAndStaysShut()
+{
+    const string name = "a store WinPure makes is trusted and stays shut";
+    bool elevated = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
+    if (!elevated)
+        return NotMeasured(name, "needs an elevated run: only an administrator can create the administrator-owned store this checks");
+
+    var admins = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
+    var me = WindowsIdentity.GetCurrent().User!;
+    string root = Path.Combine(Path.GetTempPath(), "winpure-realstore-" + Guid.NewGuid().ToString("N")[..8]);
+    string winpure = Path.Combine(root, "WinPure");
+    string backups = Path.Combine(winpure, "Backups");
+    string legacy = Path.Combine(root, "legacy");
+    var problems = new List<string>();
+    try
+    {
+        Directory.CreateDirectory(root);
+
+        // (a) EnsureProtected builds both folders owned by Administrators and trusted.
+        BackupStore.EnsureProtected(backups);
+        foreach (var p in new[] { winpure, backups })
+        {
+            var sec = new DirectoryInfo(p).GetAccessControl(AccessControlSections.Owner | AccessControlSections.Access);
+            if (!admins.Equals(sec.GetOwner(typeof(SecurityIdentifier)))) problems.Add($"{Path.GetFileName(p)} is not owned by Administrators");
+            if (BackupStore.Distrust(sec, true) is { } why) problems.Add($"{Path.GetFileName(p)} is not trusted after creation: {why}");
+        }
+
+        // (b) WriteProtected writes a file WinPure trusts, with its own protected administrator-owned descriptor.
+        string session = Path.Combine(backups, "backup_20260101_000000.json");
+        string json = "{\"Id\":\"backup_20260101_000000\",\"Entries\":[],\"TweakNames\":[\"x\"]}";
+        BackupStore.WriteProtected(session, json);
+        if (BackupStore.TryReadTrusted(session, out string readBack) is { } fw) problems.Add($"the file WinPure wrote is not trusted: {fw}");
+        else if (readBack != json) problems.Add("the file read back does not match what was written");
+        using (var fs = new FileStream(session, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            var fsec = fs.GetAccessControl();
+            if (!admins.Equals(fsec.GetOwner(typeof(SecurityIdentifier)))) problems.Add("the backup file is not owned by Administrators");
+            if (!fsec.AreAccessRulesProtected) problems.Add("the backup file inherited permissions instead of the ones WinPure sets");
+        }
+
+        // (c) MigrateLegacy copies AppData backups into the store, trusted, once.
+        Directory.CreateDirectory(legacy);
+        File.WriteAllText(Path.Combine(legacy, "backup_20250101_000000.json"), "{\"Id\":\"legacy\"}");
+        int copied = BackupStore.MigrateLegacy(legacy, backups, protectedWrites: true);
+        int copiedAgain = BackupStore.MigrateLegacy(legacy, backups, protectedWrites: true);
+        if (copied != 1 || copiedAgain != 0) problems.Add($"migration copied {copied} then {copiedAgain} (expected 1 then 0)");
+        if (BackupStore.TryReadTrusted(Path.Combine(backups, "backup_20250101_000000.json"), out _) is { } mw) problems.Add($"a migrated backup is not trusted: {mw}");
+
+        // (d) A non-administrator cannot write, re-own or rename the store, though it can a folder of its own.
+        // The control folder lives in the user's own %TEMP%, never inside the admin-created root, so its
+        // writability is not itself in question.
+        string mine = Path.Combine(Path.GetTempPath(), "winpure-mine-" + Guid.NewGuid().ToString("N")[..8]);
         try
         {
-            var sec = new DirectoryInfo(folder).GetAccessControl();
-            sec.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
-                System.Security.Principal.WindowsIdentity.GetCurrent().User!, System.Security.AccessControl.FileSystemRights.FullControl,
-                System.Security.AccessControl.AccessControlType.Allow));
-            new DirectoryInfo(folder).SetAccessControl(sec);
-            return true;
+            ReducedToken.Run(() =>
+            {
+                Directory.CreateDirectory(mine);
+                if (!TryWriteFile(mine)) problems.Add("control failed: this user could not write a folder of its own, so refusals prove nothing");
+                if (TryWriteFile(backups)) problems.Add("a non-administrator wrote a file into the store");
+                if (TryGrantMyself(backups)) problems.Add("a non-administrator granted itself access to the store");
+                if (TrySetOwner(backups, WindowsIdentity.GetCurrent().User!)) problems.Add("a non-administrator re-owned the store");
+                if (TryRename(backups)) problems.Add("a non-administrator renamed the store");
+                return true;
+            });
         }
-        catch (UnauthorizedAccessException) { return false; }
-        catch (InvalidOperationException) { return false; }
+        finally
+        {
+            try { Directory.Delete(mine, recursive: true); } catch { }
+        }
     }
+    catch (Exception ex)
+    {
+        problems.Add($"elevated store checks threw: {ex.GetType().Name}: {ex.Message}");
+    }
+    finally
+    {
+        try { Directory.Delete(root, recursive: true); } catch { }
+    }
+
+    return Report(name, problems.Count == 0,
+        problems.Count == 0
+            ? "elevated: the store is administrator-owned and trusted, WriteProtected/MigrateLegacy write trusted files, and a non-administrator cannot write, re-own or rename it"
+            : string.Join(" | ", problems));
+}
+
+// Helpers for the origin tests. Static: they capture nothing, so every refusal is the OS deciding, not the
+// test. Each returns true when the action SUCCEEDED (which, for the store, is the bad outcome).
+static bool TrySetOwner(string path, SecurityIdentifier sid)
+{
+    try
+    {
+        var di = new DirectoryInfo(path);
+        var sec = di.GetAccessControl(AccessControlSections.Owner);
+        sec.SetOwner(sid);
+        di.SetAccessControl(sec);
+        return sid.Equals(new DirectoryInfo(path).GetAccessControl(AccessControlSections.Owner).GetOwner(typeof(SecurityIdentifier)));
+    }
+    catch { return false; }
+}
+
+static bool TryCreateProtectedDir(string path)
+{
+    try { new DirectoryInfo(path).Create(BackupStore.ProtectedSecurity()); return Directory.Exists(path); }
+    catch { return false; }
+}
+
+static bool TryCreateProtectedFile(string path)
+{
+    try
+    {
+        using var s = new FileInfo(path).Create(FileMode.CreateNew, FileSystemRights.Write | FileSystemRights.ReadData,
+            FileShare.None, 4096, FileOptions.None, BackupStore.ProtectedFileSecurity());
+        return File.Exists(path);
+    }
+    catch { return false; }
+}
+
+static bool TryWriteFile(string folder)
+{
+    try { File.WriteAllText(Path.Combine(folder, "backup_planted.json"), "{}"); return true; }
+    catch { return false; }
+}
+
+static bool TryGrantMyself(string folder)
+{
+    try
+    {
+        var sec = new DirectoryInfo(folder).GetAccessControl();
+        sec.AddAccessRule(new FileSystemAccessRule(WindowsIdentity.GetCurrent().User!, FileSystemRights.FullControl, AccessControlType.Allow));
+        new DirectoryInfo(folder).SetAccessControl(sec);
+        return true;
+    }
+    catch { return false; }
+}
+
+static bool TryRename(string folder)
+{
+    try { Directory.Move(folder, folder + "-renamed"); return true; }
+    catch { return false; }
 }
 
 // Backups from before the move live in the user's AppData. They are copied into the protected folder
@@ -1121,9 +1361,9 @@ bool OldBackupsAreCopiedOnceAndLeftInPlace()
     File.WriteAllText(Path.Combine(legacy, "backup_20260912_150221.json"), "{\"Id\":\"b\"}");
     File.WriteAllText(Path.Combine(legacy, "notes.txt"), "not a backup");
 
-    int first = BackupStore.MigrateLegacy(legacy, target);
+    int first = BackupStore.MigrateLegacy(legacy, target, protectedWrites: false);
     File.WriteAllText(Path.Combine(legacy, "backup_20260913_000000.json"), "{\"Id\":\"c\"}");
-    int second = BackupStore.MigrateLegacy(legacy, target);
+    int second = BackupStore.MigrateLegacy(legacy, target, protectedWrites: false);
 
     bool originalsKept = Directory.GetFiles(legacy, "backup_*.json").Length == 3;
     bool copiedExactly = File.ReadAllText(Path.Combine(target, "backup_20260612_064833.json")) == "{\"Id\":\"a\"}";
@@ -1133,6 +1373,37 @@ bool OldBackupsAreCopiedOnceAndLeftInPlace()
     return Report("old backups are copied once and left in place",
         first == 2 && second == 0 && originalsKept && copiedExactly && inTarget == 2,
         $"first run copied {first} (expected 2), second run {second} (expected 0), originals kept={originalsKept}, content identical={copiedExactly}, backups in the new folder={inTarget} (expected 2)");
+}
+
+// A legacy backup that cannot be read (locked by another program, or its permissions denied) must not
+// stop migration and, through it, brick the store on every run. The readable ones are still copied, the
+// marker is still written so migration does not run forever, and the call never throws.
+bool ALockedLegacyBackupDoesNotBrickMigration()
+{
+    string root = Path.Combine(scratch, "migration-locked");
+    string legacy = Path.Combine(root, "legacy"), target = Path.Combine(root, "target");
+    try { Directory.Delete(root, recursive: true); } catch { }
+    Directory.CreateDirectory(legacy);
+    Directory.CreateDirectory(target);
+    File.WriteAllText(Path.Combine(legacy, "backup_20260101_000000.json"), "{\"Id\":\"readable\"}");
+    string locked = Path.Combine(legacy, "backup_20260202_000000.json");
+    File.WriteAllText(locked, "{\"Id\":\"locked\"}");
+
+    int copied = -1;
+    bool threw = false, marker = false;
+    int inTarget = -1;
+    using (var hold = new FileStream(locked, FileMode.Open, FileAccess.Read, FileShare.None))
+    {
+        try { copied = BackupStore.MigrateLegacy(legacy, target, protectedWrites: false); }
+        catch { threw = true; }
+        marker = File.Exists(Path.Combine(target, "migrated-from-appdata.txt"));
+        inTarget = Directory.GetFiles(target, "backup_*.json").Length;
+    }
+    try { Directory.Delete(root, recursive: true); } catch { }
+
+    return Report("a locked legacy backup does not brick migration",
+        !threw && copied == 1 && marker && inTarget == 1,
+        $"threw={threw} (expected False), copied {copied} (expected 1, the readable one), marker written={marker} (expected True), in target={inTarget} (expected 1)");
 }
 
 // Every service and task name reaches PowerShell inside single quotes. PowerShell treats the typographic

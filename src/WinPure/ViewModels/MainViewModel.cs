@@ -111,9 +111,11 @@ public sealed class MainViewModel : ObservableObject
         {
             Title = "Startup Apps",
             Subtitle = "Everything that starts with Windows: apps, shortcuts in your Startup folder and scheduled tasks. "
-                     + "Switching one off does not uninstall or delete anything - it flips the same switch Task Manager uses, and it takes effect right away.",
-            Main = this,
+                     + "Switching one off does not uninstall or delete anything - it flips the same switch Task Manager uses. "
+                     + "Toggle the ones you want, then click Apply Changes.",
         };
+        // The Startup page shares the Apply bar; when its pending count changes, the bar re-reads it.
+        _startup.PendingChanged += () => { if (CurrentPage is StartupViewModel) UpdatePendingCount(); };
         NavItems.Add(new NavItem { Label = "Startup", Glyph = "", Page = _startup });
 
         NavItems.Add(new NavItem
@@ -186,7 +188,7 @@ public sealed class MainViewModel : ObservableObject
                 {
                     value.SetCurrentSilently(true);
                     OnPropertyChanged(nameof(CurrentPage));
-                    OnPropertyChanged(nameof(ApplyHint));
+                    UpdatePendingCount();   // the Apply bar counts this page's pending changes
                     return;
                 }
             }
@@ -199,7 +201,7 @@ public sealed class MainViewModel : ObservableObject
             if (value.Page == _installer && !_installer.HasChecked) _ = _installer.RefreshAsync();
             OnPropertyChanged();
             OnPropertyChanged(nameof(CurrentPage));
-            OnPropertyChanged(nameof(ApplyHint));   // the hint differs on the Startup page
+            UpdatePendingCount();   // the Apply bar counts this page's pending changes (startup vs tweaks)
         }
     }
 
@@ -298,10 +300,11 @@ public sealed class MainViewModel : ObservableObject
     public bool FutureUsersApplies => AllTweaks.Any(t => t.IsDirty && t.IsSelected && FutureUsers.IsEligible(t.Tweak));
 
     public string ApplyHint => CurrentPage is StartupViewModel
-        // The Startup page has no Apply step — promising one there would be a lie.
-        // Kept to roughly the length of the line below: the status bar shares this row with
-        // the scan result on the right, and a longer sentence overlaps it.
-        ? Loc.T("Startup switches apply immediately and are backed up.")
+        ? (_startup.PendingCount == 0
+            ? Loc.T("Toggle the apps you want, then click Apply Changes.")
+            : _startup.PendingCount == 1
+            ? Loc.T("1 startup change pending — one backup is made when you apply.")
+            : Loc.F("{0} startup changes pending — one backup is made when you apply.", _startup.PendingCount))
         : PendingCount == 0
             ? Loc.T("Changes will be applied after clicking Apply Changes.")
             // An app removal among them has no backup to fall back on, so the hint stops promising one for it.
@@ -324,7 +327,10 @@ public sealed class MainViewModel : ObservableObject
 
     private void UpdatePendingCount()
     {
-        PendingCount = AllTweaks.Count(t => t.IsDirty);
+        // The Apply bar counts the pending changes of the page you are on: startup toggles on the Startup
+        // page, dirty tweaks everywhere else. The sidebar badges always count that category's tweaks.
+        PendingCount = CurrentPage is StartupViewModel ? _startup.PendingCount : AllTweaks.Count(t => t.IsDirty);
+        OnPropertyChanged(nameof(ApplyHint));
         OnPropertyChanged(nameof(FutureUsersApplies));
         foreach (var item in NavItems)
             if (item.Page is CategoryPageViewModel page)
@@ -539,6 +545,13 @@ public sealed class MainViewModel : ObservableObject
 
     public async Task ApplyChangesAsync()
     {
+        // The Startup page batches its own toggles into one backup; everything else applies dirty tweaks.
+        if (CurrentPage is StartupViewModel startupPage)
+        {
+            await ApplyStartupChangesAsync(startupPage);
+            return;
+        }
+
         var changes = AllTweaks
             .Where(t => t.IsDirty)
             .Select(t => (t.Tweak, apply: t.IsSelected))
@@ -595,6 +608,35 @@ public sealed class MainViewModel : ObservableObject
                 MessageBox.Show(Loc.T("Some changes will take full effect after a reboot."), "WinPure",
                     MessageBoxButton.OK, MessageBoxImage.Information);
             }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+        await ScanAsync();
+    }
+
+    /// <summary>
+    /// Applies all the pending Startup toggles at once — one backup for the whole batch, not one per switch.
+    /// Asks the guards once (every entry lives under the signed-in user's profile), then rescans.
+    /// </summary>
+    private async Task ApplyStartupChangesAsync(StartupViewModel startupPage)
+    {
+        if (startupPage.PendingCount == 0) return;
+        if (!ConfirmDespiteGuards(Loc.T("change startup apps"), SystemGuards.ForStartup)) return;
+
+        IsBusy = true;
+        StatusText = Loc.T("Applying startup changes…");
+        try
+        {
+            var (applied, failed) = await Task.Run(() => startupPage.ApplyPending());
+            RefreshBackupCount();
+            StatusText = failed == 0
+                ? (applied == 1 ? Loc.T("Done — 1 startup change applied.") : Loc.F("Done — {0} startup changes applied.", applied))
+                : Loc.F("{0} applied, {1} could not be changed — see the log in %AppData%\\WinPure\\Logs.", applied, failed);
+            if (failed > 0)
+                MessageBox.Show(Loc.F("{0} startup change(s) could not be applied. See the log in %AppData%\\WinPure\\Logs.", failed),
+                    "WinPure", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
         {

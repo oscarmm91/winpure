@@ -63,6 +63,7 @@ failures += PresetKeepsManualSelections() ? 0 : 1;
 failures += EveryStaticResourceAndBindingPathExists() ? 0 : 1;
 failures += TogglingAStartupEntryIsByteExact() ? 0 : 1;
 failures += DisablingAnUntouchedEntryIsUndoneByDeleting() ? 0 : 1;
+failures += TogglingStartupBatchesIntoOneBackup() ? 0 : 1;
 failures += TheStartupScannerFindsWhatWindowsHas() ? 0 : 1;
 failures += AnOptionalActionCannotFailTheWholeTweak() ? 0 : 1;
 failures += TheDocsAgreeWithTheCatalog() ? 0 : 1;
@@ -1293,6 +1294,45 @@ bool AStoreWinPureMakesIsTrustedAndStaysShut()
         problems.Count == 0
             ? "elevated: the store is administrator-owned and trusted, WriteProtected/MigrateLegacy write trusted files, and a non-administrator cannot write, re-own or rename it"
             : string.Join(" | ", problems));
+}
+
+// The Startup page batches its toggles: switching several apps off and applying makes ONE backup, not one
+// per toggle (the pile of tiny backups Oscar hit). Uses the toy test key; StartupEntryAction writes the
+// 12-byte StartupApproved value there.
+bool TogglingStartupBatchesIntoOneBackup()
+{
+    Reset();
+    var engine = new TweakEngine(new BackupManager());
+    var vm = new WinPure.ViewModels.StartupViewModel(engine) { Title = "Startup Apps", Subtitle = "Startup test" };
+    foreach (var n in new[] { "ToyA", "ToyB", "ToyC" })
+    {
+        var entry = new StartupEntry
+        {
+            Id = "startup-test-" + n, Name = n, EntryName = n, Source = StartupSource.RegistryRun,
+            Scope = "This user", Enabled = true, ApprovedKeyPath = ToyKey + @"\StartupApproved\Run",
+        };
+        var item = new WinPure.ViewModels.StartupItemViewModel { Entry = entry };
+        item.SetOriginal(true);
+        vm.Items.Add(item);
+    }
+
+    // Toggle all three off. In the old design each toggle applied immediately, one backup each.
+    foreach (var item in vm.Items) item.IsEnabled = false;
+    int pending = vm.PendingCount;
+    var (applied, failed) = vm.ApplyPending();
+
+    // One backup for the batch, and it holds all three changes. (Asserting only "one session" would not
+    // catch a per-toggle regression: three applies in the same second overwrite the same-second filename,
+    // so they also leave one file — but that file would hold only the LAST change's entry.)
+    var sessions = new BackupManager().ListSessions();
+    int entries = sessions.Count == 1 ? sessions[0].Entries.Count : -1;
+    bool stillDirty = vm.PendingCount != 0;
+
+    try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\WinPureTests", throwOnMissingSubKey: false); } catch { }
+
+    return Report("toggling startup batches into one backup",
+        pending == 3 && applied == 3 && failed == 0 && sessions.Count == 1 && entries == 3 && !stillDirty,
+        $"pending before apply={pending} (expected 3), applied={applied} (expected 3), failed={failed} (expected 0), backup sessions={sessions.Count} (expected 1), entries in it={entries} (expected 3), still dirty={stillDirty} (expected False)");
 }
 
 // "Apply to future users" only reaches reversible tweaks whose values live under HKCU: machine-wide changes

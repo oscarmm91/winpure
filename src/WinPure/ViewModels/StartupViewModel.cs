@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Windows;
 using WinPure.Models;
 using WinPure.Services;
 
@@ -20,13 +19,16 @@ public sealed class StartupItemViewModel : ObservableObject
 
     public string Glyph => Entry.Source switch
     {
-        StartupSource.RegistryRun => "",     // settings gear
-        StartupSource.StartupFolder => "",   // folder
-        _ => "",                             // calendar = scheduled
+        StartupSource.RegistryRun => "",     // settings gear
+        StartupSource.StartupFolder => "",   // folder
+        _ => "",                             // calendar = scheduled
     };
 
+    /// <summary>The scanned state. A toggle stays "dirty" until Apply commits its new value here.</summary>
+    internal bool OriginalEnabled { get; private set; }
+
     private bool _isEnabled;
-    /// <summary>The toggle. Setting it applies the change immediately, like Task Manager does.</summary>
+    /// <summary>The toggle. Setting it only marks the row pending; nothing is written until Apply.</summary>
     public bool IsEnabled
     {
         get => _isEnabled;
@@ -36,26 +38,47 @@ public sealed class StartupItemViewModel : ObservableObject
             _isEnabled = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(StateText));
-            Toggled?.Invoke(this, value);
+            OnPropertyChanged(nameof(IsDirty));
+            DirtyChanged?.Invoke();
         }
     }
 
     public string StateText => IsEnabled ? Loc.T("On") : Loc.T("Off");
 
-    internal event Action<StartupItemViewModel, bool>? Toggled;
+    /// <summary>The toggle differs from what the machine has — it is waiting for Apply.</summary>
+    public bool IsDirty => IsEnabled != OriginalEnabled;
 
-    /// <summary>Puts the switch back without re-triggering the apply (used when it failed).</summary>
-    internal void SetEnabledSilently(bool value)
+    internal event Action? DirtyChanged;
+
+    /// <summary>Set the toggle to the machine's state without marking it dirty (on load).</summary>
+    internal void SetOriginal(bool value)
     {
+        OriginalEnabled = value;
         _isEnabled = value;
         OnPropertyChanged(nameof(IsEnabled));
         OnPropertyChanged(nameof(StateText));
+        OnPropertyChanged(nameof(IsDirty));
+    }
+
+    /// <summary>After a successful apply, the current toggle becomes the new baseline.</summary>
+    internal void Commit()
+    {
+        OriginalEnabled = _isEnabled;
+        OnPropertyChanged(nameof(IsDirty));
+    }
+
+    /// <summary>After a failed apply, snap the toggle back to the baseline.</summary>
+    internal void Revert()
+    {
+        _isEnabled = OriginalEnabled;
+        OnPropertyChanged(nameof(IsEnabled));
+        OnPropertyChanged(nameof(StateText));
+        OnPropertyChanged(nameof(IsDirty));
     }
 }
 
 public sealed class StartupViewModel : PageViewModel
 {
-    public required MainViewModel Main { get; init; }
     public ObservableCollection<StartupItemViewModel> Items { get; } = new();
 
     private string _summary = "";
@@ -68,70 +91,81 @@ public sealed class StartupViewModel : PageViewModel
 
     public StartupViewModel(TweakEngine engine) => _engine = engine;
 
+    /// <summary>How many rows are toggled away from what the machine has, waiting for Apply.</summary>
+    public int PendingCount => Items.Count(i => i.IsDirty);
+
+    /// <summary>Raised when the pending count changes, so the shared Apply bar re-reads it.</summary>
+    public event Action? PendingChanged;
+
     /// <summary>Rebuilds the list from the machine. Called after each system scan.</summary>
     public void Load(ScanContext ctx)
     {
-        foreach (var item in Items) item.Toggled -= OnToggled;
+        foreach (var item in Items) item.DirtyChanged -= OnDirtyChanged;
         Items.Clear();
 
         foreach (var entry in StartupScanner.Scan(ctx))
         {
             var vm = new StartupItemViewModel { Entry = entry };
-            vm.SetEnabledSilently(entry.Enabled);
-            vm.Toggled += OnToggled;
+            vm.SetOriginal(entry.Enabled);
+            vm.DirtyChanged += OnDirtyChanged;
             Items.Add(vm);
         }
 
+        UpdateSummary();
+        IsEmpty = Items.Count == 0;
+        PendingChanged?.Invoke();
+    }
+
+    private void OnDirtyChanged()
+    {
+        OnPropertyChanged(nameof(PendingCount));
+        PendingChanged?.Invoke();
+    }
+
+    private void UpdateSummary()
+    {
         int off = Items.Count(i => !i.IsEnabled);
         int orphans = Items.Count(i => i.IsOrphan);
         Summary = Loc.F("{0} apps start with Windows — {1} on, {2} off.", Items.Count, Items.Count - off, off)
                 + (orphans == 0 ? ""
                     : orphans == 1 ? " " + Loc.T("1 points to a file that no longer exists.")
                     : " " + Loc.F("{0} point to a file that no longer exists.", orphans));
-        IsEmpty = Items.Count == 0;
     }
 
-    private bool _userGuardAccepted;
-
-    private void OnToggled(StartupItemViewModel item, bool enabled)
+    /// <summary>
+    /// Applies every pending toggle in ONE backup session — not one per toggle, which used to leave a pile
+    /// of tiny backups. Successful rows commit their new baseline; failed ones snap back. Returns how many
+    /// were applied and how many failed.
+    /// </summary>
+    public (int applied, int failed) ApplyPending()
     {
-        // Every entry here lives under the signed-in user's registry or Startup folder. When
-        // WinPure runs as another account, ask once per session before writing to the wrong profile.
-        if (!_userGuardAccepted)
+        var dirty = Items.Where(i => i.IsDirty).ToList();
+        if (dirty.Count == 0) return (0, 0);
+
+        // Turning an entry OFF applies the tweak; turning it back ON reverts it.
+        var changes = dirty.Select(i => (BuildTweak(i.Entry), apply: !i.IsEnabled)).ToList();
+        var results = _engine.ApplyChanges(changes);
+
+        int failed = 0;
+        for (int k = 0; k < dirty.Count; k++)
         {
-            if (!Main.ConfirmDespiteGuards(Loc.T("change startup apps"), SystemGuards.ForStartup))
+            if (results[k].Success)
             {
-                item.SetEnabledSilently(!enabled);
-                return;
+                dirty[k].Commit();
+                LogService.Log($"Startup entry {(dirty[k].IsEnabled ? "enabled" : "disabled")}: {dirty[k].Entry.Id}");
             }
-            _userGuardAccepted = true;
+            else
+            {
+                dirty[k].Revert();
+                failed++;
+                LogService.Log($"FAILED startup change {dirty[k].Entry.Id}: {results[k].Message}");
+            }
         }
 
-        // Turning an entry OFF is "applying" the tweak; turning it back on is reverting it.
-        var tweak = BuildTweak(item.Entry);
-        var results = _engine.ApplyChanges(new[] { (tweak, apply: !enabled) });
-        var result = results[0];
-
-        if (result.Success)
-        {
-            Main.StatusText = enabled
-                ? Loc.F("{0} will start with Windows.", item.Name)
-                : Loc.F("{0} will no longer start with Windows.", item.Name);
-            LogService.Log($"Startup entry {(enabled ? "enabled" : "disabled")}: {item.Entry.Id}");
-            Main.RefreshBackupCount();
-        }
-        else
-        {
-            // Put the switch back where it was: it did not happen.
-            item.SetEnabledSilently(!enabled);
-            Main.StatusText = Loc.F("Could not change {0}: {1}", item.Name, result.Message);
-            // The detail can be WinPure's own exception text, which stays in English; labelled, it reads as a detail to pass on.
-            MessageBox.Show(Loc.F("Could not change '{0}'.\n\nTechnical detail: {1}", item.Name, result.Message), "WinPure",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
-
-        int off = Items.Count(i => !i.IsEnabled);
-        Summary = Loc.F("{0} apps start with Windows — {1} on, {2} off.", Items.Count, Items.Count - off, off);
+        UpdateSummary();
+        OnPropertyChanged(nameof(PendingCount));
+        PendingChanged?.Invoke();
+        return (dirty.Count - failed, failed);
     }
 
     /// <summary>

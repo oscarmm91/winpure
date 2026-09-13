@@ -37,6 +37,9 @@
             <DataTemplate DataType="{x:Type vm:CleanupViewModel}">
                 <views:CleanupView/>
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:DnsViewModel}">
+                <views:DnsView/>
+            </DataTemplate>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

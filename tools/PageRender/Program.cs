@@ -79,6 +79,13 @@ internal static class Program
             while (!cleanup.HasMeasured && cclock.Elapsed < TimeSpan.FromSeconds(40)) Pump(TimeSpan.FromMilliseconds(500));
             Console.WriteLine($"cleanup measured={cleanup.HasMeasured} after {cclock.Elapsed.TotalSeconds:0}s");
             Render(root, Path.Combine(outDir, "09-cleanup.png"));
+
+            // DNS reads the current servers read-only when opened; wait, then draw the presets.
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is DnsViewModel);
+            var dns = (DnsViewModel)vm.CurrentPage;
+            var dclock = System.Diagnostics.Stopwatch.StartNew();
+            while (!dns.HasLoaded && dclock.Elapsed < TimeSpan.FromSeconds(30)) Pump(TimeSpan.FromMilliseconds(500));
+            Render(root, Path.Combine(outDir, "10-dns.png"));
             return 0;
         }
         catch (Exception ex)

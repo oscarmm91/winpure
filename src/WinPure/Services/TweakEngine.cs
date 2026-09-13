@@ -99,6 +99,19 @@ public sealed class TweakEngine
         return results;
     }
 
+    /// <summary>
+    /// Switches every adapter's DNS to a preset, in one backup session, capturing each adapter's current
+    /// servers before changing anything so Restore puts them back. Same session discipline as ApplyChanges.
+    /// </summary>
+    public (int changed, int total) ApplyDns(DnsPreset preset)
+    {
+        var session = _backupManager.CreateSession();
+        var result = DnsService.Apply(preset, session, () => FlushSnapshot(session));
+        try { _backupManager.SaveSession(session); }
+        catch (Exception ex) { LogService.Log($"The DNS backup could not be finalised: {ex.Message}"); }
+        return result;
+    }
+
     private void ApplyTweak(Tweak tweak, BackupSession session)
     {
         foreach (var action in tweak.Actions)

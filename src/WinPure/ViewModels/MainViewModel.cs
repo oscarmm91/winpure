@@ -58,6 +58,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly RestoreViewModel _restore;
     private readonly StartupViewModel _startup;
     private readonly CleanupViewModel _cleanup;
+    private readonly DnsViewModel _dns;
     private readonly InstallerViewModel _installer;
 
     /// <summary>The Remove Apps banner, also shown above search results that include an app removal.</summary>
@@ -142,6 +143,13 @@ public sealed class MainViewModel : ObservableObject
             Main = this,
         };
         NavItems.Add(new NavItem { Label = "Clean up", Glyph = ((char)0xEA99).ToString(), Page = _cleanup });
+        _dns = new DnsViewModel(_engine)
+        {
+            Title = "DNS servers",
+            Subtitle = "Switch every network adapter to a faster or ad-blocking DNS resolver. WinPure saves your current DNS first, so Restore can put it back.",
+            Main = this,
+        };
+        NavItems.Add(new NavItem { Label = "DNS", Glyph = ((char)0xE968).ToString(), Page = _dns });
         NavItems.Add(new NavItem { Label = "Restore", Glyph = "", Page = _restore });
 
         // The two pages whose changes Restore cannot undo sit together at the bottom, apart from everything else.
@@ -215,6 +223,7 @@ public sealed class MainViewModel : ObservableObject
             if (value.Page == _restore) LoadBackups();
             if (value.Page == _installer && !_installer.HasChecked) _ = _installer.RefreshAsync();
             if (value.Page == _cleanup && !_cleanup.HasMeasured) _ = _cleanup.MeasureAllAsync();
+            if (value.Page == _dns && !_dns.HasLoaded) _ = _dns.LoadAsync();
             OnPropertyChanged();
             OnPropertyChanged(nameof(CurrentPage));
             UpdatePendingCount();   // the Apply bar counts this page's pending changes (startup vs tweaks)

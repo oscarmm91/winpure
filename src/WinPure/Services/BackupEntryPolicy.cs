@@ -124,6 +124,13 @@ internal static class BackupEntryPolicy
                 reason = "WinPure never writes this value into the profile template";
                 return false;
 
+            case "dns":
+                // An adapter's DNS servers. The value must be a list of IP addresses, or "DHCP" — a forged
+                // backup must not be able to point DNS at an attacker's server through anything but a real IP.
+                if (DnsService.IsValidServerList(entry.Value)) return true;
+                reason = "a dns backup whose value is not an IP list or DHCP";
+                return false;
+
             case "system-state":
                 // Kind and state are validated in SystemState.Restore, the only way this type is restored.
                 return true;

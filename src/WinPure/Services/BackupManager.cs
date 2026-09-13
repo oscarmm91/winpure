@@ -266,6 +266,12 @@ public sealed class BackupManager
                 FutureUsers.RestoreEntry(entry);
                 break;
             }
+            case "dns":
+            {
+                // Put an adapter's DNS servers back to what it had (validated in DnsService.RestoreEntry).
+                DnsService.RestoreEntry(entry);
+                break;
+            }
         }
     }
 
@@ -296,6 +302,7 @@ public sealed class BackupManager
             "system-state" => $"{e.ValueName} setting",
             "optional-feature" => $"Windows feature {e.ValueName}",
             "future-user-value" => $"profile template {e.KeyPath}!{e.ValueName}",
+            "dns" => $"DNS on {e.ValueName}",
             _ => e.Type
         };
 }

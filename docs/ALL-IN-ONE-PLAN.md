@@ -112,7 +112,10 @@ de tocar); las irreversibles van en secciones marcadas, sin falso deshacer.
   comprobada en la máquina y cada directiva HKLM cruzada contra su `.admx` (clase Machine, no marcada por el
   informe ADMX). docs/tweaks.md + README sincronizados (la prueba de docs lo verifica). Quedan ~más candidatos
   vetados en `scratchpad/mine-digest.txt` (contexto de menú, más privacidad/perf) para siguientes lotes.
-- **Fase 3 — Red/DNS/HOSTS** (buckets C, D).
+- **Fase 3 — Red/DNS/HOSTS** (buckets C, D). **DNS HECHO** (13-sep-2026): página *DNS* con 7 presets
+  (Cloudflare/-malware, Google, Quad9, OpenDNS, AdGuard, Automático/DHCP), reversible (captura el DNS actual
+  de cada adaptador antes de cambiar → Restaurar lo devuelve), backend intercambiable + prueba con fake.
+  Pendiente: editor de HOSTS (bloqueo de telemetría por hosts).
 - **Fase 4 — Memoria + utilidades** (buckets B, G).
 - **Fase 5 — Catálogo de apps más grande + dashboard en vivo** (buckets I, F).
 

@@ -116,6 +116,7 @@ failures += OnlyReversibleHkcuTweaksReachFutureUsers() ? 0 : 1;
 failures += ApplyingToFutureUsersWritesTheTemplateAndRestoreUndoesIt() ? 0 : 1;
 failures += TheFutureUsersPolicyOnlyAllowsCatalogHkcuValues() ? 0 : 1;
 failures += CleanupMeasuresClearsAndSkipsLockedFiles() ? 0 : 1;
+failures += DnsCapturesCurrentServersAndRestorePutsThemBack() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
 
@@ -1450,6 +1451,51 @@ bool TheFutureUsersPolicyOnlyAllowsCatalogHkcuValues()
         $"forged template write refused={forgedRefused} (expected True), a genuine catalog target ({target ?? "none found!"}) allowed={catalogAllowed}");
 }
 
+// Switching DNS captures each adapter's current servers into ONE backup before changing anything, so
+// Restore puts them back exactly (a custom DNS, or automatic). Uses a fake backend — never the network.
+bool DnsCapturesCurrentServersAndRestorePutsThemBack()
+{
+    Reset();
+    var fake = new FakeDnsBackend();
+    fake.Adapters.Add(new DnsAdapter("Ethernet", new[] { "1.1.1.1", "1.0.0.1" }, false));
+    fake.Adapters.Add(new DnsAdapter("Wi-Fi", Array.Empty<string>(), true));
+    var previous = DnsService.Swap(fake);
+    var problems = new List<string>();
+    try
+    {
+        var engine = new TweakEngine(new BackupManager());
+        var preset = DnsService.Presets.First(p => p.Id == "dns-cloudflare-malware");   // 1.1.1.2 / 1.0.0.2
+        var (changed, total) = engine.ApplyDns(preset);
+        if (changed != 2 || total != 2) problems.Add($"applied {changed}/{total}, expected 2/2");
+        if (!fake.Sets.Any(s => s.Name == "Ethernet" && s.Servers.SequenceEqual(new[] { "1.1.1.2", "1.0.0.2" }))) problems.Add("Ethernet was not set to the preset");
+        if (!fake.Sets.Any(s => s.Name == "Wi-Fi" && s.Servers.SequenceEqual(new[] { "1.1.1.2", "1.0.0.2" }))) problems.Add("Wi-Fi was not set to the preset");
+
+        var session = new BackupManager().ListSessions().FirstOrDefault();
+        var eth = session?.Entries.FirstOrDefault(e => e.Type == "dns" && e.ValueName == "Ethernet");
+        var wifi = session?.Entries.FirstOrDefault(e => e.Type == "dns" && e.ValueName == "Wi-Fi");
+        if (eth?.Value != "1.1.1.1,1.0.0.1") problems.Add($"Ethernet's captured DNS was '{eth?.Value}', expected 1.1.1.1,1.0.0.1");
+        if (wifi?.Value != "DHCP") problems.Add($"Wi-Fi's captured DNS was '{wifi?.Value}', expected DHCP");
+
+        fake.Sets.Clear();
+        if (session is not null) new BackupManager().RestoreSession(session);
+        if (!fake.Sets.Any(s => s.Name == "Ethernet" && s.Servers.SequenceEqual(new[] { "1.1.1.1", "1.0.0.1" }))) problems.Add("Restore did not put Ethernet's servers back");
+        if (!fake.Sets.Any(s => s.Name == "Wi-Fi" && s.Servers.Length == 0)) problems.Add("Restore did not put Wi-Fi back to automatic");
+
+        bool good = BackupEntryPolicy.IsAllowed(new BackupEntry { Type = "dns", TweakId = "dns", ValueName = "X", Value = "8.8.8.8,8.8.4.4" }, out _);
+        bool dhcp = BackupEntryPolicy.IsAllowed(new BackupEntry { Type = "dns", TweakId = "dns", ValueName = "X", Value = "DHCP" }, out _);
+        bool refused = !BackupEntryPolicy.IsAllowed(new BackupEntry { Type = "dns", TweakId = "dns", ValueName = "X", Value = "8.8.8.8; Remove-Item C:\\" }, out _);
+        if (!good || !dhcp || !refused) problems.Add($"policy: IP list allowed={good}, DHCP allowed={dhcp}, non-IP refused={refused}");
+    }
+    catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
+    finally { DnsService.Swap(previous); }
+
+    return Report("DNS captures current servers and Restore puts them back",
+        problems.Count == 0,
+        problems.Count == 0
+            ? "both adapters switched to the preset, their prior servers captured in one backup, and Restore set them back; the policy allows only IP lists or DHCP"
+            : string.Join(" | ", problems));
+}
+
 // The Cleanup service measures a folder's size, clears its CONTENTS (keeping the folder), skips files it
 // cannot delete (in use) without failing, and honours a glob and "*" wildcard path segments.
 bool CleanupMeasuresClearsAndSkipsLockedFiles()
@@ -2222,6 +2268,11 @@ bool EveryVisibleTextHasASpanishTranslation()
         Add(target.Name, $"{target.Id} name");
         Add(target.Description, $"{target.Id} description");
     }
+    foreach (var preset in DnsService.Presets)
+    {
+        Add(preset.Name, $"{preset.Id} name");
+        Add(preset.Description, $"{preset.Id} description");
+    }
     // Sidebar labels and page titles translate themselves when set, so read them back — in English, here.
     foreach (var nav in new WinPure.ViewModels.MainViewModel().NavItems)
     {
@@ -2940,6 +2991,17 @@ sealed class FakeWinget : IWingetBackend
         if (ReallyInstalls.Contains(id)) Present.Add(id);
         return ExitCodes.TryGetValue(id, out int code) ? code : 0;
     }
+}
+
+/// <summary>A DNS backend that records what it was asked to set, so tests never touch the network.</summary>
+sealed class FakeDnsBackend : IDnsBackend
+{
+    public List<DnsAdapter> Adapters { get; } = new();
+    public List<(string Name, string[] Servers)> Sets { get; } = new();
+
+    public IReadOnlyList<DnsAdapter> ReadAdapters() => Adapters;
+    public void SetServers(string adapterName, string[] servers) => Sets.Add((adapterName, servers));
+    public void FlushCache() { }
 }
 
 /// <summary>Windows features held in memory, so tests never run DISM.</summary>

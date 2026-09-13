@@ -135,7 +135,7 @@
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <TextBlock Text="{Binding StatusText}" FontSize="12" Margin="0,0,18,0"
                                    Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center"
-                                   MaxWidth="420" TextTrimming="CharacterEllipsis"/>
+                                   MaxWidth="420" TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusText}"/>
                         <Button Style="{StaticResource PrimaryButton}" Command="{Binding ApplyCommand}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xEA18;" FontFamily="{StaticResource Font.Icon}" FontSize="14"

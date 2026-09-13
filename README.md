@@ -22,7 +22,7 @@
 
 ## Why WinPure?
 
-- 🛡 **It never breaks your system.** Every registry value, service and scheduled task is snapshotted **before** it is touched. One click in the *Restore* page rolls anything back.
+- 🛡 **It never breaks your system.** Every registry value, service and scheduled task is snapshotted **before** it is touched. One click in the *Restore* page rolls anything back — except app removals, which live on their own page and ask first.
 - ⚡ **One-click presets** — *Safe*, *Balanced* and *Aggressive* — or full manual control, tweak by tweak. Mix both freely.
 - 🔍 **Honest state detection.** On launch WinPure scans your system and shows what is *already optimized* vs *not applied*. No fake "boost" buttons.
 - 🔎 **Search every tweak** from the sidebar, and see at a glance how many changes each category has waiting.
@@ -44,9 +44,11 @@
 
 | Preset | What it includes | Risk |
 |---|---|---|
-| 🟢 **Safe** | Basic telemetry off, no Bing/ads in Start, advertising ID off, cleaner context menu, dark mode, taskbar cleanup | None — fully reversible |
-| 🔵 **Balanced** | Safe + optional services off, third-party bloatware removed (TikTok, Netflix, Candy Crush…), Delivery Optimization off, faster shutdown | Low |
-| 🟠 **Aggressive** | Balanced + OneDrive removal, Copilot/AI & Recall off, Xbox components removed, DiagTrack disabled, telemetry firewall block | Power users |
+| 🟢 **Safe** | Basic telemetry off, no Bing/ads in Start, advertising ID off, cleaner context menu, dark mode, taskbar cleanup | None |
+| 🔵 **Balanced** | Safe + optional services off, Click to Do off, Delivery Optimization off, faster shutdown | Low |
+| 🟠 **Aggressive** | Balanced + Copilot/AI & Recall off, DiagTrack disabled, telemetry firewall block, telemetry tasks off | Power users |
+
+No preset removes an app, so everything a preset does can be switched back off. Uninstalling apps has its own page, **Remove Apps**, where you tick each one yourself.
 
 Selecting a preset only marks the toggles — **nothing changes until you click Apply Changes**.
 
@@ -63,11 +65,9 @@ Telemetry (AllowTelemetry → 0), diagnostics data, DiagTrack service, outbound 
 </details>
 
 <details>
-<summary>📦 <b>Bloatware & Apps</b> — 24 tweaks</summary>
+<summary>📦 <b>Apps & AI</b> — 6 tweaks</summary>
 <br/>
-Candy Crush, TikTok/Facebook/X/Instagram, Netflix/Disney+/Prime/Spotify, Skype, Clipchamp, Paint 3D & 3D Viewer, To Do, Groove/Movies & TV, Solitaire, Wallet, Whiteboard, Phone Link, Dev Home, Get Help & Tips, Xbox suite + Game DVR, Copilot, Windows AI & Recall, Click to Do, Paint's AI features, preinstalled casual games (Asphalt, FarmVille, Royal Revolt…), AI Hub, Game Bar capture, Game Bar integration (and its ms-gamebar popup), OneDrive.
-<br/><br/>
-<img src="docs/screenshots/apps.png" width="800"/>
+Copilot, Windows AI & Recall, Click to Do, Paint's AI features, Game Bar capture, Game Bar integration (and its ms-gamebar popup) — switched off without uninstalling anything.
 </details>
 
 <details>
@@ -109,9 +109,21 @@ Turn off PowerShell 2.0, SMB 1.0, the XPS Document Writer, Windows Media Player 
 </details>
 
 <details>
+<summary>🌐 <b>Microsoft Edge</b> — 7 tweaks</summary>
+<br/>
+Edge's new tab page without news, trending searches, default tiles or the Microsoft 365 launcher; no feature tips, Acrobat upsell, default-browser prompts, shopping assistant or Rewards. These are Edge policies, so Edge says it is managed by your organization while any of them is on. All Manual, never in a preset.
+</details>
+
+<details>
+<summary>🗑️ <b>Remove Apps</b> — 18 tweaks</summary>
+<br/>
+Candy Crush, TikTok/Facebook/X/Instagram, Netflix/Disney+/Prime/Spotify, Skype, Clipchamp, Paint 3D & 3D Viewer, To Do, Groove/Movies & TV, Solitaire, Wallet, Whiteboard, Phone Link, Dev Home, Get Help & Tips, Xbox suite + Game DVR, preinstalled casual games (Asphalt, FarmVille, Royal Revolt…), AI Hub, OneDrive. The page of tweaks WinPure cannot undo: no preset ticks anything here, an import never ticks a removal, and removing asks once more before it runs.
+</details>
+
+<details>
 <summary>📥 <b>Install Apps</b> — 23 apps with winget</summary>
 <br/>
-Browsers, 7-Zip, Everything, PowerToys, ShareX, Notepad++, password managers, VLC, OBS, Git, VS Code, Python, Node.js, Discord, Zoom, LibreOffice, Acrobat Reader, Steam and Epic — installed from their publishers with winget. The one thing WinPure cannot undo, so it lives on its own page, in no preset, and asks before every install.
+Browsers, 7-Zip, Everything, PowerToys, ShareX, Notepad++, password managers, VLC, OBS, Git, VS Code, Python, Node.js, Discord, Zoom, LibreOffice, Acrobat Reader, Steam and Epic — installed from their publishers with winget. Like an app removal, an install is something WinPure cannot undo, so it lives on its own page, in no preset, and asks before every install.
 </details>
 
 <details>
@@ -131,7 +143,7 @@ Create a system restore point, repair system files (SFC + DISM), reset Windows U
 </details>
 
 <details>
-<summary>♻️ <b>Restore / Backup</b> — undo anything</summary>
+<summary>♻️ <b>Restore / Backup</b> — undo any tweak</summary>
 <br/>
 Every Apply creates a JSON snapshot of the exact registry values, service start modes and task states that are about to change. Restore any session — or a single one — at any time.
 <br/><br/>
@@ -139,20 +151,18 @@ Every Apply creates a JSON snapshot of the exact registry values, service start 
 </details>
 
 <details>
-<summary>🏠 <b>Dashboard & About</b></summary>
+<summary>ℹ️ <b>About</b></summary>
 <br/>
-<img src="docs/screenshots/dashboard.png" width="800"/>
-<br/><br/>
 <img src="docs/screenshots/about.png" width="320"/>
 </details>
 
 ## FAQ
 
 **Is it safe?**
-Yes. WinPure only uses documented registry policies and standard Windows commands, never patches system files, and snapshots everything before changing it. The *Safe* preset is 100 % reversible by design.
+Yes. WinPure only uses documented registry policies and standard Windows commands, never patches system files, and snapshots everything before changing it. No preset removes an app, so every preset is fully reversible by design.
 
 **Something broke / I changed my mind. How do I undo?**
-Open **Restore**, pick the snapshot from when you applied the change, click *Restore*. App removals are the only exception — reinstall those from the Microsoft Store.
+Open **Restore**, pick the snapshot from when you applied the change, click *Restore*. App removals and app installs are the exceptions — reinstall a removed app from the Microsoft Store (OneDrive from microsoft.com), and uninstall an installed one from Settings > Apps.
 
 **Why does it need administrator rights?**
 Most tweaks live in `HKEY_LOCAL_MACHINE`, services and scheduled tasks — all of which require elevation. WinPure asks via the standard UAC prompt.

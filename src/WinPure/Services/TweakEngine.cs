@@ -65,6 +65,18 @@ public sealed class TweakEngine
             }
         }
 
+        // Every flush above happens BEFORE an action, and a tweak's name is recorded after it succeeds. Without this last
+        // save, the final tweak of every batch never had its name on disk, and a batch whose actions capture nothing (a
+        // Store removal alone) was not listed on Restore at all. Nothing changes after this point, so failing is only logged.
+        try
+        {
+            _backupManager.SaveSession(session);
+        }
+        catch (Exception ex)
+        {
+            LogService.Log($"The backup could not record the names of this batch: {ex.Message}");
+        }
+
         return results;
     }
 

@@ -18,6 +18,14 @@ public sealed class CategoryPageViewModel : PageViewModel
     public TweakCategory? Category { get; init; }
     public required MainViewModel Main { get; init; }
     public ObservableCollection<TweakViewModel> Tweaks { get; } = new();
+
+    /// <summary>False on Remove Apps: a preset never ticks what cannot be undone, so its buttons have no place there.</summary>
+    public bool ShowsPresets { get; init; } = true;
+
+    private readonly string _warning = "";
+    /// <summary>A banner shown above the tweaks, translated when set like the title. Empty = no banner.</summary>
+    public string Warning { get => _warning; init => _warning = Loc.T(value); }
+    public bool HasWarning => Warning.Length > 0;
 }
 
 public sealed class DashboardViewModel : PageViewModel
@@ -41,7 +49,9 @@ public sealed class BackupSessionViewModel : ObservableObject
     public string Title => Session.CreatedUtc.ToLocalTime().ToString("dd MMM yyyy — HH:mm");
     public string Summary => Session.TweakNames.Count == 0
         ? (Session.Entries.Count == 1 ? Loc.T("1 change") : Loc.F("{0} changes", Session.Entries.Count))
-        : string.Join(", ", Session.TweakNames.Take(4).Select(DisplayName))
+        // App removals first, so one never hides in "(+N more)": the order otherwise follows the catalog, where Privacy
+        // comes before the removals.
+        : string.Join(", ", Session.TweakNames.OrderBy(n => IrreversibleNames.Value.Contains(n) ? 0 : 1).Take(4).Select(DisplayName))
           + (Session.TweakNames.Count > 4 ? "  " + Loc.F("(+{0} more)", Session.TweakNames.Count - 4) : "");
     public string EntryCount => Session.Entries.Count == 1
         ? Loc.T("1 registry/service entry")
@@ -54,7 +64,13 @@ public sealed class BackupSessionViewModel : ObservableObject
     private static string DisplayName(string name) =>
         name.StartsWith(StartupViewModel.TweakNamePrefix, StringComparison.Ordinal)
             ? Loc.F("Startup: {0}", name[StartupViewModel.TweakNamePrefix.Length..])
+            // An app removal is recorded in its session like any change. Restoring the session puts back the registry values
+            // some removals also change, but it does not reinstall the app.
+            : IrreversibleNames.Value.Contains(name) ? Loc.F("{0} (app not reinstalled)", Loc.T(name))
             : Loc.T(name);
+
+    private static readonly Lazy<HashSet<string>> IrreversibleNames = new(() =>
+        TweakCatalog.Build().Where(t => !t.FullyReversible).Select(t => t.Name).ToHashSet(StringComparer.Ordinal));
 }
 
 public sealed class RestoreViewModel : PageViewModel

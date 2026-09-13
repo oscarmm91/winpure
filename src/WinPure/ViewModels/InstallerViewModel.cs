@@ -37,7 +37,7 @@ public sealed class InstallableAppViewModel : ObservableObject
 }
 
 /// <summary>
-/// The one page whose changes WinPure cannot undo: Restore never uninstalls an app. So it lives apart from
+/// One of the two pages whose changes WinPure cannot undo (Remove Apps is the other): Restore never uninstalls an app. So it lives apart from
 /// the tweaks, is in no preset, asks before every install, and judges each install by what winget sees
 /// afterwards rather than by its exit code.
 /// </summary>

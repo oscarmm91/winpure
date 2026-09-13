@@ -32,14 +32,14 @@ That is the product's position, and everything below has to protect it:
 Phases 1, 2 and 3 are built, each followed by a separate commit applying its review — `git log
 --oneline` is the record, not this paragraph. Phase 3 also turned up a bug this roadmap had not
 listed: the power plan and hibernation tweaks were undone with hand-written defaults. Fixed as
-Phase 3b (`SystemStateAction`), together with Reserved Storage. Still open from Phase 3: **Edge's
-new-tab policies**, waiting on the product decision described there. From Phase 4, Windows
-optional features are built; OEM bloatware is not. From Phase 5, export/import and the winget
-installer are built. **Apply to future users** is waiting: loading the Default profile hive needs
-administrator rights and cannot be tested from an unelevated session, and a mistake leaves new profiles
-broken. **The "no way back" section** is waiting on a product decision: moving app removal out of the
-presets changes what Balanced and Aggressive promise today. Phase 6 search and pending badges are built.
-Phase 7 (Spanish) is built.
+Phase 3b (`SystemStateAction`), together with Reserved Storage. Edge's new-tab policies are built as
+the *Microsoft Edge* page: 7 tweaks, all Manual until someone checks `edge://policy` on a profile signed
+in with a personal Microsoft account. From Phase 4, Windows optional features are built; OEM bloatware
+is not. From Phase 5, export/import, the winget installer and **the "no way back" section** are built,
+the last as the *Remove Apps* page: every app removal left the presets, and the page shows no preset
+buttons. **Apply to future users** is waiting on one measurement: whether the Default profile hive can be
+loaded privately (`RegLoadAppKey`) needs an elevated probe on a copy of it, and a mistake leaves new
+profiles broken. Phase 6 search and pending badges are built. Phase 7 (Spanish) is built.
 
 ---
 
@@ -83,8 +83,12 @@ Reserved Storage off (**~7 GB back**), NumLock on at the sign-in screen, the con
 than 15 selected files, the `ms-gamebar` popup when a controller is connected, the "What's new"
 screens after each update, Xbox Game Bar overlay, daily registry backup, NTP time sync.
 
-**Edge** — 13 policies that clean the new-tab page of news, shopping and campaigns. High visible
-value; it is a product decision because it configures another vendor's app.
+**Edge** — policies that clean the new-tab page of news, shopping and campaigns. **Built** as the
+*Microsoft Edge* page: 7 tweaks writing 11 policies, all Manual. The "13" came from one Win11Debloat
+file, and only seven of its values fit: of the other six, WalletDonationEnabled is deprecated,
+DefaultBrowserSettingEnabled only works on Windows 7, HideFirstRunExperience set to 0 does nothing, and
+TabServicesEnabled, AlternateErrorPagesEnabled and UserFeedbackAllowed are data settings, not new-tab
+promotions. NewTabPageBingChatEnabled was left out because it only touches the Enterprise new tab page.
 
 ## Phase 4 — New categories
 
@@ -111,8 +115,11 @@ value; it is a product decision because it configures another vendor's app.
 - **Apply to future users** via the `Default` profile hive. Genuinely useful and genuinely
   dangerous: a badly unloaded hive can leave a profile unusable. Needs the same
   capture-before-touching discipline as the engine.
-- **The "no way back" section** itself — the home for app removal, Edge removal and anything
-  else that cannot be undone, with explicit confirmation and never pre-ticked.
+- **The "no way back" section** itself — the home for app removal and anything else that cannot
+  be undone, with explicit confirmation and never pre-ticked. **Built** as the *Remove Apps* page:
+  18 removals (the Store apps, Xbox and OneDrive) left Balanced and Aggressive, the page shows no
+  preset buttons, an import never ticks a removal, and one already done cannot be switched off.
+  Edge removal stays out — see *Not doing*.
 
 ## Phase 6 — Interface
 

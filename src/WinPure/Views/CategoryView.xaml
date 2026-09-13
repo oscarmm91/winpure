@@ -20,8 +20,20 @@
                        Foreground="{StaticResource Brush.TextSecondary}" MaxWidth="640" HorizontalAlignment="Left"/>
         </StackPanel>
 
+        <!-- warning banner, in the presets' place on Remove Apps (the page hides its preset buttons) -->
+        <Border Grid.Row="1" Margin="0,20,6,0" Padding="16,12" CornerRadius="8" BorderThickness="1"
+                BorderBrush="{StaticResource Brush.Danger}" Background="#2A1719"
+                Visibility="{Binding HasWarning, Converter={StaticResource BoolToVisibility}}">
+            <DockPanel>
+                <TextBlock Text="&#xE7BA;" FontFamily="{StaticResource Font.Icon}" FontSize="16" VerticalAlignment="Top"
+                           Margin="0,1,12,0" Foreground="{StaticResource Brush.Danger}"/>
+                <TextBlock Text="{Binding Warning}" FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource Brush.TextPrimary}"/>
+            </DockPanel>
+        </Border>
+
         <!-- preset selector -->
-        <UniformGrid Grid.Row="1" Columns="3" Margin="0,20,0,0">
+        <UniformGrid Grid.Row="1" Columns="3" Margin="0,20,0,0"
+                     Visibility="{Binding ShowsPresets, Converter={StaticResource BoolToVisibility}}">
             <RadioButton Style="{StaticResource PresetButton}" GroupName="Preset" Margin="0,0,8,0"
                          Background="{StaticResource Brush.GreenSoft}" BorderBrush="{StaticResource Brush.Green}"
                          IsChecked="{Binding Main.ActivePreset, Mode=OneWay, Converter={StaticResource EnumEquals}, ConverterParameter=Safe}"
@@ -149,7 +161,7 @@
                                                    VerticalAlignment="Center"
                                                    Visibility="{Binding FullyReversible, Converter={StaticResource InverseBoolToVisibility}}">
                                             <TextBlock.ToolTip>
-                                                <TextBlock Text="{l:Tr 'Undo requires reinstalling from the Microsoft Store.'}" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{l:Tr 'Cannot be undone: to get it back, reinstall it yourself.'}" TextWrapping="Wrap"/>
                                             </TextBlock.ToolTip>
                                         </TextBlock>
                                         <TextBlock Text="&#xE777;" FontFamily="{StaticResource Font.Icon}" FontSize="12"
@@ -181,11 +193,18 @@
                                     </StackPanel>
                                 </StackPanel>
 
-                                <!-- toggle -->
+                                <!-- toggle: enabled while the app is idle, and only while the tweak can still be switched
+                                     (an app removal that is already done cannot be switched back off) -->
                                 <ToggleButton Grid.Column="2" Style="{StaticResource ToggleSwitch}"
                                               VerticalAlignment="Center"
-                                              IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                              IsEnabled="{Binding DataContext.Main.IsIdle, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
+                                              IsChecked="{Binding IsSelected, Mode=TwoWay}">
+                                    <ToggleButton.IsEnabled>
+                                        <MultiBinding Converter="{StaticResource AllTrue}">
+                                            <Binding Path="DataContext.Main.IsIdle" RelativeSource="{RelativeSource AncestorType=ItemsControl}"/>
+                                            <Binding Path="CanToggle"/>
+                                        </MultiBinding>
+                                    </ToggleButton.IsEnabled>
+                                </ToggleButton>
                             </Grid>
                         </Border>
                     </DataTemplate>

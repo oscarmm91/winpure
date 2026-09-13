@@ -59,6 +59,9 @@ public sealed class MainViewModel : ObservableObject
     private readonly StartupViewModel _startup;
     private readonly InstallerViewModel _installer;
 
+    /// <summary>The Remove Apps banner, also shown above search results that include an app removal.</summary>
+    private const string RemoveAppsWarning = "WinPure cannot undo anything on this page: Restore does not bring an app back. To get one back, reinstall it yourself, from the Microsoft Store (OneDrive from microsoft.com).";
+
     public MainViewModel()
     {
         _engine = new TweakEngine(_backupManager);
@@ -80,7 +83,7 @@ public sealed class MainViewModel : ObservableObject
         _restore = new RestoreViewModel
         {
             Title = "Restore / Backup",
-            Subtitle = "Every change WinPure makes is snapshotted first. Roll back any session here.",
+            Subtitle = "Every change WinPure makes is snapshotted first. Roll back any session here. App removals are the exception: no backup brings an app back.",
             Main = this,
         };
         _restore.RestoreCommand = new RelayCommand(p => RestoreSession((BackupSessionViewModel)p!), _ => !IsBusy);
@@ -89,8 +92,8 @@ public sealed class MainViewModel : ObservableObject
         NavItems.Add(new NavItem { Label = "Home", Glyph = "", Page = _dashboard });
         AddCategory("Privacy", "", TweakCategory.Privacy, "Privacy & Telemetry",
             "Manage privacy settings and telemetry data collection to protect your privacy.");
-        AddCategory("Apps", "", TweakCategory.Apps, "Bloatware & Apps",
-            "Remove preinstalled apps and disable built-in features you don't use.");
+        AddCategory("Apps", "", TweakCategory.Apps, "Apps & AI",
+            "Turn off built-in AI features and Game Bar extras you don't use. Uninstalling apps has its own page, Remove Apps.");
         AddCategory("Services", "", TweakCategory.Services, "Services",
             "Disable optional Windows services to free memory and reduce background activity.");
         AddCategory("Performance", "", TweakCategory.Performance, "Performance",
@@ -101,6 +104,9 @@ public sealed class MainViewModel : ObservableObject
             "Remove clutter from the right-click menu or restore the classic one.");
         AddCategory("Features", "", TweakCategory.Features, "Windows Features",
             "Turn optional parts of Windows off, or on. Most of these changes finish after a restart.");
+        AddCategory("Edge", ((char)0xE774).ToString(), TweakCategory.Edge, "Microsoft Edge",
+            "Clean up Edge's new tab page and stop its promotions and prompts. These are Edge policies: while any of them is on, Edge says it is managed by your organization.",
+            showsPresets: false);   // every Edge tweak is Manual, so preset buttons would do nothing here
         _startup = new StartupViewModel(_engine)
         {
             Title = "Startup Apps",
@@ -122,11 +128,16 @@ public sealed class MainViewModel : ObservableObject
         });
         NavItems.Add(new NavItem { Label = "Restore", Glyph = "", Page = _restore });
 
-        // Last, apart from the tweaks on purpose: the only page whose changes Restore cannot undo.
+        // The two pages whose changes Restore cannot undo sit together at the bottom, apart from everything else.
+        // Remove Apps shows no preset buttons — a preset never ticks what cannot be undone — and keeps its warning in view.
+        AddCategory("Remove Apps", ((char)0xE74D).ToString(), TweakCategory.RemoveApps, "Remove Apps",
+            "Uninstall preinstalled apps you do not want. No preset ever ticks these, and removing them asks once more before it runs.",
+            showsPresets: false,
+            warning: RemoveAppsWarning);
         _installer = new InstallerViewModel
         {
             Title = "Install Apps",
-            Subtitle = "Popular apps installed with winget, straight from their publishers. Unlike every tweak, an install is not undone by Restore — remove an app from Settings > Apps.",
+            Subtitle = "Popular apps installed with winget, straight from their publishers. Like an app removal, an install is not undone by Restore — remove an app from Settings > Apps.",
             Main = this,
         };
         NavItems.Add(new NavItem { Label = "Install", Glyph = ((char)0xE896).ToString(), Page = _installer });
@@ -142,9 +153,14 @@ public sealed class MainViewModel : ObservableObject
         ImportConfigCommand = new RelayCommand(_ => ImportConfigFromFile(), _ => !IsBusy);
     }
 
-    private void AddCategory(string label, string glyph, TweakCategory category, string title, string subtitle)
+    private void AddCategory(string label, string glyph, TweakCategory category, string title, string subtitle,
+        bool showsPresets = true, string warning = "")
     {
-        var page = new CategoryPageViewModel { Title = title, Subtitle = subtitle, Category = category, Main = this };
+        var page = new CategoryPageViewModel
+        {
+            Title = title, Subtitle = subtitle, Category = category, Main = this,
+            ShowsPresets = showsPresets, Warning = warning,
+        };
         foreach (var vm in AllTweaks.Where(t => t.Category == category))
             page.Tweaks.Add(vm);
         NavItems.Add(new NavItem { Label = label, Glyph = glyph, Page = page });
@@ -231,6 +247,10 @@ public sealed class MainViewModel : ObservableObject
                 ? Loc.F("1 tweak mentioning \"{0}\", from every category.", query)
                 : Loc.F("{0} tweaks mentioning \"{1}\", from every category.", matches.Count, query),
             Main = this,
+            // Results that include an app removal look like Remove Apps: its warning, and no preset buttons (the two
+            // share one row of the page).
+            ShowsPresets = !matches.Any(t => !t.FullyReversible),
+            Warning = matches.Any(t => !t.FullyReversible) ? RemoveAppsWarning : "",
         };
         // The same TweakViewModel objects as on their own pages: a toggle here is the same toggle.
         foreach (var tweak in matches) page.Tweaks.Add(tweak);
@@ -277,6 +297,11 @@ public sealed class MainViewModel : ObservableObject
         ? Loc.T("Startup switches apply immediately and are backed up.")
         : PendingCount == 0
             ? Loc.T("Changes will be applied after clicking Apply Changes.")
+            // An app removal among them has no backup to fall back on, so the hint stops promising one for it.
+            : AllTweaks.Any(t => t.IsDirty && t.IsSelected && !t.FullyReversible)
+            ? (PendingCount == 1
+                ? Loc.T("1 pending change — an app removal, which cannot be undone.")
+                : Loc.F("{0} pending changes — app removals among them cannot be undone.", PendingCount))
             : PendingCount == 1
             ? Loc.T("1 pending change — a backup is created before applying.")
             : Loc.F("{0} pending changes — a backup is created before applying.", PendingCount);
@@ -370,7 +395,9 @@ public sealed class MainViewModel : ObservableObject
                 keptManual++;
                 continue;
             }
-            bool inPreset = tweak.Preset != PresetLevel.Manual && tweak.Preset <= level;
+            // The catalog keeps every removal Manual; this second check keeps a preset from ticking one even if a
+            // removal were ever given a preset level by mistake.
+            bool inPreset = tweak.Preset != PresetLevel.Manual && tweak.Preset <= level && tweak.FullyReversible;
             // a preset switches its tweaks on but never reverts something already optimized
             tweak.IsSelected = inPreset || tweak.IsOptimized;
         }
@@ -444,29 +471,32 @@ public sealed class MainViewModel : ObservableObject
 
     /// <summary>
     /// Ticks the tweaks a configuration file lists. It never unticks anything — so an import can never
-    /// schedule a revert — and never applies: that stays the user's click, with the usual checks and
-    /// the confirmation for app removals. Returns how many were ticked, already on, and unknown.
+    /// schedule a revert — and never applies: that stays the user's click, with the usual checks.
+    /// It never ticks an app removal either. A configuration file can come from anyone, and nearly every export
+    /// lists removals, because an app that is already absent reads as applied. Removals are counted and left for
+    /// the user to tick on Remove Apps. Returns how many were ticked, already on, and unknown.
     /// </summary>
     internal (int Ticked, int AlreadyOn, int Unknown) ImportConfig(string json)
     {
         var parsed = ConfigFile.Parse(json, AllTweaks.Select(t => t.Tweak.Id));
         var byId = AllTweaks.ToDictionary(t => t.Tweak.Id, StringComparer.Ordinal);
 
-        int ticked = 0, alreadyOn = 0, removesApps = 0;
+        int ticked = 0, alreadyOn = 0, removalsLeft = 0;
         foreach (var id in parsed.KnownIds)
         {
             var tweak = byId[id];
             if (tweak.IsSelected) { alreadyOn++; continue; }
+            if (!tweak.FullyReversible) { removalsLeft++; continue; }
             tweak.IsSelected = true;
             ticked++;
-            if (!tweak.FullyReversible) removesApps++;
         }
         ActivePreset = null;
 
         // Kept short: the status bar shares its row with the apply hint.
         StatusText = Loc.F("Imported: {0} ticked", ticked)
             + (alreadyOn > 0 ? Loc.F(", {0} already on", alreadyOn) : "")
-            + (removesApps > 0 ? Loc.F(", {0} remove apps", removesApps) : "")
+            + (removalsLeft == 1 ? Loc.T(", 1 removal left unticked")
+               : removalsLeft > 1 ? Loc.F(", {0} removals left unticked", removalsLeft) : "")
             + (parsed.UnknownIds.Count > 0 ? Loc.F(", {0} unknown skipped", parsed.UnknownIds.Count) : "")
             + Loc.T(" — review, then Apply Changes.");
         return (ticked, alreadyOn, parsed.UnknownIds.Count);
@@ -513,8 +543,8 @@ public sealed class MainViewModel : ObservableObject
         {
             var names = string.Join("\n  • ", irreversible.Select(c => Loc.T(c.Tweak.Name)));
             var answer = MessageBox.Show(
-                Loc.F("These changes remove apps and can only be undone by reinstalling from the Microsoft Store:\n\n  • {0}\n\nContinue?", names),
-                Loc.T("WinPure — Confirm app removal"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                Loc.F("These changes uninstall apps, and WinPure cannot undo them. To get an app back you would reinstall it yourself, from the Microsoft Store (OneDrive from microsoft.com):\n\n  • {0}\n\nRemove them?", names),
+                Loc.T("WinPure — Confirm app removal"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
             if (answer != MessageBoxResult.Yes) return;
         }
 

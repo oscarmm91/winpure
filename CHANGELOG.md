@@ -54,7 +54,7 @@ WinPure now looks at the state of the system on every scan and, if something is 
 
 A separate page installs 23 popular apps with winget — browsers, 7-Zip, Everything, PowerToys, VLC, OBS, Git, VS Code, Discord, LibreOffice, Steam and more — straight from their publishers.
 
-- It is the one page WinPure cannot undo, so it stays apart from the tweaks, is in no preset, and asks before every install, saying that Restore will not remove the app and that installing accepts the app's license terms.
+- Like Remove Apps, it is a page WinPure cannot undo, so it stays apart from the tweaks, is in no preset, and asks before every install, saying that Restore will not remove the app and that installing accepts the app's license terms.
 - Which apps are already installed comes from winget's own export, checked when you open the page. Apps winget cannot match to its catalog show as *Not detected* rather than *Not installed*.
 - An install is judged by what winget sees afterwards, not by its exit code: an installer that reports success but leaves nothing behind is shown as not installed.
 
@@ -91,6 +91,27 @@ A new page for Windows' optional features, switched with DISM and undone to the 
 - **Turn on:** Windows Sandbox, Windows Subsystem for Linux and .NET Framework 3.5.
 - A feature query that fails reads as *Couldn't detect*, never *Already optimized*. A feature your Windows build does not include is left alone, and a feature read back from a backup file is checked before DISM ever runs.
 
+### Presets no longer remove apps: a Remove Apps page
+
+Uninstalling an app is the one tweak WinPure cannot undo, so it no longer hides inside a preset.
+
+- All 18 removals — the Store apps, Xbox and OneDrive — moved to their own page, **Remove Apps**, at the bottom of the sidebar next to Install Apps. It shows no preset buttons, and a red warning in their place.
+- **Balanced no longer removes any app — it used to remove 14, most of them Microsoft's own (Skype, Clipchamp, Phone Link, Dev Home…) — and Aggressive no longer removes OneDrive or the Xbox apps.** Everything a preset does can now be switched back off. Game DVR, which Remove Xbox Apps also switches off, left Aggressive with it.
+- Importing a configuration never ticks a removal; the status bar says how many it left for you on Remove Apps. A file can list removals just because those apps were already gone on the PC that exported it.
+- A removal that is already done cannot be switched back off: its toggle stays on instead of promising an undo that does not exist.
+- The confirmation before removing now defaults to *No* and names OneDrive's own way back; the apply bar says when pending changes include a removal; and on Restore, a session that removed an app lists it first and says *(app not reinstalled)*.
+- **Fix:** a backup now records the name of the last tweak of each apply too. It was never saved, so on Restore every session named one tweak fewer, and an apply that only removed a Store app did not appear at all.
+- Search results that include an app removal show the same red warning, and no preset buttons.
+- The Apps page is now **Apps & AI**: Copilot, Windows AI & Recall, Click to Do, Paint AI and Game Bar.
+
+### New: Microsoft Edge page
+
+Seven tweaks that clean up Edge's new tab page and stop its promotions, written as Edge policies under `HKLM\SOFTWARE\Policies\Microsoft\Edge`: news and trending searches, default tiles, the Microsoft 365 launcher, feature tips and the Acrobat upsell, default-browser and PDF prompts, the shopping assistant, and Microsoft Rewards.
+
+- All Manual, in no preset, and the page shows no preset buttons. While any Edge policy is set, Edge says *"Managed by your organization"*, and every tweak's help says so.
+- Researched against Microsoft's Edge policy documentation and this PC's Edge 152, then checked by two independent reviews. The roadmap's "13 policies" came from a single Win11Debloat file, and only seven of those still hold up; one more policy was dropped because it only touches Edge's Enterprise new tab page.
+- Not verified yet: Microsoft documents several of these as not applying to a profile signed in with a personal Microsoft account. `edge://policy` shows whether Edge applied each one.
+
 ### WinPure in Spanish
 
 WinPure now speaks Spanish. It follows the language Windows is set to: Spanish Windows, Spanish app; any other language stays in English.
@@ -106,7 +127,7 @@ WinPure now speaks Spanish. It follows the language Windows is set to: Spanish W
 Registry keys, scheduled tasks and policies were checked against a real Windows 11 25H2 machine (build 26200) before being added, and every one reverts to the value the machine actually had.
 
 - **Privacy:** search history; the language list websites can read; diagnostic data tasks (disk diagnostics, Autochk, startup scan, offline maps — MareBackup is left alone because Windows Backup relies on it).
-- **Apps:** preinstalled casual games (Asphalt, FarmVille, Royal Revolt…); AI Hub on Copilot+ PCs; Game Bar capture, as a lighter option than removing the Xbox apps; Game Bar integration, which also silences the "you'll need a new app" popup for ms-gamebar links once those apps are gone.
+- **Apps:** preinstalled casual games (Asphalt, FarmVille, Royal Revolt…) and AI Hub on Copilot+ PCs, both now on Remove Apps; Game Bar capture, as a lighter option than removing the Xbox apps; Game Bar integration, which also silences the "you'll need a new app" popup for ms-gamebar links once those apps are gone.
 - **Performance:** Fast Startup; early optional updates (security updates unaffected); daily registry backup; syncing the clock with pool.ntp.org.
 - **Interface:** search highlights; NumLock on at sign-in; Spotlight as desktop background; the "What's new" screens after updates; the F1 help key.
 - **Context menu:** keep right-click options when more than 15 files are selected.

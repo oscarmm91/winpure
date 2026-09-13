@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Dev tool, not part of WinPure and not in WinPure.sln. Measures, on COPIES of the Default profile hive
+    (C:\Users\Default\NTUSER.DAT), whether "apply to future users" can load it and where writes land.
+    Run it from an ELEVATED terminal: dotnet run -\-project tools\TemplateProbe
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

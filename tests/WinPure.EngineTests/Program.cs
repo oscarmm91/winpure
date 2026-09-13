@@ -97,6 +97,13 @@ failures += WingetIdsAreCheckedAndTheExportIsReadExactly() ? 0 : 1;
 failures += AnInstallIsJudgedByWhatWingetSeesAfterwards() ? 0 : 1;
 failures += EveryVisibleTextHasASpanishTranslation() ? 0 : 1;
 failures += SpanishIsShownAndABrokenTranslationFallsBackToEnglish() ? 0 : 1;
+failures += NoPresetEverTicksAnAppRemoval() ? 0 : 1;
+failures += AnAppRemovalAlreadyDoneCannotBeSwitchedOff() ? 0 : 1;
+failures += RestoreSaysWhichChangesDoNotComeBack() ? 0 : 1;
+failures += EdgeTweaksAreManualPoliciesThatUndoByRemoving() ? 0 : 1;
+failures += EveryAppliedTweakIsNamedInItsBackup() ? 0 : 1;
+failures += TheApplyHintSaysWhenAnAppRemovalIsPending() ? 0 : 1;
+failures += TheAppRemovalConfirmationDefaultsToNo() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
 
@@ -849,8 +856,9 @@ bool ImportingTicksButNeverUnticksOrApplies()
     var inFile = main.AllTweaks[2];          // listed and not ticked: gets ticked
     handNotInFile.IsSelected = true;
     handInFile.IsSelected = true;
-    // Two app removals, so the status bar's "remove apps" count cannot come out right by accident: with the
-    // condition inverted it would count the one reversible tweak ticked instead, and still say a number.
+    // Two app removals listed in the file. An import must never tick one — nearly every export lists removals, because an
+    // app that is already absent reads as applied — and the status bar must say how many it left, counted right: with the
+    // condition inverted it would count the one reversible tweak instead, and still say a number.
     var removals = main.AllTweaks.Where(t => !t.FullyReversible && t != handNotInFile && t != handInFile && t != inFile).Take(2).ToList();
 
     int backupsBefore = Directory.Exists(scratch) ? Directory.GetFiles(scratch).Length : 0;
@@ -860,13 +868,15 @@ bool ImportingTicksButNeverUnticksOrApplies()
 
     var involved = new HashSet<WinPure.ViewModels.TweakViewModel>(removals) { handNotInFile, handInFile, inFile };
     bool untouchedStayOff = main.AllTweaks.Where(t => !involved.Contains(t)).All(t => !t.IsSelected);
-    bool removalsAnnounced = main.StatusText.Contains("2 remove apps", StringComparison.Ordinal);
-    return Report("importing ticks boxes but never unticks or applies",
-        inFile.IsSelected && handNotInFile.IsSelected && handInFile.IsSelected && untouchedStayOff && removals.Count == 2 &&
-        ticked == 3 && alreadyOn == 1 && unknown == 1 && removalsAnnounced && backupsAfter == backupsBefore,
+    bool removalsLeftUnticked = removals.Count == 2 && removals.All(r => !r.IsSelected);
+    bool removalsAnnounced = main.StatusText.Contains("2 removals left unticked", StringComparison.Ordinal);
+    return Report("importing ticks boxes but never unticks, applies or ticks an app removal",
+        inFile.IsSelected && handNotInFile.IsSelected && handInFile.IsSelected && untouchedStayOff && removalsLeftUnticked &&
+        ticked == 1 && alreadyOn == 1 && unknown == 1 && removalsAnnounced && backupsAfter == backupsBefore,
         $"listed tweak ticked={inFile.IsSelected}, hand-ticked but not listed still ticked={handNotInFile.IsSelected} (expected True), " +
-        $"nothing else ticked={untouchedStayOff}, counts ticked/alreadyOn/unknown={ticked}/{alreadyOn}/{unknown} (expected 3/1/1), " +
-        $"status says '2 remove apps'={removalsAnnounced} ('{main.StatusText}'), backups written={backupsAfter - backupsBefore} (expected 0)");
+        $"nothing else ticked={untouchedStayOff}, listed removals left unticked={removalsLeftUnticked}, " +
+        $"counts ticked/alreadyOn/unknown={ticked}/{alreadyOn}/{unknown} (expected 1/1/1), " +
+        $"status says '2 removals left unticked'={removalsAnnounced} ('{main.StatusText}'), backups written={backupsAfter - backupsBefore} (expected 0)");
 }
 
 // Search looks in every category, replaces the page while it has text, and shows the same tweaks
@@ -1222,13 +1232,19 @@ bool TheDocsAgreeWithTheCatalog()
     var titles = new (string Doc, TweakCategory Cat)[]
     {
         ("Privacy & Telemetry", TweakCategory.Privacy),
-        ("Bloatware & Apps", TweakCategory.Apps),
+        ("Apps & AI", TweakCategory.Apps),
         ("Services", TweakCategory.Services),
         ("Performance", TweakCategory.Performance),
         ("UI & Personalization", TweakCategory.UI),
         ("Context Menu", TweakCategory.ContextMenu),
         ("Windows Features", TweakCategory.Features),
+        ("Microsoft Edge", TweakCategory.Edge),
+        ("Remove Apps", TweakCategory.RemoveApps),
     };
+
+    // A category missing from the list above would be skipped in silence: neither its count nor its rows compared.
+    foreach (var cat in Enum.GetValues<TweakCategory>().Where(c => titles.All(t => t.Cat != c)))
+        problems.Add($"this test does not know the '{cat}' category, so its docs are not checked");
 
     foreach (var (doc, cat) in titles)
     {
@@ -1496,7 +1512,8 @@ bool EveryStaticResourceAndBindingPathExists()
                 problems.Add($"{name}: undefined resource '{m.Groups[1].Value}'");
 
         // Binding paths that go through the page's Main view-model.
-        foreach (Match m in Regex.Matches(text, @"Binding\s+(?:Path=)?Main\.([A-Za-z_][A-Za-z0-9_]*)"))
+        // Also element syntax (<Binding Path="DataContext.Main.X"/>) and paths through DataContext, which the card toggle uses.
+        foreach (Match m in Regex.Matches(text, @"Binding\s+(?:Path=""?)?(?:DataContext\.)?Main\.([A-Za-z_][A-Za-z0-9_]*)"))
         {
             string member = m.Groups[1].Value;
             if (typeof(WinPure.ViewModels.MainViewModel).GetProperty(member) is null)
@@ -1510,6 +1527,8 @@ bool EveryStaticResourceAndBindingPathExists()
     {
         ("MainWindow.xaml", new[] { typeof(WinPure.ViewModels.MainViewModel), typeof(WinPure.ViewModels.NavItem) }),
         ("Styles.xaml", new[] { typeof(WinPure.ViewModels.NavItem) }),
+        // The tweak pages: page bindings and each card's. A review found ShowsPresets, Warning and CanToggle unchecked.
+        ("CategoryView.xaml", new[] { typeof(WinPure.ViewModels.CategoryPageViewModel), typeof(WinPure.ViewModels.TweakViewModel) }),
     };
     foreach (var (fileName, types) in directContexts)
     {
@@ -1519,9 +1538,12 @@ bool EveryStaticResourceAndBindingPathExists()
             problems.Add($"{fileName} was not found");
             continue;
         }
-        foreach (Match m in Regex.Matches(File.ReadAllText(file), @"\{Binding\s+(?:Path=)?([A-Za-z_][A-Za-z0-9_]*)"))
+        string content = File.ReadAllText(file);
+        var members = Regex.Matches(content, @"\{Binding\s+(?:Path=)?([A-Za-z_][A-Za-z0-9_]*)").Select(m => m.Groups[1].Value)
+            // Element syntax with a plain path, such as the toggle's <Binding Path="CanToggle"/>.
+            .Concat(Regex.Matches(content, @"<Binding\s+Path=""([A-Za-z_][A-Za-z0-9_]*)""").Select(m => m.Groups[1].Value));
+        foreach (string member in members)
         {
-            string member = m.Groups[1].Value;
             if (!types.Any(t => t.GetProperty(member) is not null))
                 problems.Add($"{fileName}: no '{member}' on {string.Join(" or ", types.Select(t => t.Name))}");
         }
@@ -1635,6 +1657,7 @@ bool EveryVisibleTextHasASpanishTranslation()
         Add(nav.Label, "sidebar");
         Add(nav.Page.Title, "page title");
         Add(nav.Page.Subtitle, "page subtitle");
+        if (nav.Page is WinPure.ViewModels.CategoryPageViewModel page) Add(page.Warning, "page warning");
     }
 
     var spanish = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -1658,9 +1681,9 @@ bool EveryVisibleTextHasASpanishTranslation()
     }
 
     string? dump = Environment.GetEnvironmentVariable("WINPURE_DUMP_MISSING");
-    if (!string.IsNullOrEmpty(dump) && missing.Count > 0)
+    if (!string.IsNullOrEmpty(dump) && (missing.Count > 0 || orphans.Count > 0))
         File.WriteAllText(dump, System.Text.Json.JsonSerializer.Serialize(
-            missing.Select(k => new { en = k, where = keys[k] }),
+            new { missing = missing.Select(k => new { en = k, where = keys[k] }), orphans },
             new System.Text.Json.JsonSerializerOptions
             {
                 WriteIndented = true,
@@ -1676,6 +1699,225 @@ bool EveryVisibleTextHasASpanishTranslation()
 
     static string Holes(string s) =>
         string.Join(" ", Regex.Matches(s, @"\{\d+(?:[,:][^}]*)?\}").Select(m => m.Value).OrderBy(v => v, StringComparer.Ordinal));
+}
+
+// Removing an app is the one tweak WinPure cannot undo. It used to sit in Balanced and Aggressive, so one preset click
+// ticked 16 removals. Now every removal is Manual on Remove Apps, no preset ticks one even if the catalog slips, and
+// that page shows no preset buttons but a warning.
+bool NoPresetEverTicksAnAppRemoval()
+{
+    var problems = new List<string>();
+    foreach (var t in TweakCatalog.Build())
+    {
+        if (!t.FullyReversible && (t.Preset != PresetLevel.Manual || t.Category != TweakCategory.RemoveApps))
+            problems.Add($"{t.Id} cannot be undone but is {t.Preset} in {t.Category}");
+        if (t.Category == TweakCategory.RemoveApps && t.FullyReversible)
+            problems.Add($"{t.Id} is on Remove Apps but can be undone");
+    }
+
+    foreach (var level in new[] { PresetLevel.Safe, PresetLevel.Balanced, PresetLevel.Aggressive })
+    {
+        var main = new WinPure.ViewModels.MainViewModel();
+        main.SelectPreset(level);
+        var ticked = main.AllTweaks.Where(t => !t.FullyReversible && t.IsSelected).Select(t => t.Tweak.Id).ToList();
+        if (ticked.Count > 0)
+            problems.Add($"{level} ticks {ticked.Count} removal(s), e.g. {string.Join(", ", ticked.Take(3))}");
+    }
+
+    // The guard behind the catalog: a removal given a preset level by mistake is still not ticked.
+    var probe = new WinPure.ViewModels.MainViewModel();
+    var slipped = new WinPure.ViewModels.TweakViewModel(new Tweak
+    {
+        Id = "toy-removal-in-a-preset", Category = TweakCategory.RemoveApps, Name = "toy", Description = "toy",
+        Preset = PresetLevel.Balanced, FullyReversible = false, Actions = Array.Empty<TweakAction>(),
+    });
+    probe.AllTweaks.Add(slipped);
+    probe.SelectPreset(PresetLevel.Aggressive);
+    if (slipped.IsSelected) problems.Add("a removal given a preset level by mistake is ticked by Aggressive");
+
+    // Every category has exactly one page in the sidebar.
+    var pageless = Enum.GetValues<TweakCategory>()
+        .Where(c => probe.NavItems.Count(n => n.Page is WinPure.ViewModels.CategoryPageViewModel p && p.Category == c) != 1).ToList();
+    if (pageless.Count > 0) problems.Add($"categories without exactly one sidebar page: {string.Join(", ", pageless)}");
+
+    var page = new WinPure.ViewModels.MainViewModel().NavItems.Select(n => n.Page)
+        .OfType<WinPure.ViewModels.CategoryPageViewModel>().FirstOrDefault(p => p.Category == TweakCategory.RemoveApps);
+    if (page is null) problems.Add("there is no Remove Apps page");
+    else
+    {
+        if (page.ShowsPresets) problems.Add("the Remove Apps page shows preset buttons");
+        if (!page.HasWarning) problems.Add("the Remove Apps page has no warning");
+    }
+
+    return Report("no preset ever ticks an app removal", problems.Count == 0,
+        problems.Count == 0
+            ? $"{TweakCatalog.Build().Count(t => !t.FullyReversible)} removals, all Manual on Remove Apps; Safe, Balanced and Aggressive tick none; the page hides presets and shows its warning"
+            : string.Join(" | ", problems));
+}
+
+// A removal that is already done has nothing to undo, so its toggle must not offer to switch it off. A removal not done
+// yet can still be ticked, and a tweak that can be undone can always be switched. Checked on the property the card binds to.
+bool AnAppRemovalAlreadyDoneCannotBeSwitchedOff()
+{
+    var catalog = TweakCatalog.Build();
+    var engine = new TweakEngine(new BackupManager());
+
+    // Every package listed, and no Candy Crush among them: the removal reads as done.
+    var done = new WinPure.ViewModels.TweakViewModel(catalog.First(t => t.Id == "apps-candycrush"));
+    done.RefreshStatus(engine, new ScanContext { Loaded = true, AppsQueryOk = true, TasksQueryOk = true, FeaturesQueryOk = true });
+    bool doneLocked = done.IsOptimized && !done.CanToggle;
+
+    // Candy Crush still installed: not done, so it can be ticked.
+    var present = new ScanContext { Loaded = true, AppsQueryOk = true, TasksQueryOk = true, FeaturesQueryOk = true };
+    present.InstalledPackages.Add("king.com.CandyCrushSaga");
+    var notDone = new WinPure.ViewModels.TweakViewModel(catalog.First(t => t.Id == "apps-candycrush"));
+    notDone.RefreshStatus(engine, present);
+    bool notDoneFree = !notDone.IsOptimized && notDone.CanToggle;
+
+    // A tweak that can be undone and reads as applied keeps its toggle. Checked after a scan: before one nothing reads as
+    // applied, and a CanToggle that locked every applied tweak would pass.
+    var reversible = new WinPure.ViewModels.TweakViewModel(new Tweak
+    {
+        Id = "toy-reversible", Category = TweakCategory.UI, Name = "toy", Description = "toy",
+        Actions = new TweakAction[] { new AppxRemoveAction { PackagePatterns = new[] { "WinPureNoSuchPackage" } } },
+    });
+    reversible.RefreshStatus(engine, new ScanContext { Loaded = true, AppsQueryOk = true, TasksQueryOk = true, FeaturesQueryOk = true });
+    bool reversibleFree = reversible.IsOptimized && reversible.CanToggle;
+
+    return Report("an app removal already done cannot be switched off", doneLocked && notDoneFree && reversibleFree,
+        $"done removal: optimized={done.IsOptimized}, can toggle={done.CanToggle} (expected False); " +
+        $"removal not done: can toggle={notDone.CanToggle} (expected True); " +
+        $"reversible tweak applied: optimized={reversible.IsOptimized}, can toggle={reversible.CanToggle} (expected True)");
+}
+
+// Restore lists a session that removed an app like any other, but restoring it cannot bring the app back. The session
+// says so next to that name, and only there.
+bool RestoreSaysWhichChangesDoNotComeBack()
+{
+    // Five reversible tweaks recorded before the removal, as the catalog order puts Privacy first: the summary shows four
+    // names, and the removal must not be the one folded into "(+N more)".
+    var session = new BackupSession
+    {
+        Id = "test-session",
+        TweakNames = new List<string>
+        {
+            "Disable Telemetry", "Disable Diagnostics Data", "Disable Bing in Start Menu", "Disable Silent App Installs",
+            "Disable Consumer Features", "Remove OneDrive",
+        },
+    };
+    string summary = new WinPure.ViewModels.BackupSessionViewModel { Session = session }.Summary;
+    bool removalMarked = summary.Contains("Remove OneDrive (app not reinstalled)", StringComparison.Ordinal);
+    bool reversibleUnmarked = !summary.Contains("Telemetry (app not reinstalled)", StringComparison.Ordinal);
+    return Report("Restore says which changes do not come back", removalMarked && reversibleUnmarked,
+        $"summary '{summary}': removal marked={removalMarked}, reversible tweak left unmarked={reversibleUnmarked}");
+}
+
+// Every Edge tweak is an Edge policy: Manual, because nobody has checked edge://policy on a profile signed in with a
+// personal Microsoft account; only DWORDs under Policies\Microsoft\Edge; removed on undo when they were not there
+// before (no hand-written default); and each says Edge will call itself managed. The policies the research refused
+// must not creep back in.
+bool EdgeTweaksAreManualPoliciesThatUndoByRemoving()
+{
+    var problems = new List<string>();
+    var edge = TweakCatalog.Build().Where(t => t.Category == TweakCategory.Edge).ToList();
+    foreach (var t in edge)
+    {
+        if (t.Preset != PresetLevel.Manual) problems.Add($"{t.Id} is {t.Preset}");
+        if (!t.Help.Contains("managed by your organization", StringComparison.Ordinal))
+            problems.Add($"{t.Id} does not say Edge will show it is managed");
+        foreach (var action in t.Actions)
+        {
+            if (action is not RegistryValueAction v) { problems.Add($"{t.Id} has a {action.GetType().Name}"); continue; }
+            if (!v.KeyPath.Equals(@"HKLM\SOFTWARE\Policies\Microsoft\Edge", StringComparison.Ordinal)) problems.Add($"{t.Id} writes under {v.KeyPath}");
+            if (v.Kind != RegistryValueKind.DWord) problems.Add($"{t.Id}!{v.ValueName} is a {v.Kind}");
+            if (v.DefaultValue is not null) problems.Add($"{t.Id}!{v.ValueName} has a hand-written default");
+        }
+    }
+    // The eleven names checked against Edge 152 on 2026-09-12. A new or renamed one must be checked in edge://policy first:
+    // a mistyped policy is written, reads back as Optimized, and does nothing.
+    string[] verified =
+    {
+        "NewTabPageContentEnabled", "AddressBarTrendingSuggestEnabled", "NewTabPageHideDefaultTopSites", "NewTabPageAppLauncherEnabled",
+        "ShowRecommendationsEnabled", "SpotlightExperiencesAndRecommendationsEnabled", "ShowAcrobatSubscriptionButton",
+        "DefaultBrowserSettingsCampaignEnabled", "ShowPDFDefaultRecommendationsEnabled", "EdgeShoppingAssistantEnabled", "ShowMicrosoftRewards",
+    };
+    var written = edge.SelectMany(t => t.Actions).OfType<RegistryValueAction>().Select(v => v.ValueName).ToHashSet(StringComparer.Ordinal);
+    if (!written.SetEquals(verified))
+        problems.Add($"policy names differ from the ones checked against Edge 152: new [{string.Join(", ", written.Except(verified))}], gone [{string.Join(", ", verified.Except(written))}]");
+
+    string[] refused =
+    {
+        "PromotionalTabsEnabled", "EdgeCollectionsEnabled", "HubsSidebarEnabled",
+        "NewTabPageQuickLinksEnabled", "NewTabPageBingChatEnabled", "NewTabPageAllowedBackgroundTypes",
+    };
+    foreach (var name in refused.Where(n => edge.SelectMany(t => t.Actions).OfType<RegistryValueAction>().Any(v => v.ValueName == n)))
+        problems.Add($"{name} was left out on purpose and is back");
+
+    return Report("Edge tweaks are Manual policies that undo by removing", edge.Count == 7 && problems.Count == 0,
+        problems.Count == 0 && edge.Count == 7
+            ? $"{edge.Count} tweaks, {edge.Sum(t => t.Actions.Count)} policies: Manual, DWORDs under Policies\\Microsoft\\Edge, no hand-written defaults, the managed notice named, none of the refused policies"
+            : $"{edge.Count} Edge tweaks (expected 7) | " + string.Join(" | ", problems));
+}
+
+// Every snapshot is flushed BEFORE an action, and a tweak's name is recorded after the action succeeds. With no save
+// after the last action, the final tweak of every batch never had its name on disk: on Restore, a batch from Remove
+// Apps showed its last removal without the mark that says the app does not come back.
+bool EveryAppliedTweakIsNamedInItsBackup()
+{
+    Reset();
+    Tweak Toy(string id, string name, string value) => new()
+    {
+        Id = id, Category = TweakCategory.UI, Name = name, Description = "toy",
+        Actions = new TweakAction[]
+        {
+            new RegistryValueAction { KeyPath = ToyKey, ValueName = value, Kind = RegistryValueKind.DWord, ApplyValue = 1, DefaultValue = null },
+        },
+    };
+    var manager = new BackupManager();
+    new TweakEngine(manager).ApplyChanges(new[] { (Toy("toy-named-first", "Toy named first", "NamedFirst"), true), (Toy("toy-named-last", "Toy named last", "NamedLast"), true) });
+    var newest = manager.ListSessions().OrderByDescending(s => s.CreatedUtc).FirstOrDefault();
+    var names = newest?.TweakNames ?? new List<string>();
+    bool bothNamed = names.Contains("Toy named first") && names.Contains("Toy named last");
+    Reset();
+    return Report("every applied tweak is named in its backup", bothNamed,
+        $"newest session on disk names [{string.Join(", ", names)}] (expected both toys)");
+}
+
+// The apply bar promises a backup before applying. For an app removal there is nothing to back up that brings the app
+// back, so the hint must stop promising it as soon as one is pending, and promise it again once none is.
+bool TheApplyHintSaysWhenAnAppRemovalIsPending()
+{
+    var main = new WinPure.ViewModels.MainViewModel();
+    var removal = main.AllTweaks.First(t => !t.FullyReversible);
+    var reversible = main.AllTweaks.First(t => t.FullyReversible);
+
+    removal.IsSelected = true;
+    string removalOnly = main.ApplyHint;
+    reversible.IsSelected = true;
+    string both = main.ApplyHint;
+    removal.IsSelected = false;
+    string reversibleOnly = main.ApplyHint;
+
+    bool ok = removalOnly == "1 pending change — an app removal, which cannot be undone."
+        && both == "2 pending changes — app removals among them cannot be undone."
+        && reversibleOnly == "1 pending change — a backup is created before applying.";
+    return Report("the apply hint says when an app removal is pending", ok,
+        $"removal only: '{removalOnly}' | removal and a reversible tweak: '{both}' | reversible only: '{reversibleOnly}'");
+}
+
+// Enter must not confirm an uninstall that cannot be undone. The dialog cannot be driven from here, so the call itself
+// is read: the removal confirmation has to name No as its default button.
+bool TheAppRemovalConfirmationDefaultsToNo()
+{
+    const string title = "the app removal confirmation defaults to No";
+    string srcDir = FindSourceDir();
+    if (srcDir.Length == 0) return Report(title, true, "skipped: the source tree is not next to the test binary (packaged run)");
+    string code = File.ReadAllText(Path.Combine(srcDir, "ViewModels", "MainViewModel.cs"));
+    int at = code.IndexOf("Loc.T(\"WinPure — Confirm app removal\")", StringComparison.Ordinal);
+    int end = at < 0 ? -1 : code.IndexOf(");", at, StringComparison.Ordinal);
+    bool found = at >= 0 && end > at;
+    bool defaultsToNo = found && code[at..end].Contains("MessageBoxResult.No", StringComparison.Ordinal);
+    return Report(title, defaultsToNo, found ? $"default button No present={defaultsToNo}" : "the confirmation call was not found");
 }
 
 // The other half: that the Spanish is what actually shows, and that a broken translation cannot take the app down.

@@ -19,6 +19,7 @@ public static class TweakCatalog
         tweaks.AddRange(UI());
         tweaks.AddRange(ContextMenu());
         tweaks.AddRange(Features());
+        tweaks.AddRange(Edge());
         return tweaks;
     }
 
@@ -41,6 +42,9 @@ public static class TweakCatalog
         ValueName = clsid, Kind = RegistryValueKind.String,
         ApplyValue = note, DefaultValue = null,
     };
+
+    /// <summary>A Segoe Fluent icon from its code point, so a new icon can be read in the diff.</summary>
+    private static string Glyph(int code) => ((char)code).ToString();
 
     // ------------------------------------------------------------------ Privacy
 
@@ -345,10 +349,12 @@ public static class TweakCatalog
 
     // ------------------------------------------------------------------ Apps / Bloatware
 
-    private static Tweak AppRemoval(string id, PresetLevel preset, string name, string description,
+    // No preset parameter, on purpose: a removal cannot be undone, so it is never in a preset and always lives on the
+    // Remove Apps page. Putting one in a preset would take changing this factory, and a test fails then.
+    private static Tweak AppRemoval(string id, string name, string description,
         string icon, params string[] patterns) => new()
     {
-        Id = id, Category = TweakCategory.Apps, Preset = preset,
+        Id = id, Category = TweakCategory.RemoveApps, Preset = PresetLevel.Manual,
         Name = name, Description = description, Icon = icon,
         FullyReversible = false,
         Help = "Removes the Store package for all users and un-provisions it for new users. To get it back, reinstall it from the Microsoft Store.",
@@ -357,40 +363,40 @@ public static class TweakCatalog
 
     private static IEnumerable<Tweak> Apps()
     {
-        yield return AppRemoval("apps-candycrush", PresetLevel.Balanced, "Remove Candy Crush",
+        yield return AppRemoval("apps-candycrush", "Remove Candy Crush",
             "Uninstall Candy Crush games preinstalled by Windows.", "", "king.com.CandyCrush", "king.com.");
-        yield return AppRemoval("apps-social", PresetLevel.Balanced, "Remove Social Media Apps",
+        yield return AppRemoval("apps-social", "Remove Social Media Apps",
             "Uninstall preinstalled TikTok, Facebook, Twitter/X and Instagram.", "",
             "BytedancePte.Ltd.TikTok", "Facebook", "Twitter", "Instagram");
-        yield return AppRemoval("apps-streaming", PresetLevel.Balanced, "Remove Streaming Apps",
+        yield return AppRemoval("apps-streaming", "Remove Streaming Apps",
             "Uninstall preinstalled Netflix, Disney+, Prime Video and Spotify.", "",
             "Netflix", "Disney", "AmazonVideo", "PrimeVideo", "SpotifyAB.SpotifyMusic");
-        yield return AppRemoval("apps-skype", PresetLevel.Balanced, "Remove Skype",
+        yield return AppRemoval("apps-skype", "Remove Skype",
             "Uninstall the preinstalled Skype app.", "", "Microsoft.SkypeApp");
-        yield return AppRemoval("apps-clipchamp", PresetLevel.Balanced, "Remove Clipchamp",
+        yield return AppRemoval("apps-clipchamp", "Remove Clipchamp",
             "Uninstall the Clipchamp video editor.", "", "Clipchamp.Clipchamp");
-        yield return AppRemoval("apps-3d", PresetLevel.Balanced, "Remove Paint 3D & 3D Viewer",
+        yield return AppRemoval("apps-3d", "Remove Paint 3D & 3D Viewer",
             "Uninstall the legacy 3D apps.", "", "Microsoft.Microsoft3DViewer", "Microsoft.MSPaint");
-        yield return AppRemoval("apps-todo", PresetLevel.Manual, "Remove Microsoft To Do",
+        yield return AppRemoval("apps-todo", "Remove Microsoft To Do",
             "Uninstall the Microsoft To Do app.", "", "Microsoft.Todos");
-        yield return AppRemoval("apps-zune", PresetLevel.Balanced, "Remove Groove Music & Movies + TV",
+        yield return AppRemoval("apps-zune", "Remove Groove Music & Movies + TV",
             "Uninstall the legacy Zune media apps.", "", "Microsoft.ZuneMusic", "Microsoft.ZuneVideo");
-        yield return AppRemoval("apps-solitaire", PresetLevel.Balanced, "Remove Solitaire Collection",
+        yield return AppRemoval("apps-solitaire", "Remove Solitaire Collection",
             "Uninstall Microsoft Solitaire Collection.", "", "Microsoft.MicrosoftSolitaireCollection");
-        yield return AppRemoval("apps-wallet", PresetLevel.Balanced, "Remove Wallet",
+        yield return AppRemoval("apps-wallet", "Remove Wallet",
             "Uninstall the Microsoft Wallet app.", "", "Microsoft.Wallet");
-        yield return AppRemoval("apps-whiteboard", PresetLevel.Manual, "Remove Whiteboard",
+        yield return AppRemoval("apps-whiteboard", "Remove Whiteboard",
             "Uninstall the Microsoft Whiteboard app.", "", "Microsoft.Whiteboard");
-        yield return AppRemoval("apps-phonelink", PresetLevel.Balanced, "Remove Phone Link",
+        yield return AppRemoval("apps-phonelink", "Remove Phone Link",
             "Uninstall the YourPhone / Phone Link app.", "", "Microsoft.YourPhone");
-        yield return AppRemoval("apps-devhome", PresetLevel.Balanced, "Remove Dev Home",
+        yield return AppRemoval("apps-devhome", "Remove Dev Home",
             "Uninstall the Dev Home app.", "", "Microsoft.Windows.DevHome");
-        yield return AppRemoval("apps-gethelp", PresetLevel.Balanced, "Remove Get Help & Tips",
+        yield return AppRemoval("apps-gethelp", "Remove Get Help & Tips",
             "Uninstall the Get Help and Get Started apps.", "", "Microsoft.GetHelp", "Microsoft.Getstarted", "Microsoft.StartExperiencesApp");
 
         yield return new Tweak
         {
-            Id = "apps-xbox", Category = TweakCategory.Apps, Preset = PresetLevel.Aggressive,
+            Id = "apps-xbox", Category = TweakCategory.RemoveApps, Preset = PresetLevel.Manual,
             Name = "Remove Xbox Apps & Overlay",
             Description = "Uninstall Xbox apps, Game Bar overlay and disable Game DVR.",
             Help = "Removes the Xbox app family and turns off Game DVR background recording. Do not apply if you play Game Pass titles.",
@@ -477,13 +483,13 @@ public static class TweakCatalog
         // "RoyalRevolt" without a space: Win11Debloat's Apps.json lists the AppId as "Royal Revolt",
         // which can never match a package name. CrapFixer has the real one, flaregamesGmbH.RoyalRevolt2,
         // and Win-Debloat-Tools matches *RoyalRevolt* — two sources agreeing.
-        yield return AppRemoval("apps-casual-games", PresetLevel.Balanced, "Remove Preinstalled Casual Games",
+        yield return AppRemoval("apps-casual-games", "Remove Preinstalled Casual Games",
             "Uninstall third-party games some PCs ship with: Asphalt, Caesars Slots, Cooking Fever, Disney Magic Kingdoms, FarmVille, Hidden City, March of Empires, NYT Crossword and Royal Revolt.",
             "",
             "Asphalt8Airborne", "CaesarsSlotsFreeCasino", "COOKINGFEVER", "DisneyMagicKingdoms",
             "FarmVille2CountryEscape", "HiddenCity", "MarchofEmpires", "NYTCrossword", "RoyalRevolt");
 
-        yield return AppRemoval("apps-aihub", PresetLevel.Balanced, "Remove AI Hub",
+        yield return AppRemoval("apps-aihub", "Remove AI Hub",
             "Uninstall the AI Hub app that Copilot+ PCs ship with.", "", "Microsoft.Windows.AIHub");
 
         yield return new Tweak
@@ -491,7 +497,7 @@ public static class TweakCatalog
             Id = "apps-gamebar-capture", Category = TweakCategory.Apps, Preset = PresetLevel.Manual,
             Name = "Disable Game Bar Capture",
             Description = "Turn off Game Bar's clips, screenshots and recording, and its startup tips, without uninstalling anything.",
-            Help = "An alternative to removing the Xbox apps, so it is in no preset: Aggressive removes them outright. Game Bar stays installed. GameDVR_Enabled, which Sophia Script writes alongside AppCaptureEnabled, is deliberately left to Remove Xbox Apps — two tweaks writing one value would overwrite each other's backups.",
+            Help = "An alternative to removing the Xbox apps (on the Remove Apps page) that uninstalls nothing: Game Bar stays installed. GameDVR_Enabled, which Sophia Script writes alongside AppCaptureEnabled, is deliberately left to Remove Xbox Apps — two tweaks writing one value would overwrite each other's backups.",
             Icon = "",
             Actions = new TweakAction[]
             {
@@ -502,8 +508,8 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
-            // Manual, not Aggressive: Remove Xbox Apps tells Game Pass players to leave it unticked, and
-            // this one ticked on its own breaks the Xbox button while Game Bar is still installed.
+            // Manual: meant for PCs where Remove Xbox Apps already ran. Ticked on its own, it breaks the Xbox
+            // button while Game Bar is still installed.
             Id = "apps-gamebar-integration", Category = TweakCategory.Apps, Preset = PresetLevel.Manual,
             Name = "Disable Game Bar Integration",
             Description = "Stop games and controllers from opening Game Bar — which also silences the \"You'll need a new app to open this ms-gamebar link\" popup once the Xbox apps are removed.",
@@ -529,7 +535,7 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
-            Id = "apps-onedrive", Category = TweakCategory.Apps, Preset = PresetLevel.Aggressive,
+            Id = "apps-onedrive", Category = TweakCategory.RemoveApps, Preset = PresetLevel.Manual,
             Name = "Remove OneDrive",
             Description = "Uninstall OneDrive and block file sync via policy.",
             Help = "Runs the OneDrive uninstaller and sets the DisableFileSyncNGSC policy. Your files stay on disk; reinstall from microsoft.com to undo.",
@@ -552,6 +558,119 @@ public static class TweakCatalog
                     TimeoutMs = 300_000,
                 },
                 Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\OneDrive", "DisableFileSyncNGSC", 1, null),
+            },
+        };
+    }
+
+    // ------------------------------------------------------------------ Microsoft Edge
+
+    // Policies under HKLM\SOFTWARE\Policies\Microsoft\Edge, researched on 2026-09-12 against Microsoft's Edge policy
+    // documentation, the reference repos and this machine (Edge 152). Edge's ADMX is not installed in
+    // C:\Windows\PolicyDefinitions, so the ADMX audit in tests/ lists every value here as declared by no ADMX; that is
+    // expected. All Manual, on purpose: any Edge policy makes Edge say it is managed by your organization, and Microsoft
+    // documents several of these as not applying to a profile signed in with a personal Microsoft account — nobody has
+    // yet checked edge://policy on such a profile. Left out: PromotionalTabsEnabled (deprecated), EdgeCollectionsEnabled
+    // (stops working after 152), HubsSidebarEnabled (the whole sidebar), NewTabPageQuickLinksEnabled (also hides the
+    // sites you pinned), NewTabPageBingChatEnabled (the Enterprise new tab page only), NewTabPageAllowedBackgroundTypes
+    // (a background you may be using, not an ad).
+    private const string EdgePolicies = @"HKLM\SOFTWARE\Policies\Microsoft\Edge";
+
+    private const string EdgeManagedNote = "Like every Edge tweak, this is an Edge policy: while any of them is on, Edge says it is managed by your organization. Restart Edge to see the change; edge://policy shows whether Edge applied it. Microsoft documents most of these as not applying to a profile signed in with a personal Microsoft account.";
+
+    private static IEnumerable<Tweak> Edge()
+    {
+        yield return new Tweak
+        {
+            Id = "edge-ntp-news", Category = TweakCategory.Edge, Preset = PresetLevel.Manual,
+            Name = "Hide News on Edge's New Tab Page",
+            Description = "Remove the Microsoft news feed and trending searches from Edge's new tab page.",
+            Help = "Sets NewTabPageContentEnabled and AddressBarTrendingSuggestEnabled to 0. The page's Content and Layout options stay locked while it is on. " + EdgeManagedNote,
+            Icon = Glyph(0xE774),
+            Actions = new TweakAction[]
+            {
+                Dword(EdgePolicies, "NewTabPageContentEnabled", 0, null),
+                Dword(EdgePolicies, "AddressBarTrendingSuggestEnabled", 0, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "edge-ntp-default-tiles", Category = TweakCategory.Edge, Preset = PresetLevel.Manual,
+            Name = "Hide Default Tiles on Edge's New Tab Page",
+            Description = "Hide the site tiles Edge adds to the new tab page by itself.",
+            Help = "Sets NewTabPageHideDefaultTopSites to 1. Microsoft documents it for the default tiles only, so the sites you pinned yourself are expected to stay. " + EdgeManagedNote,
+            Icon = Glyph(0xE80F),
+            Actions = new TweakAction[]
+            {
+                Dword(EdgePolicies, "NewTabPageHideDefaultTopSites", 1, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "edge-ntp-app-launcher", Category = TweakCategory.Edge, Preset = PresetLevel.Manual,
+            Name = "Hide the Microsoft 365 Launcher in Edge",
+            Description = "Remove the Microsoft 365 app launcher button from Edge's new tab page.",
+            Help = "Sets NewTabPageAppLauncherEnabled to 0. Leave it off if you open Office apps from there. " + EdgeManagedNote,
+            Icon = Glyph(0xE8A9),
+            Actions = new TweakAction[]
+            {
+                Dword(EdgePolicies, "NewTabPageAppLauncherEnabled", 0, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "edge-promotions", Category = TweakCategory.Edge, Preset = PresetLevel.Manual,
+            Name = "Stop Edge Tips and Promotions",
+            Description = "Stop Edge's feature tips, Microsoft service suggestions and the Adobe Acrobat upsell in its PDF viewer.",
+            Help = "Sets ShowRecommendationsEnabled, SpotlightExperiencesAndRecommendationsEnabled and ShowAcrobatSubscriptionButton to 0. Helpful tips, such as a suggestion to try a feature, go too, and Microsoft describes SpotlightExperiencesAndRecommendationsEnabled as also covering customized background images. " + EdgeManagedNote,
+            Icon = Glyph(0xE8BD),
+            Actions = new TweakAction[]
+            {
+                Dword(EdgePolicies, "ShowRecommendationsEnabled", 0, null),
+                Dword(EdgePolicies, "SpotlightExperiencesAndRecommendationsEnabled", 0, null),
+                Dword(EdgePolicies, "ShowAcrobatSubscriptionButton", 0, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "edge-default-nags", Category = TweakCategory.Edge, Preset = PresetLevel.Manual,
+            Name = "Stop Edge's Default App Prompts",
+            Description = "Stop Edge asking to become your default browser or PDF reader.",
+            Help = "Sets DefaultBrowserSettingsCampaignEnabled and ShowPDFDefaultRecommendationsEnabled to 0. You can still make Edge your default yourself in Settings. " + EdgeManagedNote,
+            Icon = Glyph(0xE946),
+            Actions = new TweakAction[]
+            {
+                Dword(EdgePolicies, "DefaultBrowserSettingsCampaignEnabled", 0, null),
+                Dword(EdgePolicies, "ShowPDFDefaultRecommendationsEnabled", 0, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "edge-shopping", Category = TweakCategory.Edge, Preset = PresetLevel.Manual,
+            Name = "Disable Edge Shopping Assistant",
+            Description = "Stop Edge from showing coupons, price comparisons and cashback on shopping sites.",
+            Help = "Sets EdgeShoppingAssistantEnabled to 0. If you use Edge's coupons or price history, you lose them. " + EdgeManagedNote,
+            Icon = Glyph(0xE719),
+            Actions = new TweakAction[]
+            {
+                Dword(EdgePolicies, "EdgeShoppingAssistantEnabled", 0, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "edge-rewards", Category = TweakCategory.Edge, Preset = PresetLevel.Manual,
+            Name = "Hide Microsoft Rewards in Edge",
+            Description = "Hide Microsoft Rewards offers and points prompts in Edge.",
+            Help = "Sets ShowMicrosoftRewards to 0. If you collect Rewards points in Edge, you lose that. " + EdgeManagedNote,
+            Icon = Glyph(0xE734),
+            Actions = new TweakAction[]
+            {
+                Dword(EdgePolicies, "ShowMicrosoftRewards", 0, null),
             },
         };
     }

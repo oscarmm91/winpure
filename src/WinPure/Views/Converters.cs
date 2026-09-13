@@ -20,6 +20,19 @@ public sealed class EnumEqualsConverter : IValueConverter
         Binding.DoNothing;
 }
 
+/// <summary>
+/// True only when every bound value is true. A tweak's toggle is enabled while the app is idle AND the tweak can still
+/// be switched — an app removal that is already done cannot be switched back off.
+/// </summary>
+public sealed class AllTrueConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture) =>
+        values.All(v => v is true);
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 public sealed class InverseBoolToVisibilityConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>

@@ -29,36 +29,18 @@ All registry/service changes are snapshotted to `%ProgramData%\WinPure\Backups\`
 | Disable Diagnostic Data Tasks | Aggressive | Disables *StartupAppTask*, *Autochk\Proxy*, *DiskDiagnosticDataCollector*, *MapsToastTask* & *MapsUpdateTask* (MareBackup left alone: it feeds Windows Backup) |
 | Disable CEIP & Feedback Tasks | Aggressive | Disables *Consolidator*, *UsbCeip*, *DmClient* scheduled tasks |
 
-## 📦 Bloatware & Apps
+## 📦 Apps & AI
 
-App removals use `Remove-AppxPackage -AllUsers` + de-provisioning. **Undo = reinstall from the Microsoft Store** (WinPure warns before applying).
+Built-in features switched off without uninstalling anything. Removing apps has its own section, **Remove Apps**, further down.
 
-| Tweak | Preset | Packages / keys |
+| Tweak | Preset | Keys |
 |---|---|---|
-| Remove Candy Crush | Balanced | `king.com.*` |
-| Remove Social Media Apps | Balanced | TikTok, Facebook, Twitter/X, Instagram |
-| Remove Streaming Apps | Balanced | Netflix, Disney+, Prime Video, Spotify |
-| Remove Skype | Balanced | `Microsoft.SkypeApp` |
-| Remove Clipchamp | Balanced | `Clipchamp.Clipchamp` |
-| Remove Paint 3D & 3D Viewer | Balanced | `Microsoft.MSPaint`, `Microsoft.Microsoft3DViewer` |
-| Remove Microsoft To Do | Manual | `Microsoft.Todos` |
-| Remove Groove Music & Movies + TV | Balanced | `Microsoft.ZuneMusic`, `Microsoft.ZuneVideo` |
-| Remove Solitaire Collection | Balanced | `Microsoft.MicrosoftSolitaireCollection` |
-| Remove Wallet | Balanced | `Microsoft.Wallet` |
-| Remove Whiteboard | Manual | `Microsoft.Whiteboard` |
-| Remove Phone Link | Balanced | `Microsoft.YourPhone` |
-| Remove Dev Home | Balanced | `Microsoft.Windows.DevHome` |
-| Remove Get Help & Tips | Balanced | `Microsoft.GetHelp`, `Microsoft.Getstarted`, `Microsoft.StartExperiencesApp` (Tips on 24H2/25H2) |
-| Remove Xbox Apps & Overlay | Aggressive | Xbox app family + Game DVR off (`GameDVR_Enabled = 0`, `AllowGameDVR = 0`) |
 | Disable Copilot / Windows AI | Aggressive | `TurnOffWindowsCopilot = 1` (HKLM + HKCU) + taskbar button off |
 | Disable Windows AI & Recall | Aggressive | `WindowsAI!DisableAIDataAnalysis = 1` (HKLM + HKCU), `AllowRecallEnablement = 0`, `AllowRecallExport = 0`, Notepad AI off, AI Settings page hidden |
 | Disable Click to Do | Balanced | `WindowsAI!DisableClickToDo = 1` (HKLM + HKCU) - the AI overlay on selected text/images |
 | Disable Paint AI Features | Manual | `CurrentVersion\Policies\Paint!DisableCocreator / DisableImageCreator / DisableGenerativeFill = 1` |
-| Remove Preinstalled Casual Games | Balanced | `Asphalt8Airborne`, `CaesarsSlotsFreeCasino`, `COOKINGFEVER`, `DisneyMagicKingdoms`, `FarmVille2CountryEscape`, `HiddenCity`, `MarchofEmpires`, `NYTCrossword`, `RoyalRevolt` |
-| Remove AI Hub | Balanced | `Microsoft.Windows.AIHub` (Copilot+ PCs) |
 | Disable Game Bar Capture | Manual | `GameDVR!AppCaptureEnabled = 0` + `GameBar!ShowStartupPanel = 0` — nothing uninstalled; an alternative to removing Xbox |
 | Disable Game Bar Integration | Manual | `GameBar!UseNexusForGameBarEnabled = 0` + do-nothing handler under `HKCU\SOFTWARE\Classes\ms-gamebar` — silences the ms-gamebar popup after removing Xbox |
-| Remove OneDrive | Aggressive | `OneDriveSetup /uninstall` + `DisableFileSyncNGSC = 1` (files stay on disk) |
 
 ## ⚙️ Services
 
@@ -147,6 +129,45 @@ Switched with DISM (`Enable-` / `Disable-WindowsOptionalFeature -NoRestart`, nev
 | Turn On Windows Sandbox | Manual | `Containers-DisposableClientVM` (Pro, Enterprise, Education) |
 | Turn On Windows Subsystem for Linux | Manual | `Microsoft-Windows-Subsystem-Linux` + `VirtualMachinePlatform` |
 | Turn On .NET Framework 3.5 | Manual | `NetFx3` (downloaded from Windows Update) |
+
+## 🌐 Microsoft Edge
+
+Edge policies under `HKLM\SOFTWARE\Policies\Microsoft\Edge`, all Manual. While any Edge policy is set, Edge shows *"Managed by your organization"* — that is how Edge marks policies. Restart Edge after applying; `edge://policy` shows whether Edge took each one. Microsoft documents several of these as not applying to a profile signed in with a personal Microsoft account, which is not verified yet. Undo removes the value, or puts back the one that was there before.
+
+| Tweak | Preset | Policies |
+|---|---|---|
+| Hide News on Edge's New Tab Page | Manual | `NewTabPageContentEnabled = 0`, `AddressBarTrendingSuggestEnabled = 0` |
+| Hide Default Tiles on Edge's New Tab Page | Manual | `NewTabPageHideDefaultTopSites = 1` |
+| Hide the Microsoft 365 Launcher in Edge | Manual | `NewTabPageAppLauncherEnabled = 0` |
+| Stop Edge Tips and Promotions | Manual | `ShowRecommendationsEnabled = 0`, `SpotlightExperiencesAndRecommendationsEnabled = 0`, `ShowAcrobatSubscriptionButton = 0` |
+| Stop Edge's Default App Prompts | Manual | `DefaultBrowserSettingsCampaignEnabled = 0`, `ShowPDFDefaultRecommendationsEnabled = 0` |
+| Disable Edge Shopping Assistant | Manual | `EdgeShoppingAssistantEnabled = 0` |
+| Hide Microsoft Rewards in Edge | Manual | `ShowMicrosoftRewards = 0` |
+
+## 🗑️ Remove Apps
+
+WinPure cannot bring back an app removed here, so none of it is in a preset and the page shows no preset buttons. (Restore does put back the few registry values some of these tweaks also change, such as Game DVR for Xbox.) App removals use `Remove-AppxPackage -AllUsers` + de-provisioning; **to get an app back, reinstall it from the Microsoft Store** (OneDrive from microsoft.com). WinPure asks once more before removing, an import never ticks a removal, and a removal already done cannot be switched back off.
+
+| Tweak | Preset | Packages / keys |
+|---|---|---|
+| Remove Candy Crush | Manual | `king.com.*` |
+| Remove Social Media Apps | Manual | TikTok, Facebook, Twitter/X, Instagram |
+| Remove Streaming Apps | Manual | Netflix, Disney+, Prime Video, Spotify |
+| Remove Skype | Manual | `Microsoft.SkypeApp` |
+| Remove Clipchamp | Manual | `Clipchamp.Clipchamp` |
+| Remove Paint 3D & 3D Viewer | Manual | `Microsoft.MSPaint`, `Microsoft.Microsoft3DViewer` |
+| Remove Microsoft To Do | Manual | `Microsoft.Todos` |
+| Remove Groove Music & Movies + TV | Manual | `Microsoft.ZuneMusic`, `Microsoft.ZuneVideo` |
+| Remove Solitaire Collection | Manual | `Microsoft.MicrosoftSolitaireCollection` |
+| Remove Wallet | Manual | `Microsoft.Wallet` |
+| Remove Whiteboard | Manual | `Microsoft.Whiteboard` |
+| Remove Phone Link | Manual | `Microsoft.YourPhone` |
+| Remove Dev Home | Manual | `Microsoft.Windows.DevHome` |
+| Remove Get Help & Tips | Manual | `Microsoft.GetHelp`, `Microsoft.Getstarted`, `Microsoft.StartExperiencesApp` (Tips on 24H2/25H2) |
+| Remove Xbox Apps & Overlay | Manual | Xbox app family + Game DVR off (`GameDVR_Enabled = 0`, `AllowGameDVR = 0`) |
+| Remove Preinstalled Casual Games | Manual | `Asphalt8Airborne`, `CaesarsSlotsFreeCasino`, `COOKINGFEVER`, `DisneyMagicKingdoms`, `FarmVille2CountryEscape`, `HiddenCity`, `MarchofEmpires`, `NYTCrossword`, `RoyalRevolt` |
+| Remove AI Hub | Manual | `Microsoft.Windows.AIHub` (Copilot+ PCs) |
+| Remove OneDrive | Manual | `OneDriveSetup /uninstall` + `DisableFileSyncNGSC = 1` (files stay on disk) |
 
 ## 🔧 Repair & Maintenance (one-shot tools)
 

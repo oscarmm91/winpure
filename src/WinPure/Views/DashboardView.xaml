@@ -8,7 +8,7 @@
         <StackPanel Margin="0,18,6,12">
             <TextBlock Text="{l:Tr 'Dashboard'}" FontSize="28" FontWeight="SemiBold"
                        Foreground="{StaticResource Brush.TextPrimary}"/>
-            <TextBlock Text="{l:Tr 'Clean, optimize and take control of Windows 11 — every change is backed up and reversible.'}"
+            <TextBlock Text="{l:Tr 'Clean, optimize and take control of Windows 11 — every change is backed up and reversible, except the apps you choose to remove.'}"
                        FontSize="13" Margin="0,6,0,0" Foreground="{StaticResource Brush.TextSecondary}"/>
 
             <!-- stats -->
@@ -78,7 +78,7 @@
                         BorderThickness="1" BorderBrush="{StaticResource Brush.Accent}">
                     <StackPanel>
                         <TextBlock Text="{l:Tr 'Balanced'}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
-                        <TextBlock Text="{l:Tr 'Safe + optional services off, third-party bloatware removed, faster shutdown.'}"
+                        <TextBlock Text="{l:Tr 'Safe + optional services off, Click to Do off, Delivery Optimization off, faster shutdown.'}"
                                    FontSize="12" Margin="0,6,0,12" TextWrapping="Wrap"
                                    Foreground="{StaticResource Brush.TextSecondary}" MinHeight="48"/>
                         <Button Style="{StaticResource SubtleButton}" Content="{l:Tr 'Select Balanced preset'}"
@@ -90,7 +90,7 @@
                         BorderThickness="1" BorderBrush="{StaticResource Brush.Orange}">
                     <StackPanel>
                         <TextBlock Text="{l:Tr 'Aggressive'}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
-                        <TextBlock Text="{l:Tr 'Balanced + OneDrive removal, Copilot/AI off, Xbox services cleaned, DiagTrack disabled.'}"
+                        <TextBlock Text="{l:Tr 'Balanced + Copilot/AI and Recall off, DiagTrack disabled, telemetry blocked at the firewall.'}"
                                    FontSize="12" Margin="0,6,0,12" TextWrapping="Wrap"
                                    Foreground="{StaticResource Brush.TextSecondary}" MinHeight="48"/>
                         <Button Style="{StaticResource SubtleButton}" Content="{l:Tr 'Select Aggressive preset'}"
@@ -101,7 +101,7 @@
             </UniformGrid>
 
             <TextBlock Margin="0,18,0,0" FontSize="12" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap"
-                       Text="{l:Tr 'Selecting a preset only marks the toggles — nothing changes until you click Apply Changes. A registry snapshot is saved automatically before every apply; use the Restore page to roll back.'}"/>
+                       Text="{l:Tr 'Presets never remove apps. Selecting one only marks the toggles — nothing changes until you click Apply Changes. A registry snapshot is saved automatically before every apply; use the Restore page to roll back.'}"/>
 
             <Button Style="{StaticResource SubtleButton}" Margin="0,16,0,0" HorizontalAlignment="Left"
                     Command="{Binding Main.RescanCommand}">
@@ -118,7 +118,7 @@
                 <Separator Margin="14,0,0,0" Background="{StaticResource Brush.Divider}"/>
             </DockPanel>
             <TextBlock FontSize="12" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap"
-                       Text="{l:Tr 'Save which tweaks are switched on, then tick the same ones on another PC. Importing only ticks boxes and never unticks any — nothing changes until you click Apply Changes.'}"/>
+                       Text="{l:Tr 'Save which tweaks are switched on, then tick the same ones on another PC. Importing only ticks boxes — it never unticks one and never ticks an app removal — and nothing changes until you click Apply Changes.'}"/>
             <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                 <Button Style="{StaticResource SubtleButton}" Command="{Binding Main.ExportConfigCommand}">
                     <StackPanel Orientation="Horizontal">

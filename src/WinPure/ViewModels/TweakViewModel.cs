@@ -29,11 +29,18 @@ public sealed class TweakViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(StatusText));
                 OnPropertyChanged(nameof(IsOptimized));
+                OnPropertyChanged(nameof(CanToggle));
             }
         }
     }
 
     public bool IsOptimized => Status == TweakStatus.Optimized;
+
+    /// <summary>
+    /// False for an app removal that is already done: switching it off would promise an undo that does not exist,
+    /// so its toggle stays on and disabled.
+    /// </summary>
+    public bool CanToggle => FullyReversible || !IsOptimized;
     public string StatusText => Status switch
     {
         TweakStatus.Optimized => Loc.T("Optimized"),

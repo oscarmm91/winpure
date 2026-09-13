@@ -63,6 +63,14 @@ internal static class Program
 
             vm.CurrentNav = vm.NavItems.First(n => n.Page is RepairViewModel);
             Render(root, Path.Combine(outDir, "06-repair.png"));
+
+            // One removal ticked, so the apply bar shows the hint for changes that cannot be undone.
+            vm.AllTweaks.First(t => !t.FullyReversible).IsSelected = true;
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is CategoryPageViewModel { Category: TweakCategory.RemoveApps });
+            Render(root, Path.Combine(outDir, "07-remove-apps.png"));
+
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is CategoryPageViewModel { Category: TweakCategory.Edge });
+            Render(root, Path.Combine(outDir, "08-edge.png"));
             return 0;
         }
         catch (Exception ex)

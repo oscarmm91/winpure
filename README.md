@@ -79,7 +79,7 @@ SysMain (SuperFetch), Windows Search indexing, Print Spooler, Remote Registry, E
 </details>
 
 <details>
-<summary>🚀 <b>Performance</b> — 16 tweaks</summary>
+<summary>🚀 <b>Performance</b> — 17 tweaks</summary>
 <br/>
 Faster app timeouts & shutdown, foreground-app priority, window animations, hibernation, High Performance power plan, fullscreen optimizations, mouse acceleration, long paths, Remote Desktop, Fast Startup, early optional updates, daily registry backup, NTP time server, Reserved Storage.
 <br/><br/>
@@ -87,7 +87,7 @@ Faster app timeouts & shutdown, foreground-app priority, window animations, hibe
 </details>
 
 <details>
-<summary>🎨 <b>UI & Personalization</b> — 21 tweaks</summary>
+<summary>🎨 <b>UI & Personalization</b> — 27 tweaks</summary>
 <br/>
 Dark mode, Snap Assist flyout, Start Menu suggestions/most-used/recently-added, "new app" badge, file extensions, hidden files, Widgets/Task View/Chat taskbar buttons, taskbar alignment, End Task on right-click, Aero Shake, search highlights, NumLock at sign-in, Spotlight wallpaper, "What's new" screens after updates, the F1 help key.
 <br/><br/>

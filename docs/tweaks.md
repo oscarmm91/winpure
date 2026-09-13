@@ -87,6 +87,7 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Enable Daily Registry Backup | Manual | `Configuration Manager!EnablePeriodicBackup = 1` |
 | Sync the Clock With pool.ntp.org | Manual | `W32Time\Parameters!NtpServer = pool.ntp.org,0x9` (same flags as stock: only the server changes) |
 | Keep driver updates out of Windows Update | Balanced | `WindowsUpdate!ExcludeWUDriversInQualityUpdate = 1` (policy) — WU stops pushing driver updates |
+| Don't force a reboot after updates while signed in | Balanced | `WindowsUpdate\AU!NoAutoRebootWithLoggedOnUsers = 1` (policy) — updates still install |
 
 ## 🎨 UI & Personalization
 
@@ -113,6 +114,12 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Disable Aero Shake | Safe | `DisallowShaking = 1` |
 | Speed up menu animations | Balanced | `Control Panel\Desktop!MenuShowDelay = 0` — instant submenus (stock 400 ms) |
 | Stop the Sticky Keys shortcut prompt | Manual | Accessibility `Flags`: StickyKeys 506, Keyboard Response 122, ToggleKeys 58 — turns off the 5×-Shift popup, not the feature |
+| Hide the taskbar search box | Balanced | `Search!SearchboxTaskbarMode = 0` — search still works from Start |
+| Turn off transparency effects | Manual | `Themes\Personalize!EnableTransparency = 0` (repaints without a sign-out) |
+| Open File Explorer to This PC | Balanced | `Explorer\Advanced!LaunchTo = 1` (default 2 = Home) |
+| Keep Edge tabs out of Alt+Tab | Balanced | `Explorer\Advanced!MultiTaskingAltTabFilter = 3` |
+| Never combine taskbar buttons | Balanced | `Explorer\Advanced!TaskbarGlomLevel = 2`, `MMTaskbarGlomLevel = 2` |
+| Remove "- Shortcut" from new shortcut names | Balanced | `Explorer\NamingTemplates!ShortcutNameTemplate = "%s.lnk"` |
 
 ## 🖱️ Context Menu
 

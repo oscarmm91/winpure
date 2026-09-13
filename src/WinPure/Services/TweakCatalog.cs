@@ -1067,6 +1067,19 @@ public static class TweakCatalog
                 Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate", "ExcludeWUDriversInQualityUpdate", 1, null),
             },
         };
+
+        yield return new Tweak
+        {
+            Id = "perf-no-forced-reboot", Category = TweakCategory.Performance, Preset = PresetLevel.Balanced,
+            Name = "Don't force a reboot after updates while signed in",
+            Description = "Keep Windows Update from restarting the PC on its own while you are logged on. Updates still install.",
+            Help = "Sets the NoAutoRebootWithLoggedOnUsers policy to 1 (declared in WindowsUpdate.admx, under \\WindowsUpdate\\AU). This is not disabling updates — only the forced reboot while you are signed in. Undo deletes the value.",
+            Icon = Glyph(0xE777),
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU", "NoAutoRebootWithLoggedOnUsers", 1, null),
+            },
+        };
     }
 
     // ------------------------------------------------------------------ UI & Personalization
@@ -1353,6 +1366,85 @@ public static class TweakCatalog
                 Str(@"HKCU\Control Panel\Accessibility\StickyKeys", "Flags", "506", "510"),
                 Str(@"HKCU\Control Panel\Accessibility\Keyboard Response", "Flags", "122", "126"),
                 Str(@"HKCU\Control Panel\Accessibility\ToggleKeys", "Flags", "58", "62"),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "ui-hide-search-box", Category = TweakCategory.UI, Preset = PresetLevel.Balanced,
+            Name = "Hide the taskbar search box",
+            Description = "Remove the search box or icon from the taskbar to reclaim space. Search still works from the Start menu.",
+            Help = "Sets SearchboxTaskbarMode to 0. The value has several states (0 hidden, 1 icon, 2 box); undo restores the one you had.",
+            Icon = Glyph(0xE721), RequiresExplorerRestart = true,
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Search", "SearchboxTaskbarMode", 0, 1),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "ui-transparency", Category = TweakCategory.UI, Preset = PresetLevel.Manual,
+            Name = "Turn off transparency effects",
+            Description = "Make the Start menu, taskbar and other surfaces solid instead of translucent — a small GPU saving.",
+            Help = "Sets Themes\\Personalize!EnableTransparency to 0 and broadcasts the theme-change so it repaints without a sign-out.",
+            Icon = Glyph(0xE790), NotifiesThemeChange = true,
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "EnableTransparency", 0, 1),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "ui-explorer-this-pc", Category = TweakCategory.UI, Preset = PresetLevel.Balanced,
+            Name = "Open File Explorer to This PC",
+            Description = "Make File Explorer open to This PC (your drives) instead of Home.",
+            Help = "Sets Explorer\\Advanced!LaunchTo to 1 (This PC); the default is 2 (Home). Undo restores the value you had.",
+            Icon = Glyph(0xEC4E), RequiresExplorerRestart = true,
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "LaunchTo", 1, 2),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "ui-alt-tab-no-edge-tabs", Category = TweakCategory.UI, Preset = PresetLevel.Balanced,
+            Name = "Keep Edge tabs out of Alt+Tab",
+            Description = "Stop Microsoft Edge's browser tabs from appearing as separate windows when you press Alt+Tab.",
+            Help = "Sets Explorer\\Advanced!MultiTaskingAltTabFilter to 3 (show no tabs). The value is absent by default, so undo deletes it.",
+            Icon = Glyph(0xE7C4),
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "MultiTaskingAltTabFilter", 3, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "ui-taskbar-never-combine", Category = TweakCategory.UI, Preset = PresetLevel.Balanced,
+            Name = "Never combine taskbar buttons",
+            Description = "Show each window as its own labelled taskbar button instead of stacking them together.",
+            Help = "Sets TaskbarGlomLevel and MMTaskbarGlomLevel (secondary monitors) to 2 (never combine). Both are absent by default, so undo deletes them. Native since Windows 11 23H2.",
+            Icon = Glyph(0xE71D), RequiresExplorerRestart = true,
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "TaskbarGlomLevel", 2, null),
+                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "MMTaskbarGlomLevel", 2, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "ui-no-shortcut-suffix", Category = TweakCategory.UI, Preset = PresetLevel.Balanced,
+            Name = "Remove \"- Shortcut\" from new shortcut names",
+            Description = "Stop Windows from adding \" - Shortcut\" to the name every time you create one.",
+            Help = "Sets Explorer\\NamingTemplates!ShortcutNameTemplate to \"%s.lnk\". The value is absent by default, so undo deletes it.",
+            Icon = Glyph(0xE71B),
+            Actions = new TweakAction[]
+            {
+                Str(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\NamingTemplates", "ShortcutNameTemplate", "%s.lnk", null),
             },
         };
     }

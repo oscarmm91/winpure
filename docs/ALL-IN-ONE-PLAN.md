@@ -105,8 +105,10 @@ de tocar); las irreversibles van en secciones marcadas, sin falso deshacer.
   una lista filtrada; Respaldos salta a Restaurar), (3) *Arranque* en lote (un solo respaldo). Los tres con
   prueba/render.
 - **Fase 1 — Limpieza** (bucket A): **HECHO** (13-sep-2026). Página *Limpieza* con 10 categorías vetadas (temp, caché de WU, DO, navegadores multi-perfil, miniaturas, INetCache, volcados/WER, sombreadores GPU, historial de Defender, Papelera), vista previa de tamaño, salta archivos en uso, confirmación por defecto No. `Services/CleanupService.cs` + `CleanupCatalog.cs`. Pendiente opcional: Windows.old y DISM StartComponentCleanup (necesitan toma de posesión / comando largo).
-- **Fase 2 — Auditoría de tweaks** (bucket H): **EN CURSO** (13-sep-2026). Primer lote: **12 tweaks nuevos
-  verificados** (catálogo 111 → 123). 9 de Privacidad (anuncios de OneDrive/365, avisos de cuenta, Asistencia
+- **Fase 2 — Auditoría de tweaks** (bucket H): **EN CURSO** (13-sep-2026). **111 → 130 tweaks** en dos lotes.
+  Lote 2 (+7): 6 de Interfaz muy pedidos (ocultar cuadro de búsqueda, sin transparencias, Explorador en Este
+  equipo, Edge fuera de Alt+Tab, no combinar botones de la barra, sin "- Acceso directo") y 1 de Rendimiento
+  (no forzar reinicio tras actualizar). Lote 1 (+12): 9 de Privacidad (anuncios de OneDrive/365, avisos de cuenta, Asistencia
   remota, contenido de nube, Buscar mi dispositivo, telemetría de compatibilidad, ARSO), 1 de Rendimiento
   (excluir controladores de WU), 2 de Interfaz (MenuShowDelay, aviso de Teclas especiales). Cada clave HKCU
   comprobada en la máquina y cada directiva HKLM cruzada contra su `.admx` (clase Machine, no marcada por el

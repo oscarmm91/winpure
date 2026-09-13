@@ -62,6 +62,23 @@ public static class RepairCatalog
         },
         new RepairTool
         {
+            Id = "repair-component-cleanup",
+            Name = "Clean Up the Component Store (DISM)",
+            Description = "Reclaim disk space by removing superseded Windows Update files from the component store (WinSxS). Can take several minutes.",
+            Icon = "",   // Segoe Fluent Repair glyph, written as an escape so the diff is readable
+            // Plain StartComponentCleanup only — never /ResetBase, which makes the updates currently
+            // installed non-uninstallable. Like SFC/DISM this touches the component store, so killing it
+            // midway can leave it inconsistent: not cancellable, the elapsed-time readout reassures instead.
+            ConfirmText = "This runs 'DISM /Online /Cleanup-Image /StartComponentCleanup' to remove superseded update components from WinSxS. It can take several minutes and cannot be cancelled midway. Continue?",
+            TimeoutMs = 1_800_000,
+            Cancellable = false,
+            Script = """
+                Dism /Online /Cleanup-Image /StartComponentCleanup
+                exit 0
+                """,
+        },
+        new RepairTool
+        {
             Id = "repair-windows-update",
             Name = "Reset Windows Update",
             Description = "Fix stuck updates: clear the download cache and restart update services.",

@@ -572,7 +572,6 @@
   "nothing to clean": "nada que limpiar",
   "{0} selected to clean": "{0} seleccionados para limpiar",
   "Measuring how much can be freed…": "Midiendo cuánto se puede liberar…",
-  "This permanently deletes the following, including your own files in the Recycle Bin. It cannot be undone:\n\n  • {0}\n\nClean now?": "Esto borra de forma permanente lo siguiente, incluidos tus propios archivos de la Papelera. No se puede deshacer:\n\n  • {0}\n\n¿Limpiar ahora?",
   "This permanently deletes the following caches to free space. Windows recreates them as needed:\n\n  • {0}\n\nClean now?": "Esto borra de forma permanente las siguientes cachés para liberar espacio. Windows las recrea cuando hace falta:\n\n  • {0}\n\n¿Limpiar ahora?",
   "WinPure — Clean up": "WinPure — Limpieza",
   "Cleaning…": "Limpiando…",
@@ -716,5 +715,11 @@
   "Blocks the Play To Menu shell extension {7AD84985-87B4-4a16-BE58-8B72A5B390F7} via the same Shell Extensions\\Blocked mechanism as the other context-menu removals; undo deletes the block.": "Bloquea la extensión de shell Play To Menu {7AD84985-87B4-4a16-BE58-8B72A5B390F7} con el mismo mecanismo Shell Extensions\\Blocked que las demás entradas quitadas del menú; deshacer borra el bloqueo.",
   "Remove 'Include in library'": "Quitar 'Incluir en biblioteca'",
   "Remove the legacy 'Include in library' entry from the folder right-click menu.": "Quita la entrada heredada 'Incluir en biblioteca' del menú contextual de carpetas.",
-  "Deletes the Library Location handler key (same pattern as 'Remove Share'); the backup re-creates it on undo. HKCR resolves to HKLM\\Software\\Classes on this machine.": "Borra la clave del controlador Library Location (mismo patrón que 'Quitar Compartir'); el respaldo la recrea al deshacer. HKCR se resuelve en HKLM\\Software\\Classes en esta máquina."
+  "Deletes the Library Location handler key (same pattern as 'Remove Share'); the backup re-creates it on undo. HKCR resolves to HKLM\\Software\\Classes on this machine.": "Borra la clave del controlador Library Location (mismo patrón que 'Quitar Compartir'); el respaldo la recrea al deshacer. HKCR se resuelve en HKLM\\Software\\Classes en esta máquina.",
+  "Clean Up the Component Store (DISM)": "Limpiar el almacén de componentes (DISM)",
+  "Reclaim disk space by removing superseded Windows Update files from the component store (WinSxS). Can take several minutes.": "Recupera espacio en disco quitando archivos de Windows Update ya superados del almacén de componentes (WinSxS). Puede tardar varios minutos.",
+  "This runs 'DISM /Online /Cleanup-Image /StartComponentCleanup' to remove superseded update components from WinSxS. It can take several minutes and cannot be cancelled midway. Continue?": "Esto ejecuta 'DISM /Online /Cleanup-Image /StartComponentCleanup' para quitar componentes de actualización superados de WinSxS. Puede tardar varios minutos y no se puede cancelar a la mitad. ¿Continuar?",
+  "Previous Windows installation (Windows.old)": "Instalación anterior de Windows (Windows.old)",
+  "The old Windows kept after a feature update. Frees many GB, but removes the ability to roll that update back and the previous profile's files. Only shown when it exists.": "El Windows viejo que queda tras una actualización de características. Libera varios GB, pero elimina la posibilidad de revertir esa actualización y los archivos del perfil anterior. Solo se muestra si existe.",
+  "This permanently deletes the following, which include your own files or the ability to roll back a Windows update. It cannot be undone:\n\n  • {0}\n\nClean now?": "Esto borra permanentemente lo siguiente, que incluye tus propios archivos o la posibilidad de revertir una actualización de Windows. No se puede deshacer:\n\n  • {0}\n\n¿Limpiar ahora?"
 }

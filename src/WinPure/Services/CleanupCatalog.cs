@@ -118,6 +118,16 @@ public static class CleanupCatalog
         },
         new CleanupTarget
         {
+            Id = "clean-windows-old",
+            Name = "Previous Windows installation (Windows.old)",
+            Description = "The old Windows kept after a feature update. Frees many GB, but removes the ability to roll that update back and the previous profile's files. Only shown when it exists.",
+            Icon = Glyph(0xE81C),
+            Kind = CleanupKind.Folder,
+            Roots = new[] { @"%SystemDrive%\Windows.old" },
+            NeedsConfirm = true,
+        },
+        new CleanupTarget
+        {
             Id = "clean-recycle-bin",
             Name = "Recycle Bin",
             Description = "Permanently delete everything in the Recycle Bin. These are your own deleted files — this cannot be undone.",

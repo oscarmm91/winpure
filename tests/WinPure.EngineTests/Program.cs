@@ -116,6 +116,7 @@ failures += OnlyReversibleHkcuTweaksReachFutureUsers() ? 0 : 1;
 failures += ApplyingToFutureUsersWritesTheTemplateAndRestoreUndoesIt() ? 0 : 1;
 failures += TheFutureUsersPolicyOnlyAllowsCatalogHkcuValues() ? 0 : 1;
 failures += CleanupMeasuresClearsAndSkipsLockedFiles() ? 0 : 1;
+failures += CleanupFolderKindDeletesTheWholeFolder() ? 0 : 1;
 failures += DnsCapturesCurrentServersAndRestorePutsThemBack() ? 0 : 1;
 failures += AServiceCanBeSetToManualNotJustDisabled() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
@@ -332,13 +333,18 @@ bool CancellingReallyKillsTheProcess()
 bool OnlySafeRepairsOfferCancel()
 {
     var tools = RepairCatalog.Build();
-    var systemFiles = tools.FirstOrDefault(t => t.Id == "repair-system-files");
-    var others = tools.Where(t => t.Id != "repair-system-files").ToList();
+    // Both component-store DISM operations are unsafe to kill: SFC+DISM /RestoreHealth and
+    // /StartComponentCleanup can each leave WinSxS inconsistent if interrupted.
+    var mustNotCancel = new[] { "repair-system-files", "repair-component-cleanup" };
+    var protectedTools = tools.Where(t => mustNotCancel.Contains(t.Id)).ToList();
+    var others = tools.Where(t => !mustNotCancel.Contains(t.Id)).ToList();
 
-    bool ok = systemFiles is { Cancellable: false } && others.Count > 0 && others.All(t => t.Cancellable);
+    bool ok = protectedTools.Count == mustNotCancel.Length
+        && protectedTools.All(t => !t.Cancellable)
+        && others.Count > 0 && others.All(t => t.Cancellable);
     return Report("only repairs that are safe to kill offer Cancel",
         ok,
-        $"repair-system-files cancellable={systemFiles?.Cancellable.ToString() ?? "(missing)"}, " +
+        $"component-store tools non-cancellable={protectedTools.All(t => !t.Cancellable)} (found {protectedTools.Count}/{mustNotCancel.Length}), " +
         $"the other {others.Count} tools cancellable={others.All(t => t.Cancellable)}");
 }
 
@@ -1495,6 +1501,48 @@ bool DnsCapturesCurrentServersAndRestorePutsThemBack()
         problems.Count == 0
             ? "both adapters switched to the preset, their prior servers captured in one backup, and Restore set them back; the policy allows only IP lists or DHCP"
             : string.Join(" | ", problems));
+}
+
+// A Folder-kind cleanup target (Windows.old) deletes the WHOLE folder, not just its contents, and is a
+// safe no-op when the folder is absent. (The privileged ownership-seizing path only runs when a plain
+// delete fails, so a user-owned temp folder here never invokes icacls/PowerShell.)
+bool CleanupFolderKindDeletesTheWholeFolder()
+{
+    string parent = Path.Combine(Path.GetTempPath(), "winpure-cleanfolder-" + Guid.NewGuid().ToString("N")[..8]);
+    string root = Path.Combine(parent, "Windows.old");
+    Directory.CreateDirectory(root);
+    var problems = new List<string>();
+    try
+    {
+        File.WriteAllBytes(Path.Combine(root, "a.txt"), new byte[100]);
+        Directory.CreateDirectory(Path.Combine(root, "sub"));
+        File.WriteAllBytes(Path.Combine(root, "sub", "b.txt"), new byte[200]);
+
+        var target = new CleanupTarget { Id = "t", Name = "n", Description = "d", Kind = CleanupKind.Folder, Roots = new[] { root } };
+        long measured = CleanupService.Measure(target);
+        if (measured != 300) problems.Add($"measured {measured}, expected 300");
+
+        // A folder target is shown only when its folder exists; other kinds always show.
+        if (!CleanupService.ShouldShow(target)) problems.Add("folder target with an existing root should be shown");
+        var absentFolder = new CleanupTarget { Id = "af", Name = "n", Description = "d", Kind = CleanupKind.Folder, Roots = new[] { Path.Combine(parent, "not-here") } };
+        if (CleanupService.ShouldShow(absentFolder)) problems.Add("folder target with no existing root should be hidden");
+        var absentPaths = new CleanupTarget { Id = "ap", Name = "n", Description = "d", Roots = new[] { Path.Combine(parent, "not-here") } };
+        if (!CleanupService.ShouldShow(absentPaths)) problems.Add("a Paths target should always show, even when empty");
+
+        var result = CleanupService.Clean(target);
+        if (Directory.Exists(root)) problems.Add("the whole folder should be deleted, but it still exists");
+        if (result.Deleted < 1) problems.Add($"deleted={result.Deleted}, expected >=1");
+        if (result.Bytes != 300) problems.Add($"freed={result.Bytes}, expected 300");
+
+        var absent = CleanupService.Clean(new CleanupTarget { Id = "t2", Name = "n", Description = "d", Kind = CleanupKind.Folder, Roots = new[] { Path.Combine(parent, "does-not-exist") } });
+        if (absent.Bytes != 0 || absent.Deleted != 0) problems.Add($"absent folder freed={absent.Bytes} deleted={absent.Deleted}, expected 0/0");
+    }
+    catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
+    finally { try { Directory.Delete(parent, recursive: true); } catch { } }
+
+    return Report("cleanup deletes a whole folder (Windows.old) and no-ops when it is absent",
+        problems.Count == 0,
+        problems.Count == 0 ? "measured 300, deleted the whole folder, freed 300; an absent folder is a no-op" : string.Join(" | ", problems));
 }
 
 // A service tweak can target Manual (3), not only Disabled (4): "applied" then means the start mode

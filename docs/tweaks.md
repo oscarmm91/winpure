@@ -199,6 +199,7 @@ WinPure cannot bring back an app removed here, so none of it is in a preset and 
 |---|---|
 | Create System Restore Point | `Enable-ComputerRestore` + `Checkpoint-Computer` (frequency limit lifted) |
 | Repair System Files | `sfc /scannow` + `DISM /Online /Cleanup-Image /RestoreHealth` |
+| Clean Up the Component Store (DISM) | `DISM /Online /Cleanup-Image /StartComponentCleanup` (never `/ResetBase`); non-cancellable |
 | Reset Windows Update | Stops `wuauserv/BITS/cryptsvc`, clears download cache + qmgr, restarts services |
 | Reset Network | `netsh winsock reset`, `netsh int ip reset`, `ipconfig /flushdns` |
 | Clean Temporary Files | Empties `%TEMP%` and `C:\Windows\Temp`, reports MB freed |

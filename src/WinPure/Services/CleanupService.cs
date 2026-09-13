@@ -10,6 +10,8 @@ public enum CleanupKind
     Paths,
     /// <summary>Empty the Recycle Bin through the shell.</summary>
     RecycleBin,
+    /// <summary>Delete a whole folder, taking ownership first if the tree is protected (e.g. Windows.old).</summary>
+    Folder,
 }
 
 /// <summary>
@@ -52,12 +54,24 @@ public static class CleanupService
         AttributesToSkip = 0,
     };
 
+    /// <summary>
+    /// Whether the row is worth showing at all. A whole-folder target (Windows.old) only applies when the
+    /// folder is actually present, so it is hidden on machines that never did a feature update; every other
+    /// target always shows (an empty cache is a legitimate "nothing to clean", not an absent feature).
+    /// </summary>
+    public static bool ShouldShow(CleanupTarget target)
+    {
+        if (target.Kind != CleanupKind.Folder) return true;
+        try { return ExpandRoots(target.Roots).Any(); } catch { return false; }
+    }
+
     /// <summary>Bytes this target would free right now. Never throws; an unreadable target measures as 0.</summary>
     public static long Measure(CleanupTarget target)
     {
         try
         {
             if (target.Kind == CleanupKind.RecycleBin) return RecycleBinBytes();
+            // A whole-folder target measures the folder itself (which is deleted, not just cleared).
             long total = 0;
             foreach (var dir in ExpandRoots(target.Roots)) total += MeasureDir(dir, target.Globs);
             return total;
@@ -69,6 +83,7 @@ public static class CleanupService
     public static Result Clean(CleanupTarget target)
     {
         if (target.Kind == CleanupKind.RecycleBin) return EmptyRecycleBin();
+        if (target.Kind == CleanupKind.Folder) return CleanFolders(target);
 
         long bytes = 0;
         int deleted = 0, skipped = 0;
@@ -183,6 +198,47 @@ public static class CleanupService
     private static long SafeLength(FileInfo f)
     {
         try { return f.Length; } catch { return 0; }
+    }
+
+    /// <summary>Deletes whole folders a <see cref="CleanupKind.Folder"/> target names (e.g. Windows.old).</summary>
+    private static Result CleanFolders(CleanupTarget target)
+    {
+        long bytes = 0;
+        int deleted = 0, skipped = 0;
+        foreach (var dir in ExpandRoots(target.Roots))
+        {
+            long size = MeasureDir(dir, Array.Empty<string>());
+            if (TryDeleteTree(dir)) { bytes += size; deleted++; continue; }
+            // A protected tree — Windows.old is owned by SYSTEM/TrustedInstaller and full of read-only
+            // files. Seize ownership by SID (locale-independent, no takeown "/d Y" prompt) and grant
+            // Administrators full control, then let PowerShell clear the read-only bit and delete.
+            SeizeOwnership(dir);
+            PowerShellRunner.Run(
+                $"Remove-Item -LiteralPath {PowerShellRunner.Quote(dir)} -Recurse -Force -ErrorAction SilentlyContinue",
+                600_000);
+            long left = SafeDirExists(dir) ? MeasureDir(dir, Array.Empty<string>()) : 0;
+            if (left == 0) { bytes += size; deleted++; }
+            else { bytes += Math.Max(0, size - left); skipped++; }
+        }
+        return new Result(bytes, deleted, skipped);
+    }
+
+    private static bool TryDeleteTree(string dir)
+    {
+        try { Directory.Delete(dir, recursive: true); return true; }
+        catch { return false; }
+    }
+
+    private static bool SafeDirExists(string dir)
+    {
+        try { return Directory.Exists(dir); } catch { return false; }
+    }
+
+    private static void SeizeOwnership(string dir)
+    {
+        // *S-1-5-32-544 = BUILTIN\Administrators, by SID so this works on any Windows display language.
+        PowerShellRunner.Run($"icacls {PowerShellRunner.Quote(dir)} /setowner *S-1-5-32-544 /T /C /Q", 600_000);
+        PowerShellRunner.Run($"icacls {PowerShellRunner.Quote(dir)} /grant *S-1-5-32-544:F /T /C /Q", 600_000);
     }
 
     // ---- Recycle Bin (shell) ----

@@ -54,6 +54,7 @@ public sealed class CleanupViewModel : PageViewModel
     {
         foreach (var target in CleanupCatalog.Build())
         {
+            if (!CleanupService.ShouldShow(target)) continue;   // e.g. Windows.old on a PC that never updated
             var vm = new CleanupItemViewModel { Target = target, IsSelected = !target.NeedsConfirm };
             vm.SelectionChanged += () => OnPropertyChanged(nameof(SelectedSizeText));
             Items.Add(vm);
@@ -91,7 +92,7 @@ public sealed class CleanupViewModel : PageViewModel
         bool destructive = chosen.Any(i => i.NeedsConfirm);
         string names = string.Join("\n  • ", chosen.Select(i => i.Name));
         string body = destructive
-            ? Loc.F("This permanently deletes the following, including your own files in the Recycle Bin. It cannot be undone:\n\n  • {0}\n\nClean now?", names)
+            ? Loc.F("This permanently deletes the following, which include your own files or the ability to roll back a Windows update. It cannot be undone:\n\n  • {0}\n\nClean now?", names)
             : Loc.F("This permanently deletes the following caches to free space. Windows recreates them as needed:\n\n  • {0}\n\nClean now?", names);
         var answer = MessageBox.Show(body, Loc.T("WinPure — Clean up"),
             MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);

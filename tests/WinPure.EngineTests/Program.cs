@@ -26,6 +26,8 @@ string scratch = Path.Combine(Path.GetTempPath(), "winpure-engine-tests");
 BackupManager.BackupDirectory = scratch;
 // Toy tweaks restore under ToyKey, which no real tweak touches; the app itself never sets this.
 BackupEntryPolicy.TestKeyPrefix = ToyKey;
+// The assertions below read English text, and the app follows Windows' language — which here is Spanish.
+Loc.Use("en");
 
 if (args.Length > 0 && args[0] == "crash-child")
 {
@@ -93,6 +95,8 @@ failures += BackupsLiveWhereOnlyAdministratorsCanWrite() ? 0 : 1;
 failures += OldBackupsAreCopiedOnceAndLeftInPlace() ? 0 : 1;
 failures += WingetIdsAreCheckedAndTheExportIsReadExactly() ? 0 : 1;
 failures += AnInstallIsJudgedByWhatWingetSeesAfterwards() ? 0 : 1;
+failures += EveryVisibleTextHasASpanishTranslation() ? 0 : 1;
+failures += SpanishIsShownAndABrokenTranslationFallsBackToEnglish() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
 
@@ -1553,6 +1557,156 @@ bool EveryStaticResourceAndBindingPathExists()
         problems.Count == 0
             ? $"{xamlFiles.Count} XAML files, {defined.Count} resource keys, all references resolve"
             : string.Join(" | ", problems));
+}
+
+// The Spanish app. English stays in the code and is the key to its translation (Services/Loc.cs), so this test
+// is what keeps the two in step. It fails on text the Spanish app would show in English, on a translation of
+// text nothing shows any more, on a translation whose placeholders differ from its English, and on a view or
+// message that shows English without going through Loc. Set WINPURE_DUMP_MISSING to a file path to get the
+// missing texts as JSON, ready to translate.
+bool EveryVisibleTextHasASpanishTranslation()
+{
+    const string title = "every visible text has a Spanish translation";
+    string srcDir = FindSourceDir();
+    if (srcDir.Length == 0)
+        return Report(title, true, "skipped: the source tree is not next to the test binary (packaged run)");
+
+    var problems = new List<string>();
+    var keys = new Dictionary<string, string>(StringComparer.Ordinal);   // English text -> where it was found
+    void Add(string text, string where) { if (text.Length > 0) keys.TryAdd(text, where); }
+    bool IsBuildOutput(string f) =>
+        f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") ||
+        f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}");
+
+    // Code: every literal passed to Loc.T, Loc.F and Loc.N — which is why a key must be one plain literal.
+    foreach (var file in Directory.GetFiles(srcDir, "*.cs", SearchOption.AllDirectories).Where(f => !IsBuildOutput(f)))
+    {
+        string text = File.ReadAllText(file);
+        string fileName = Path.GetFileName(file);
+        foreach (Match m in Regex.Matches(text, @"\bLoc\.[TFN]\(\s*""((?:[^""\\]|\\.)*)"""))
+        {
+            // Regex.Unescape follows regex rules, not C#'s: an escape they disagree on is reported, not a crashed run.
+            try { Add(Regex.Unescape(m.Groups[1].Value), fileName); }
+            catch (ArgumentException) { problems.Add($"{fileName}: a Loc key with an escape this test cannot read ({m.Value})"); }
+        }
+        foreach (Match m in Regex.Matches(text, @"\bLoc\.[TFN]\(\s*(?:[$@]|""(?:[^""\\]|\\.)*""\s*\+)"))
+            problems.Add($"{fileName}: a Loc key that is not one plain literal ({m.Value.Trim()}...)");
+        foreach (Match m in Regex.Matches(text, @"\b(?:StatusText|Summary)\s*=\s*\$?""|MessageBox\.Show\(\s*\$?"""))
+            problems.Add($"{fileName}: shows English without Loc ({m.Value})");
+    }
+
+    // Views: every {l:Tr '...'}, and no English literal shown without one.
+    string[] notTranslated = { "WinPure", "v1.0.0", "Oscar Medina", "@oscaremeh", "Instagram", "TikTok", "YouTube" };
+    foreach (var file in Directory.GetFiles(srcDir, "*.xaml", SearchOption.AllDirectories).Where(f => !IsBuildOutput(f)))
+    {
+        string text = File.ReadAllText(file);
+        string fileName = Path.GetFileName(file);
+        var quoted = Regex.Matches(text, @"\{l:Tr\s+'([^'&]*)'\s*\}");
+        foreach (Match m in quoted) Add(m.Groups[1].Value, fileName);
+        if (Regex.Matches(text, @"\{l:Tr\b").Count != quoted.Count)
+            problems.Add($"{fileName}: an l:Tr whose text is not in single quotes, or holds an XML entity");
+        foreach (Match m in Regex.Matches(text, @"\b(?:Text|Content|Title|ToolTip|Header)=""([^""{&][^""]*)"""))
+            if (Regex.IsMatch(m.Groups[1].Value, "[A-Za-z]") && !notTranslated.Contains(m.Groups[1].Value))
+                problems.Add($"{fileName}: '{m.Groups[1].Value}' is shown in English, without l:Tr");
+    }
+
+    // Catalogs: written in English and translated where they are shown.
+    foreach (var tweak in TweakCatalog.Build())
+    {
+        Add(tweak.Name, $"{tweak.Id} name");
+        Add(tweak.Description, $"{tweak.Id} description");
+        Add(tweak.Help, $"{tweak.Id} help");
+    }
+    foreach (var tool in RepairCatalog.Build())
+    {
+        Add(tool.Name, $"{tool.Id} name");
+        Add(tool.Description, $"{tool.Id} description");
+        Add(tool.ConfirmText ?? "", $"{tool.Id} confirmation");
+        Add(tool.DoneText ?? "", $"{tool.Id} result");
+    }
+    foreach (var app in AppInstallerCatalog.Build())
+    {
+        Add(app.Description, $"{app.Id} description");
+        Add(app.Group, "install page group");
+    }
+    // Sidebar labels and page titles translate themselves when set, so read them back — in English, here.
+    foreach (var nav in new WinPure.ViewModels.MainViewModel().NavItems)
+    {
+        Add(nav.Label, "sidebar");
+        Add(nav.Page.Title, "page title");
+        Add(nav.Page.Subtitle, "page subtitle");
+    }
+
+    var spanish = new Dictionary<string, string>(StringComparer.Ordinal);
+    using (var stream = typeof(Loc).Assembly.GetManifestResourceStream("WinPure.Strings.es.json"))
+    {
+        if (stream is null)
+            return Report(title, false, "Strings.es.json is not embedded in WinPure.dll");
+        using var doc = System.Text.Json.JsonDocument.Parse(stream);
+        foreach (var prop in doc.RootElement.EnumerateObject())
+            if (!spanish.TryAdd(prop.Name, prop.Value.GetString() ?? ""))
+                problems.Add($"translated twice: '{prop.Name}'");
+    }
+
+    var missing = keys.Keys.Where(k => !spanish.TryGetValue(k, out var es) || string.IsNullOrWhiteSpace(es)).ToList();
+    var orphans = spanish.Keys.Where(k => !keys.ContainsKey(k)).ToList();
+    foreach (var (english, translated) in spanish)
+    {
+        if (string.IsNullOrWhiteSpace(translated)) continue;
+        string a = Holes(english), b = Holes(translated);
+        if (a != b) problems.Add($"placeholders differ in '{english}': [{a}] vs [{b}]");
+    }
+
+    string? dump = Environment.GetEnvironmentVariable("WINPURE_DUMP_MISSING");
+    if (!string.IsNullOrEmpty(dump) && missing.Count > 0)
+        File.WriteAllText(dump, System.Text.Json.JsonSerializer.Serialize(
+            missing.Select(k => new { en = k, where = keys[k] }),
+            new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true,
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            }));
+
+    if (orphans.Count > 0) problems.Insert(0, $"{orphans.Count} translation(s) of text nothing shows any more, e.g. '{orphans[0]}'");
+    if (missing.Count > 0) problems.Insert(0, $"{missing.Count} of {keys.Count} texts have no Spanish, e.g. '{missing[0]}' ({keys[missing[0]]})");
+    return Report(title, problems.Count == 0,
+        problems.Count == 0
+            ? $"{keys.Count} texts, every one translated"
+            : string.Join(" | ", problems.Take(6)) + (problems.Count > 6 ? $" | +{problems.Count - 6} more" : ""));
+
+    static string Holes(string s) =>
+        string.Join(" ", Regex.Matches(s, @"\{\d+(?:[,:][^}]*)?\}").Select(m => m.Value).OrderBy(v => v, StringComparer.Ordinal));
+}
+
+// The other half: that the Spanish is what actually shows, and that a broken translation cannot take the app down.
+bool SpanishIsShownAndABrokenTranslationFallsBackToEnglish()
+{
+    const string title = "Spanish is shown, and a broken translation falls back to English";
+    try
+    {
+        Loc.Use("es");
+        const string englishHint = "Changes will be applied after clicking Apply Changes.";
+        string hint = new WinPure.ViewModels.MainViewModel().ApplyHint;
+        bool spanishShown = Loc.Language == "es" && hint != englishHint && hint == Loc.T(englishHint);
+        bool untranslatedIsEnglish = Loc.T("A sentence nobody translated.") == "A sentence nobody translated.";
+
+        Loc.UseTable("es", new Dictionary<string, string> { ["{0} of {1} done"] = "{0} de {2} listo", ["Hello"] = "" });
+        string broken = Loc.F("{0} of {1} done", 3, 4);
+        bool brokenIsEnglish = broken == "3 of 4 done";
+        bool emptyIsEnglish = Loc.T("Hello") == "Hello";
+
+        return Report(title, spanishShown && untranslatedIsEnglish && brokenIsEnglish && emptyIsEnglish,
+            $"Spanish shown={spanishShown} ('{hint}'), untranslated stays English={untranslatedIsEnglish}, "
+          + $"broken placeholders show English={brokenIsEnglish} ('{broken}'), empty translation shows English={emptyIsEnglish}");
+    }
+    catch (Exception ex)
+    {
+        return Report(title, false, $"threw {ex.GetType().Name}: {ex.Message}");
+    }
+    finally
+    {
+        Loc.Use("en");
+    }
 }
 
 static string FindSourceDir()

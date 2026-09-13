@@ -26,6 +26,7 @@
 - ⚡ **One-click presets** — *Safe*, *Balanced* and *Aggressive* — or full manual control, tweak by tweak. Mix both freely.
 - 🔍 **Honest state detection.** On launch WinPure scans your system and shows what is *already optimized* vs *not applied*. No fake "boost" buttons.
 - 🔎 **Search every tweak** from the sidebar, and see at a glance how many changes each category has waiting.
+- 🌎 **English and Spanish.** WinPure follows your Windows display language.
 - 📤 **Export / import your configuration** — tick the same tweaks on another PC from one small file. Importing only ticks boxes; nothing changes until you click Apply.
 - 🧰 **Repair toolbox built in** — SFC + DISM, Windows Update reset, network reset, restore points and temp cleanup.
 - 📴 **100 % offline & portable.** A single .exe — no installer, no .NET needed, no telemetry of its own, runs from a USB stick.

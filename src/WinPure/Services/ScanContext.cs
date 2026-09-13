@@ -164,9 +164,9 @@ public sealed class ScanContext
         var result = PowerShellRunner.Run(script, 60_000, dieWithApp: true);
         if (!result.Success || string.IsNullOrWhiteSpace(result.Output))
         {
-            string why = result.TimedOut ? "the system scan timed out"
-                : string.IsNullOrWhiteSpace(result.Error) ? "the system scan produced no output"
-                : $"the system scan failed: {FirstLine(result.Error)}";
+            string why = result.TimedOut ? Loc.T("the system scan timed out")
+                : string.IsNullOrWhiteSpace(result.Error) ? Loc.T("the system scan produced no output")
+                : Loc.F("the system scan failed: {0}", FirstLine(result.Error));
             ctx.Warnings.Add(why);
             LogService.Log($"Scan failed: {why}");
             return ctx;
@@ -213,7 +213,7 @@ public sealed class ScanContext
 
             if (!ctx.AppsQueryOk)
             {
-                ctx.Warnings.Add("installed apps could not be listed");
+                ctx.Warnings.Add(Loc.T("installed apps could not be listed"));
                 LogService.Log($"Scan: app listing failed: {Text(root, "appsError")}");
             }
             else if (Text(root, "appsScope") == "user")
@@ -223,19 +223,19 @@ public sealed class ScanContext
 
             if (!ctx.TasksQueryOk)
             {
-                ctx.Warnings.Add("scheduled tasks could not be read");
+                ctx.Warnings.Add(Loc.T("scheduled tasks could not be read"));
                 LogService.Log($"Scan: scheduled task listing failed: {Text(root, "tasksError")}");
             }
 
             if (!ctx.FeaturesQueryOk)
             {
-                ctx.Warnings.Add("Windows features could not be read");
+                ctx.Warnings.Add(Loc.T("Windows features could not be read"));
                 LogService.Log($"Scan: optional feature listing failed: {Text(root, "featuresError")}");
             }
         }
         catch (Exception ex)
         {
-            ctx.Warnings.Add("the system scan returned something unreadable");
+            ctx.Warnings.Add(Loc.T("the system scan returned something unreadable"));
             LogService.Log($"Scan output could not be parsed: {ex.Message}");
         }
         return ctx;

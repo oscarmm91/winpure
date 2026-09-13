@@ -11,6 +11,11 @@ public sealed class RepairTool
     public int TimeoutMs { get; init; } = 600_000;
     /// <summary>Shown in a confirmation dialog before running. Null = run without confirmation.</summary>
     public string? ConfirmText { get; init; }
+    /// <summary>
+    /// What the card says on success, in place of the script's last line of output; {0} is that line. Null shows
+    /// the line itself — right for tools whose output is Windows' own text, already in the user's language.
+    /// </summary>
+    public string? DoneText { get; init; }
     public bool RequiresRestart { get; init; }
     /// <summary>
     /// Whether killing this mid-run is safe. False for anything that repairs Windows itself:
@@ -29,6 +34,7 @@ public static class RepairCatalog
             Id = "repair-restore-point",
             Name = "Create System Restore Point",
             Description = "Create a Windows restore point before making big changes.",
+            DoneText = "Restore point created.",
             Icon = "",
             Script = """
                 $ErrorActionPreference = 'Stop'
@@ -59,6 +65,7 @@ public static class RepairCatalog
             Id = "repair-windows-update",
             Name = "Reset Windows Update",
             Description = "Fix stuck updates: clear the download cache and restart update services.",
+            DoneText = "Windows Update components were reset.",
             Icon = "",
             ConfirmText = "This stops the update services, clears the Windows Update download cache (SoftwareDistribution\\Download) and restarts the services. Continue?",
             Script = """
@@ -94,6 +101,7 @@ public static class RepairCatalog
             ConfirmText = "This deletes everything in your temporary folder and in the Windows Temp folder. Files that are in use are skipped. Continue?",
             Name = "Clean Temporary Files",
             Description = "Delete user and system temp files to free disk space.",
+            DoneText = "Temp files cleaned. Freed {0} MB.",
             Icon = "",
             Script = """
                 $ErrorActionPreference = 'SilentlyContinue'
@@ -102,7 +110,7 @@ public static class RepairCatalog
                 Get-ChildItem "$env:SystemRoot\Temp" -Force | Remove-Item -Recurse -Force
                 $after = (Get-PSDrive -Name $env:SystemDrive.TrimEnd(':')).Free
                 $freed = [math]::Max(0, ($after - $before) / 1MB)
-                Write-Output ("Temp files cleaned. Freed {0:N0} MB." -f $freed)
+                Write-Output ('{0:N0}' -f $freed)
                 exit 0
                 """,
         },

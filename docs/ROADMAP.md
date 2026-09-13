@@ -39,6 +39,7 @@ installer are built. **Apply to future users** is waiting: loading the Default p
 administrator rights and cannot be tested from an unelevated session, and a mistake leaves new profiles
 broken. **The "no way back" section** is waiting on a product decision: moving app removal out of the
 presets changes what Balanced and Aggressive promise today. Phase 6 search and pending badges are built.
+Phase 7 (Spanish) is built.
 
 ---
 
@@ -125,9 +126,14 @@ value; it is a product decision because it configures another vendor's app.
 
 ## Phase 7 — Spanish
 
-Deferred on purpose: every feature above adds strings. `.resx` with a key convention per tweak
-(`{Category}_{Name}_{Title}`) and English fallback, so a missing translation shows English
-instead of an empty control. No dependency needed.
+Built. English stays in the code and is the key: `Loc.T("English")` looks it up in
+`src/WinPure/Resources/Strings.es.json`, and XAML uses `{l:Tr 'English'}`. The app follows Windows'
+display language (`WINPURE_LANG=en|es` overrides it), and anything without a translation shows English.
+
+Not the `.resx` with a key per tweak this section first proposed. With a key per tweak, editing the
+English leaves the old Spanish on screen, saying what the English no longer says, and nothing notices.
+Keyed by the English text, the edit orphans the translation and a test fails. The same test fails on a
+view that shows an English literal, and on a translation whose placeholders differ from its English.
 
 ---
 

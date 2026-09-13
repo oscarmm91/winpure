@@ -11,10 +11,11 @@ public sealed class StartupItemViewModel : ObservableObject
     public required StartupEntry Entry { get; init; }
 
     public string Name => Entry.Name;
-    public string Publisher => Entry.Publisher.Length > 0 ? Entry.Publisher : "Unknown publisher";
+    public string Publisher => Entry.Publisher.Length > 0 ? Entry.Publisher : Loc.T("Unknown publisher");
     public string Detail => Entry.Command;
-    public string SourceLabel => Entry.SourceLabel;
-    public string Scope => Entry.Scope;
+    // Kept in English on the entry — the scope is part of its id, and ids end up in backups — and translated here.
+    public string SourceLabel => Loc.T(Entry.SourceLabel);
+    public string Scope => Loc.T(Entry.Scope);
     public bool IsOrphan => Entry.IsOrphan;
 
     public string Glyph => Entry.Source switch
@@ -39,7 +40,7 @@ public sealed class StartupItemViewModel : ObservableObject
         }
     }
 
-    public string StateText => IsEnabled ? "On" : "Off";
+    public string StateText => IsEnabled ? Loc.T("On") : Loc.T("Off");
 
     internal event Action<StartupItemViewModel, bool>? Toggled;
 
@@ -83,8 +84,10 @@ public sealed class StartupViewModel : PageViewModel
 
         int off = Items.Count(i => !i.IsEnabled);
         int orphans = Items.Count(i => i.IsOrphan);
-        Summary = $"{Items.Count} apps start with Windows — {Items.Count - off} on, {off} off"
-                + (orphans > 0 ? $". {orphans} point to a file that no longer exists." : ".");
+        Summary = Loc.F("{0} apps start with Windows — {1} on, {2} off.", Items.Count, Items.Count - off, off)
+                + (orphans == 0 ? ""
+                    : orphans == 1 ? " " + Loc.T("1 points to a file that no longer exists.")
+                    : " " + Loc.F("{0} point to a file that no longer exists.", orphans));
         IsEmpty = Items.Count == 0;
     }
 
@@ -96,7 +99,7 @@ public sealed class StartupViewModel : PageViewModel
         // WinPure runs as another account, ask once per session before writing to the wrong profile.
         if (!_userGuardAccepted)
         {
-            if (!Main.ConfirmDespiteGuards("change startup apps", SystemGuards.ForStartup))
+            if (!Main.ConfirmDespiteGuards(Loc.T("change startup apps"), SystemGuards.ForStartup))
             {
                 item.SetEnabledSilently(!enabled);
                 return;
@@ -111,7 +114,9 @@ public sealed class StartupViewModel : PageViewModel
 
         if (result.Success)
         {
-            Main.StatusText = $"{item.Name} will {(enabled ? "start" : "no longer start")} with Windows.";
+            Main.StatusText = enabled
+                ? Loc.F("{0} will start with Windows.", item.Name)
+                : Loc.F("{0} will no longer start with Windows.", item.Name);
             LogService.Log($"Startup entry {(enabled ? "enabled" : "disabled")}: {item.Entry.Id}");
             Main.RefreshBackupCount();
         }
@@ -119,14 +124,21 @@ public sealed class StartupViewModel : PageViewModel
         {
             // Put the switch back where it was: it did not happen.
             item.SetEnabledSilently(!enabled);
-            Main.StatusText = $"Could not change {item.Name}: {result.Message}";
-            MessageBox.Show($"Could not change '{item.Name}'.\n\n{result.Message}", "WinPure",
+            Main.StatusText = Loc.F("Could not change {0}: {1}", item.Name, result.Message);
+            // The detail can be WinPure's own exception text, which stays in English; labelled, it reads as a detail to pass on.
+            MessageBox.Show(Loc.F("Could not change '{0}'.\n\nTechnical detail: {1}", item.Name, result.Message), "WinPure",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         int off = Items.Count(i => !i.IsEnabled);
-        Summary = $"{Items.Count} apps start with Windows — {Items.Count - off} on, {off} off.";
+        Summary = Loc.F("{0} apps start with Windows — {1} on, {2} off.", Items.Count, Items.Count - off, off);
     }
+
+    /// <summary>
+    /// Starts the name a startup change is recorded under in its backup — in English, like every tweak name; the
+    /// Restore page translates it where it shows it.
+    /// </summary>
+    internal const string TweakNamePrefix = "Startup: ";
 
     private static Tweak BuildTweak(StartupEntry entry)
     {
@@ -143,7 +155,7 @@ public sealed class StartupViewModel : PageViewModel
         {
             Id = entry.Id,
             Category = TweakCategory.Apps,
-            Name = $"Startup: {entry.Name}",
+            Name = TweakNamePrefix + entry.Name,
             Description = $"Stop {entry.Name} from starting with Windows.",
             Icon = "",
             Actions = new[] { action },

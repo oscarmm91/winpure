@@ -1,6 +1,7 @@
 <UserControl x:Class="WinPure.Views.CategoryView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:WinPure.Views"
              xmlns:models="clr-namespace:WinPure.Models">
 
     <Grid>
@@ -30,8 +31,8 @@
                     <TextBlock Text="&#xEA18;" FontFamily="{StaticResource Font.Icon}" FontSize="18"
                                Foreground="{StaticResource Brush.GreenText}" VerticalAlignment="Center"/>
                     <StackPanel Margin="12,0,0,0">
-                        <TextBlock Text="Safe" FontSize="14.5" FontWeight="SemiBold"/>
-                        <TextBlock Text="Recommended" FontSize="11.5" Foreground="{StaticResource Brush.TextSecondary}"/>
+                        <TextBlock Text="{l:Tr 'Safe'}" FontSize="14.5" FontWeight="SemiBold"/>
+                        <TextBlock Text="{l:Tr 'Recommended'}" FontSize="11.5" Foreground="{StaticResource Brush.TextSecondary}"/>
                     </StackPanel>
                 </StackPanel>
             </RadioButton>
@@ -44,8 +45,8 @@
                     <TextBlock Text="&#xF080;" FontFamily="{StaticResource Font.Icon}" FontSize="18"
                                Foreground="#5CA9E8" VerticalAlignment="Center"/>
                     <StackPanel Margin="12,0,0,0">
-                        <TextBlock Text="Balanced" FontSize="14.5" FontWeight="SemiBold"/>
-                        <TextBlock Text="Default" FontSize="11.5" Foreground="{StaticResource Brush.TextSecondary}"/>
+                        <TextBlock Text="{l:Tr 'Balanced'}" FontSize="14.5" FontWeight="SemiBold"/>
+                        <TextBlock Text="{l:Tr 'Default'}" FontSize="11.5" Foreground="{StaticResource Brush.TextSecondary}"/>
                     </StackPanel>
                 </StackPanel>
             </RadioButton>
@@ -58,8 +59,8 @@
                     <TextBlock Text="&#xE945;" FontFamily="{StaticResource Font.Icon}" FontSize="18"
                                Foreground="{StaticResource Brush.Orange}" VerticalAlignment="Center"/>
                     <StackPanel Margin="12,0,0,0">
-                        <TextBlock Text="Aggressive" FontSize="14.5" FontWeight="SemiBold"/>
-                        <TextBlock Text="Maximum Privacy" FontSize="11.5" Foreground="{StaticResource Brush.TextSecondary}"/>
+                        <TextBlock Text="{l:Tr 'Aggressive'}" FontSize="14.5" FontWeight="SemiBold"/>
+                        <TextBlock Text="{l:Tr 'Maximum Privacy'}" FontSize="11.5" Foreground="{StaticResource Brush.TextSecondary}"/>
                     </StackPanel>
                 </StackPanel>
             </RadioButton>
@@ -130,9 +131,12 @@
 
                                 <!-- text -->
                                 <StackPanel Grid.Column="1" Margin="14,0,12,0">
-                                    <StackPanel Orientation="Horizontal">
+                                    <!-- A WrapPanel, not a horizontal StackPanel: a title longer than the card (Spanish
+                                         titles run about a quarter longer) used to push the help icon out of sight.
+                                         Now the title wraps, and the icons move to the next line when there is no room. -->
+                                    <WrapPanel Orientation="Horizontal">
                                         <TextBlock Text="{Binding Name}" FontSize="13.5" FontWeight="SemiBold"
-                                                   Foreground="{StaticResource Brush.TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                                   Foreground="{StaticResource Brush.TextPrimary}" TextWrapping="Wrap"/>
                                         <TextBlock Text="&#xE946;" FontFamily="{StaticResource Font.Icon}" FontSize="12"
                                                    Margin="8,1,0,0" Foreground="{StaticResource Brush.TextTertiary}"
                                                    VerticalAlignment="Center" ToolTipService.InitialShowDelay="200">
@@ -145,7 +149,7 @@
                                                    VerticalAlignment="Center"
                                                    Visibility="{Binding FullyReversible, Converter={StaticResource InverseBoolToVisibility}}">
                                             <TextBlock.ToolTip>
-                                                <TextBlock Text="Undo requires reinstalling from the Microsoft Store." TextWrapping="Wrap"/>
+                                                <TextBlock Text="{l:Tr 'Undo requires reinstalling from the Microsoft Store.'}" TextWrapping="Wrap"/>
                                             </TextBlock.ToolTip>
                                         </TextBlock>
                                         <TextBlock Text="&#xE777;" FontFamily="{StaticResource Font.Icon}" FontSize="12"
@@ -153,10 +157,10 @@
                                                    VerticalAlignment="Center"
                                                    Visibility="{Binding RequiresRestart, Converter={StaticResource BoolToVisibility}}">
                                             <TextBlock.ToolTip>
-                                                <TextBlock Text="Takes full effect after a restart." TextWrapping="Wrap"/>
+                                                <TextBlock Text="{l:Tr 'Takes full effect after a restart.'}" TextWrapping="Wrap"/>
                                             </TextBlock.ToolTip>
                                         </TextBlock>
-                                    </StackPanel>
+                                    </WrapPanel>
                                     <TextBlock Text="{Binding Description}" FontSize="12" Margin="0,4,0,0"
                                                TextWrapping="Wrap" Foreground="{StaticResource Brush.TextSecondary}"/>
                                     <StackPanel Orientation="Horizontal" Margin="0,7,0,0">

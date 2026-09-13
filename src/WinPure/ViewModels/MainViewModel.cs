@@ -10,7 +10,9 @@ namespace WinPure.ViewModels;
 
 public sealed class NavItem : ObservableObject
 {
-    public required string Label { get; init; }
+    private readonly string _label = "";
+    /// <summary>Translated when set: the English passed in is the key.</summary>
+    public required string Label { get => _label; init => _label = Loc.T(value); }
     public required string Glyph { get; init; }
     public required PageViewModel Page { get; init; }
     internal MainViewModel? Owner { get; set; }
@@ -220,10 +222,14 @@ public sealed class MainViewModel : ObservableObject
         var matches = AllTweaks.Where(t => MatchesSearch(t, query)).ToList();
         var page = new CategoryPageViewModel
         {
-            Title = "Search",
+            // PageViewModel translates what it is given, so the title goes in as its English key. The subtitle has to
+            // be formatted first; the lookup PageViewModel then makes on it finds nothing and leaves it as it is.
+            Title = Loc.N("Search"),
             Subtitle = matches.Count == 0
-                ? $"No tweak mentions \"{query}\". Try a single word, such as an app or a Windows feature."
-                : $"{matches.Count} tweak{(matches.Count == 1 ? "" : "s")} mentioning \"{query}\", from every category.",
+                ? Loc.F("No tweak mentions \"{0}\". Try a single word, such as an app or a Windows feature.", query)
+                : matches.Count == 1
+                ? Loc.F("1 tweak mentioning \"{0}\", from every category.", query)
+                : Loc.F("{0} tweaks mentioning \"{1}\", from every category.", matches.Count, query),
             Main = this,
         };
         // The same TweakViewModel objects as on their own pages: a toggle here is the same toggle.
@@ -234,11 +240,12 @@ public sealed class MainViewModel : ObservableObject
     private static bool MatchesSearch(TweakViewModel tweak, string query)
     {
         // Case and accents ignored: an accent typed by habit on a Spanish keyboard still finds it.
+        // Both languages are searched: someone who knows a setting by its English name still finds it
+        // in the Spanish app.
         var compare = CultureInfo.InvariantCulture.CompareInfo;
         const CompareOptions options = CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace;
-        return compare.IndexOf(tweak.Name, query, options) >= 0
-            || compare.IndexOf(tweak.Description, query, options) >= 0
-            || compare.IndexOf(tweak.Tweak.Help, query, options) >= 0;
+        return new[] { tweak.Name, tweak.Description, tweak.Help, tweak.Tweak.Name, tweak.Tweak.Description, tweak.Tweak.Help }
+            .Any(text => compare.IndexOf(text, query, options) >= 0);
     }
 
     private bool _isBusy;
@@ -257,7 +264,7 @@ public sealed class MainViewModel : ObservableObject
     }
     public bool IsIdle => !IsBusy;
 
-    private string _statusText = "Ready.";
+    private string _statusText = Loc.T("Ready.");
     public string StatusText { get => _statusText; set => Set(ref _statusText, value); }
 
     private int _pendingCount;
@@ -267,10 +274,12 @@ public sealed class MainViewModel : ObservableObject
         // The Startup page has no Apply step — promising one there would be a lie.
         // Kept to roughly the length of the line below: the status bar shares this row with
         // the scan result on the right, and a longer sentence overlaps it.
-        ? "Startup switches apply immediately and are backed up."
+        ? Loc.T("Startup switches apply immediately and are backed up.")
         : PendingCount == 0
-            ? "Changes will be applied after clicking Apply Changes."
-            : $"{PendingCount} pending change{(PendingCount == 1 ? "" : "s")} — a backup is created before applying.";
+            ? Loc.T("Changes will be applied after clicking Apply Changes.")
+            : PendingCount == 1
+            ? Loc.T("1 pending change — a backup is created before applying.")
+            : Loc.F("{0} pending changes — a backup is created before applying.", PendingCount);
 
     private PresetLevel? _activePreset;
     public PresetLevel? ActivePreset { get => _activePreset; set => Set(ref _activePreset, value); }
@@ -297,7 +306,7 @@ public sealed class MainViewModel : ObservableObject
     public async Task ScanAsync()
     {
         IsBusy = true;
-        StatusText = "Scanning system state…";
+        StatusText = Loc.T("Scanning system state…");
         try
         {
             // Registry-backed tweaks resolve instantly; Appx/tasks/power need one PS pass.
@@ -318,16 +327,17 @@ public sealed class MainViewModel : ObservableObject
             UpdatePendingCount();
             UpdateDashboard();
             int undetected = AllTweaks.Count(t => t.Status == TweakStatus.Unknown);
+            string systemWarnings = guards.Count == 1 ? Loc.T("1 system warning") : Loc.F("{0} system warnings", guards.Count);
             StatusText = ctx.Warnings.Count == 0 && guards.Count > 0
                 // Kept short: this text shares the status bar with the apply hint.
-                ? $"Scan complete — {guards.Count} system warning{(guards.Count == 1 ? "" : "s")}, shown before applying."
+                ? Loc.F("Scan complete — {0}, shown before applying.", systemWarnings)
                 : ctx.Warnings.Count == 0
-                ? $"Scan complete. {_dashboard.OptimizedCount} of {_dashboard.TotalCount} tweaks already optimized."
+                ? Loc.F("Scan complete. {0} of {1} tweaks already optimized.", _dashboard.OptimizedCount, _dashboard.TotalCount)
                 // Name what could not be checked. "Some states are unknown" told the user
                 // nothing, and an undetected tweak used to look exactly like an optimized one.
-                : $"Scan incomplete — {string.Join("; ", ctx.Warnings)}. {undetected} tweak(s) could not be checked."
+                : Loc.F("Scan incomplete — {0}. {1} tweak(s) could not be checked.", string.Join("; ", ctx.Warnings), undetected)
                   // An incomplete scan must not hide the system warnings it did find.
-                  + (guards.Count > 0 ? $" {guards.Count} system warning{(guards.Count == 1 ? "" : "s")}." : "");
+                  + (guards.Count > 0 ? " " + systemWarnings + "." : "");
             LogService.Log(StatusText);
         }
         finally
@@ -365,9 +375,18 @@ public sealed class MainViewModel : ObservableObject
             tweak.IsSelected = inPreset || tweak.IsOptimized;
         }
 
+        string preset = level switch
+        {
+            PresetLevel.Safe => Loc.T("Safe"),
+            PresetLevel.Balanced => Loc.T("Balanced"),
+            PresetLevel.Aggressive => Loc.T("Aggressive"),
+            _ => level.ToString(),
+        };
         StatusText = keptManual == 0
-            ? $"{level} preset selected — review and click Apply Changes."
-            : $"{level} preset selected, keeping {keptManual} manual selection{(keptManual == 1 ? "" : "s")} — review and click Apply Changes.";
+            ? Loc.F("{0} preset selected — review and click Apply Changes.", preset)
+            : keptManual == 1
+            ? Loc.F("{0} preset selected, keeping 1 manual selection — review and click Apply Changes.", preset)
+            : Loc.F("{0} preset selected, keeping {1} manual selections — review and click Apply Changes.", preset, keptManual);
     }
 
     // ---------------------------------------------------------------- configuration files
@@ -376,8 +395,8 @@ public sealed class MainViewModel : ObservableObject
     {
         var dialog = new SaveFileDialog
         {
-            Title = "Export WinPure configuration",
-            Filter = "WinPure configuration (*.json)|*.json",
+            Title = Loc.T("Export WinPure configuration"),
+            Filter = Loc.T("WinPure configuration (*.json)|*.json"),
             FileName = $"winpure-config-{DateTime.Now:yyyy-MM-dd}.json",
             AddExtension = true,
         };
@@ -388,12 +407,14 @@ public sealed class MainViewModel : ObservableObject
             var ids = AllTweaks.Where(t => t.IsSelected).Select(t => t.Tweak.Id).ToList();
             string version = typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "";
             File.WriteAllText(dialog.FileName, ConfigFile.Serialize(ids, version));
-            StatusText = $"Configuration exported — {ids.Count} tweak{(ids.Count == 1 ? "" : "s")} switched on.";
+            StatusText = ids.Count == 1
+                ? Loc.T("Configuration exported — 1 tweak switched on.")
+                : Loc.F("Configuration exported — {0} tweaks switched on.", ids.Count);
             LogService.Log($"Configuration exported to {dialog.FileName} ({ids.Count} tweaks).");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show($"The configuration could not be saved:\n\n{ex.Message}", "WinPure — Export configuration",
+            MessageBox.Show(Loc.F("The configuration could not be saved:\n\n{0}", ex.Message), Loc.T("WinPure — Export configuration"),
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
@@ -402,8 +423,8 @@ public sealed class MainViewModel : ObservableObject
     {
         var dialog = new OpenFileDialog
         {
-            Title = "Import WinPure configuration",
-            Filter = "WinPure configuration (*.json)|*.json|All files (*.*)|*.*",
+            Title = Loc.T("Import WinPure configuration"),
+            Filter = Loc.T("WinPure configuration (*.json)|*.json|All files (*.*)|*.*"),
         };
         if (dialog.ShowDialog() != true) return;
 
@@ -411,13 +432,13 @@ public sealed class MainViewModel : ObservableObject
         {
             // Checked before reading, so a huge file picked by mistake is never loaded into memory.
             if (new FileInfo(dialog.FileName).Length > ConfigFile.MaxChars * 4L)
-                throw new InvalidDataException("This file is too large to be a WinPure configuration.");
+                throw new InvalidDataException(Loc.T("This file is too large to be a WinPure configuration."));
             ImportConfig(File.ReadAllText(dialog.FileName));
             LogService.Log($"Configuration imported from {dialog.FileName}: {StatusText}");
         }
         catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show(ex.Message, "WinPure — Import configuration", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(ex.Message, Loc.T("WinPure — Import configuration"), MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -443,11 +464,11 @@ public sealed class MainViewModel : ObservableObject
         ActivePreset = null;
 
         // Kept short: the status bar shares its row with the apply hint.
-        StatusText = $"Imported: {ticked} ticked"
-            + (alreadyOn > 0 ? $", {alreadyOn} already on" : "")
-            + (removesApps > 0 ? $", {removesApps} remove apps" : "")
-            + (parsed.UnknownIds.Count > 0 ? $", {parsed.UnknownIds.Count} unknown skipped" : "")
-            + " — review, then Apply Changes.";
+        StatusText = Loc.F("Imported: {0} ticked", ticked)
+            + (alreadyOn > 0 ? Loc.F(", {0} already on", alreadyOn) : "")
+            + (removesApps > 0 ? Loc.F(", {0} remove apps", removesApps) : "")
+            + (parsed.UnknownIds.Count > 0 ? Loc.F(", {0} unknown skipped", parsed.UnknownIds.Count) : "")
+            + Loc.T(" — review, then Apply Changes.");
         return (ticked, alreadyOn, parsed.UnknownIds.Count);
     }
 
@@ -468,8 +489,8 @@ public sealed class MainViewModel : ObservableObject
         if (relevant.Count == 0) return true;
 
         var answer = MessageBox.Show(
-            $"Before you {what}, WinPure found:\n\n{SystemGuards.Describe(relevant)}\n\nContinue anyway?",
-            "WinPure — Check before continuing", MessageBoxButton.YesNo, MessageBoxImage.Warning,
+            Loc.F("Before you {0}, WinPure found:\n\n{1}\n\nContinue anyway?", what, SystemGuards.Describe(relevant)),
+            Loc.T("WinPure — Check before continuing"), MessageBoxButton.YesNo, MessageBoxImage.Warning,
             MessageBoxResult.No);
         bool go = answer == MessageBoxResult.Yes;
         LogService.Log($"Guards shown before '{what}' ({string.Join(", ", relevant.Select(g => g.Id))}): user chose {(go ? "to continue" : "to stop")}");
@@ -485,15 +506,15 @@ public sealed class MainViewModel : ObservableObject
             .Select(t => (t.Tweak, apply: t.IsSelected))
             .ToList();
         if (changes.Count == 0) return;
-        if (!ConfirmDespiteGuards("apply these changes")) return;
+        if (!ConfirmDespiteGuards(Loc.T("apply these changes"))) return;
 
         var irreversible = changes.Where(c => c.apply && !c.Tweak.FullyReversible).ToList();
         if (irreversible.Count > 0)
         {
-            var names = string.Join("\n  • ", irreversible.Select(c => c.Tweak.Name));
+            var names = string.Join("\n  • ", irreversible.Select(c => Loc.T(c.Tweak.Name)));
             var answer = MessageBox.Show(
-                $"These changes remove apps and can only be undone by reinstalling from the Microsoft Store:\n\n  • {names}\n\nContinue?",
-                "WinPure — Confirm app removal", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                Loc.F("These changes remove apps and can only be undone by reinstalling from the Microsoft Store:\n\n  • {0}\n\nContinue?", names),
+                Loc.T("WinPure — Confirm app removal"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (answer != MessageBoxResult.Yes) return;
         }
 
@@ -509,20 +530,22 @@ public sealed class MainViewModel : ObservableObject
             bool needsReboot = results.Any(r => r.Success && r.Tweak.RequiresRestart);
 
             StatusText = failed == 0
-                ? $"Done — {results.Count} change{(results.Count == 1 ? "" : "s")} applied."
-                : $"Finished with {failed} error{(failed == 1 ? "" : "s")} — see the log in %AppData%\\WinPure\\Logs.";
+                ? (results.Count == 1 ? Loc.T("Done — 1 change applied.") : Loc.F("Done — {0} changes applied.", results.Count))
+                : failed == 1
+                ? Loc.T("Finished with 1 error — see the log in %AppData%\\WinPure\\Logs.")
+                : Loc.F("Finished with {0} errors — see the log in %AppData%\\WinPure\\Logs.", failed);
 
             if (needsExplorer)
             {
                 var answer = MessageBox.Show(
-                    "Some changes need File Explorer to restart to take effect.\nRestart Explorer now?",
+                    Loc.T("Some changes need File Explorer to restart to take effect.\nRestart Explorer now?"),
                     "WinPure", MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (answer == MessageBoxResult.Yes)
                     await Task.Run(() => PowerShellRunner.Run("Stop-Process -Name explorer -Force"));
             }
             else if (needsReboot)
             {
-                MessageBox.Show("Some changes will take full effect after a reboot.", "WinPure",
+                MessageBox.Show(Loc.T("Some changes will take full effect after a reboot."), "WinPure",
                     MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
@@ -546,21 +569,23 @@ public sealed class MainViewModel : ObservableObject
     private async void RestoreSession(BackupSessionViewModel vm)
     {
         // Restoring as the wrong user writes the per-user half of the backup into the wrong profile.
-        if (!ConfirmDespiteGuards("restore this backup", SystemGuards.ForRestore)) return;
+        if (!ConfirmDespiteGuards(Loc.T("restore this backup"), SystemGuards.ForRestore)) return;
 
         var answer = MessageBox.Show(
-            $"Restore the snapshot from {vm.Title}?\nAll {vm.Session.Entries.Count} captured values will be written back.",
-            "WinPure — Restore backup", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            Loc.F("Restore the snapshot from {0}?\nAll {1} captured values will be written back.", vm.Title, vm.Session.Entries.Count),
+            Loc.T("WinPure — Restore backup"), MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (answer != MessageBoxResult.Yes) return;
 
         IsBusy = true;
-        StatusText = "Restoring backup…";
+        StatusText = Loc.T("Restoring backup…");
         try
         {
             int failures = await Task.Run(() => _backupManager.RestoreSession(vm.Session));
             // a snapshot may include theme values — make open apps repaint
             NativeMethods.BroadcastThemeChange();
-            StatusText = failures == 0 ? "Backup restored." : $"Backup restored with {failures} errors (see log).";
+            StatusText = failures == 0 ? Loc.T("Backup restored.")
+                : failures == 1 ? Loc.T("Backup restored with 1 error (see log).")
+                : Loc.F("Backup restored with {0} errors (see log).", failures);
         }
         finally
         {
@@ -573,11 +598,11 @@ public sealed class MainViewModel : ObservableObject
     {
         // Backups live in the profile of the account WinPure runs as. Elevated as someone else, this
         // list is that account's backups, not the signed-in user's — and deleting cannot be undone.
-        if (!ConfirmDespiteGuards("delete this backup", SystemGuards.ForRestore)) return;
+        if (!ConfirmDespiteGuards(Loc.T("delete this backup"), SystemGuards.ForRestore)) return;
 
         var answer = MessageBox.Show(
-            $"Delete the backup from {vm.Title}? This cannot be undone.",
-            "WinPure — Delete backup", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            Loc.F("Delete the backup from {0}? This cannot be undone.", vm.Title),
+            Loc.T("WinPure — Delete backup"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
         if (answer != MessageBoxResult.Yes) return;
         _backupManager.DeleteSession(vm.Session);
         LoadBackups();

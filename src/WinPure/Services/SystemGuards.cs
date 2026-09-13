@@ -152,11 +152,11 @@ public sealed record GuardInputs
         // every day and teaches people to click past it.
         var keys = new (string Path, string Reason)[]
         {
-            ($@"{cbs}\RebootPending", "Windows servicing is waiting for a restart"),
-            ($@"{cbs}\RebootInProgress", "a Windows servicing restart is in progress"),
-            ($@"{cbs}\PackagesPending", "Windows packages are pending installation"),
-            ($@"{wu}\RebootRequired", "Windows Update needs a restart"),
-            ($@"{wu}\PostRebootReporting", "Windows Update is finishing after a restart"),
+            ($@"{cbs}\RebootPending", Loc.T("Windows servicing is waiting for a restart")),
+            ($@"{cbs}\RebootInProgress", Loc.T("a Windows servicing restart is in progress")),
+            ($@"{cbs}\PackagesPending", Loc.T("Windows packages are pending installation")),
+            ($@"{wu}\RebootRequired", Loc.T("Windows Update needs a restart")),
+            ($@"{wu}\PostRebootReporting", Loc.T("Windows Update is finishing after a restart")),
         };
 
         foreach (var (path, reason) in keys)
@@ -198,9 +198,9 @@ public static class SystemGuards
             string signedIn = f.SessionUser ?? session;
             string runningAs = f.ProcessUser ?? process;
             warnings.Add(new GuardWarning(DifferentUserId, GuardSeverity.High,
-                "WinPure is running as a different user",
-                $"You are signed in as {signedIn}, but WinPure is running as {runningAs}. Personal settings and "
-              + $"Startup apps would change for {runningAs}, not for you."));
+                Loc.T("WinPure is running as a different user"),
+                Loc.F("You are signed in as {0}, but WinPure is running as {1}. Personal settings and Startup apps would change for {1}, not for you.",
+                    signedIn, runningAs)));
         }
 
         // ANY signal is enough. Sophia's version requires all five keys at once
@@ -209,9 +209,9 @@ public static class SystemGuards
         if (f.PendingRebootSignals.Count > 0)
         {
             warnings.Add(new GuardWarning(RebootPendingId, GuardSeverity.Medium,
-                "Windows is waiting for a restart",
-                string.Join("; ", f.PendingRebootSignals) + ". Changes made now can be undone when Windows "
-              + "finishes, and would then show as not applied. Restarting first is safer."));
+                Loc.T("Windows is waiting for a restart"),
+                Loc.F("{0}. Changes made now can be undone when Windows finishes, and would then show as not applied. Restarting first is safer.",
+                    string.Join("; ", f.PendingRebootSignals))));
         }
 
         // Only the read-only half of Sophia's BitLocker check. Offering to decrypt a drive —
@@ -221,8 +221,8 @@ public static class SystemGuards
             && !bl.Equals("FullyDecrypted", StringComparison.OrdinalIgnoreCase))
         {
             warnings.Add(new GuardWarning(BitLockerBusyId, GuardSeverity.High,
-                "BitLocker is still working on your system drive",
-                $"The drive is {DescribeBitLocker(bl)}. Wait until that finishes before changing system settings."));
+                Loc.T("BitLocker is still working on your system drive"),
+                Loc.F("The drive is {0}. Wait until that finishes before changing system settings.", DescribeBitLocker(bl))));
         }
 
         // Only judged when the listing covered every user. An empty list from a failed query is
@@ -236,9 +236,9 @@ public static class SystemGuards
             if (missing.Count > 0)
             {
                 warnings.Add(new GuardWarning(CoreAppsMissingId, GuardSeverity.Medium,
-                    "Part of Windows' app platform is missing",
-                    $"Not installed: {string.Join(", ", missing.Select(FriendlyPackage))}. This usually means another "
-                  + "tool already removed it. Removing more apps on top of that can leave Start, search or Settings not working."));
+                    Loc.T("Part of Windows' app platform is missing"),
+                    Loc.F("Not installed: {0}. This usually means another tool already removed it. Removing more apps on top of that can leave Start, search or Settings not working.",
+                        string.Join(", ", missing.Select(FriendlyPackage)))));
             }
         }
 
@@ -247,8 +247,8 @@ public static class SystemGuards
         if (f.EventLogStatus is { Length: > 0 } ev && !ev.Equals("Running", StringComparison.OrdinalIgnoreCase))
         {
             warnings.Add(new GuardWarning(EventLogStoppedId, GuardSeverity.Low,
-                "The Windows Event Log is switched off",
-                "That is rarely done on purpose, and usually means another tool already changed this system."));
+                Loc.T("The Windows Event Log is switched off"),
+                Loc.T("That is rarely done on purpose, and usually means another tool already changed this system.")));
         }
 
         return warnings.OrderByDescending(w => w.Severity).ToList();
@@ -286,17 +286,17 @@ public static class SystemGuards
 
     private static string DescribeBitLocker(string status) => status switch
     {
-        "EncryptionInProgress" => "being encrypted",
-        "DecryptionInProgress" => "being decrypted",
-        "EncryptionPaused" => "part-way through encryption (paused)",
-        "DecryptionPaused" => "part-way through decryption (paused)",
-        _ => $"in state '{status}'",
+        "EncryptionInProgress" => Loc.T("being encrypted"),
+        "DecryptionInProgress" => Loc.T("being decrypted"),
+        "EncryptionPaused" => Loc.T("part-way through encryption (paused)"),
+        "DecryptionPaused" => Loc.T("part-way through decryption (paused)"),
+        _ => Loc.F("in state '{0}'", status),
     };
 
     private static string FriendlyPackage(string package) => package switch
     {
         StorePackage => "Microsoft Store",
-        ShellPackage => "Windows Feature Experience Pack (Start, taskbar and search)",
+        ShellPackage => Loc.T("Windows Feature Experience Pack (Start, taskbar and search)"),
         _ => package,
     };
 }

@@ -47,9 +47,10 @@ public sealed class StartupEntry
 
     public string SourceLabel => Source switch
     {
-        StartupSource.RegistryRun => "Registry",
-        StartupSource.StartupFolder => "Startup folder",
-        StartupSource.ScheduledTask => "Scheduled task",
+        // English here; the page translates it where it is shown.
+        StartupSource.RegistryRun => Services.Loc.N("Registry"),
+        StartupSource.StartupFolder => Services.Loc.N("Startup folder"),
+        StartupSource.ScheduledTask => Services.Loc.N("Scheduled task"),
         _ => "",
     };
 }

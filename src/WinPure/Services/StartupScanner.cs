@@ -23,12 +23,12 @@ public static class StartupScanner
 
     private static readonly RunLocation[] RunLocations =
     {
-        new($@"HKCU\Software\{RunSuffix}", $@"HKCU\Software\{ApprovedRoot}\Run", "This user"),
-        new($@"HKLM\SOFTWARE\{RunSuffix}", $@"HKLM\SOFTWARE\{ApprovedRoot}\Run", "All users"),
+        new($@"HKCU\Software\{RunSuffix}", $@"HKCU\Software\{ApprovedRoot}\Run", Loc.N("This user")),
+        new($@"HKLM\SOFTWARE\{RunSuffix}", $@"HKLM\SOFTWARE\{ApprovedRoot}\Run", Loc.N("All users")),
         // 32-bit installers write under WOW6432Node, and their mirror is Run32 — NOT Run.
         // Verified on 2026-09-12: "Adobe Creative Cloud" lives in WOW6432Node\Run and its
         // bit lives in StartupApproved\Run32. Writing to Run would silently do nothing.
-        new($@"HKLM\SOFTWARE\WOW6432Node\{RunSuffix}", $@"HKLM\SOFTWARE\{ApprovedRoot}\Run32", "All users (32-bit)"),
+        new($@"HKLM\SOFTWARE\WOW6432Node\{RunSuffix}", $@"HKLM\SOFTWARE\{ApprovedRoot}\Run32", Loc.N("All users (32-bit)")),
     };
 
     /// <summary>Every StartupApproved key the scanner reads and writes — the only ones a backup may restore a switch into.</summary>
@@ -45,10 +45,10 @@ public static class StartupScanner
 
         entries.AddRange(FromStartupFolder(
             Environment.GetFolderPath(Environment.SpecialFolder.Startup),
-            $@"HKCU\Software\{ApprovedRoot}\StartupFolder", "This user"));
+            $@"HKCU\Software\{ApprovedRoot}\StartupFolder", Loc.N("This user")));
         entries.AddRange(FromStartupFolder(
             Environment.GetFolderPath(Environment.SpecialFolder.CommonStartup),
-            $@"HKLM\SOFTWARE\{ApprovedRoot}\StartupFolder", "All users"));
+            $@"HKLM\SOFTWARE\{ApprovedRoot}\StartupFolder", Loc.N("All users")));
 
         if (ctx is not null)
             entries.AddRange(FromLogonTasks(ctx));
@@ -131,7 +131,7 @@ public static class StartupScanner
                 Publisher = task.Author,
                 Command = task.Action.Length > 0 ? task.Action : task.Path,
                 Source = StartupSource.ScheduledTask,
-                Scope = "Scheduled task",
+                Scope = Loc.N("Scheduled task"),
                 Enabled = task.Enabled,
                 TaskPath = task.Path,
             };

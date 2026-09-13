@@ -10,9 +10,10 @@ public sealed class InstallableAppViewModel : ObservableObject
 {
     public required InstallableApp App { get; init; }
 
+    // Product names are not translated.
     public string Name => App.Name;
-    public string Description => App.Description;
-    public string Group => App.Group;
+    public string Description => Loc.T(App.Description);
+    public string Group => Loc.T(App.Group);
     public string Icon => App.Icon;
 
     private string _statusText = "";
@@ -47,7 +48,7 @@ public sealed class InstallerViewModel : PageViewModel
     public RelayCommand InstallCommand { get; }
     public RelayCommand RefreshCommand { get; }
 
-    private string _summary = "Checks which of these apps are installed when you open this page.";
+    private string _summary = Loc.T("Checks which of these apps are installed when you open this page.");
     public string Summary { get => _summary; set => Set(ref _summary, value); }
 
     private bool _isChecking;
@@ -74,13 +75,13 @@ public sealed class InstallerViewModel : PageViewModel
     {
         if (IsChecking) return;
         IsChecking = true;
-        Summary = "Checking which apps winget sees installed…";
+        Summary = Loc.T("Checking which apps winget sees installed…");
         try
         {
             var installed = await Task.Run(() => Winget.Backend.ReadInstalledIds());
             if (installed is null)
             {
-                Summary = "winget is not available or did not answer, so installed apps cannot be checked. It comes with 'App Installer' from the Microsoft Store.";
+                Summary = Loc.T("winget is not available or did not answer, so installed apps cannot be checked. It comes with 'App Installer' from the Microsoft Store.");
                 return;
             }
 
@@ -89,10 +90,10 @@ public sealed class InstallerViewModel : PageViewModel
             {
                 app.IsInstalled = installed.Contains(app.App.Id);
                 if (app.IsInstalled) found++;
-                if (!app.IsRunning) app.StatusText = app.IsInstalled ? "Installed" : "Not detected";
+                if (!app.IsRunning) app.StatusText = app.IsInstalled ? Loc.T("Installed") : Loc.T("Not detected");
             }
             HasChecked = true;
-            Summary = $"{found} of {Apps.Count} already installed. Installed apps are not removed by Restore: uninstall them from Settings > Apps.";
+            Summary = Loc.F("{0} of {1} already installed. Installed apps are not removed by Restore: uninstall them from Settings > Apps.", found, Apps.Count);
         }
         finally
         {
@@ -103,12 +104,10 @@ public sealed class InstallerViewModel : PageViewModel
 
     private async Task InstallAsync(InstallableAppViewModel app)
     {
-        if (!Main.ConfirmDespiteGuards($"install {app.Name}", SystemGuards.ForRepair)) return;
+        if (!Main.ConfirmDespiteGuards(Loc.F("install {0}", app.Name), SystemGuards.ForRepair)) return;
         var answer = MessageBox.Show(
-            $"Install {app.Name} with winget?\n\n" +
-            "It is downloaded from its publisher, and installing accepts that app's license terms. " +
-            "WinPure's Restore cannot undo this: to remove the app later, uninstall it from Settings > Apps.",
-            "WinPure — Install app", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+            Loc.F("Install {0} with winget?\n\nIt is downloaded from its publisher, and installing accepts that app's license terms. WinPure's Restore cannot undo this: to remove the app later, uninstall it from Settings > Apps.", app.Name),
+            Loc.T("WinPure — Install app"), MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) return;
         await InstallConfirmedAsync(app);
     }
@@ -122,9 +121,9 @@ public sealed class InstallerViewModel : PageViewModel
         Main.IsBusy = true;
         app.IsRunning = true;
         var clock = Stopwatch.StartNew();
-        app.StatusText = "Installing… 0:00";
-        using var ticker = new Timer(_ => app.StatusText = $"Installing… {RepairToolViewModel.Format(clock.Elapsed)}", null, 1000, 1000);
-        Main.StatusText = $"Installing {app.Name}…";
+        app.StatusText = Loc.F("Installing… {0}", "0:00");
+        using var ticker = new Timer(_ => app.StatusText = Loc.F("Installing… {0}", RepairToolViewModel.Format(clock.Elapsed)), null, 1000, 1000);
+        Main.StatusText = Loc.F("Installing {0}…", app.Name);
         LogService.Log($"Install started: {app.App.Id}");
         try
         {
@@ -136,11 +135,11 @@ public sealed class InstallerViewModel : PageViewModel
 
             app.IsInstalled = present;
             app.StatusText = present
-                ? $"Installed ({elapsed})"
+                ? Loc.F("Installed ({0})", elapsed)
                 : installed is null
-                    ? $"winget finished with code 0x{exitCode:X8}, and installed apps could not be checked afterwards."
-                    : $"Not installed: winget finished with code 0x{exitCode:X8} and does not see {app.Name} afterwards.";
-            Main.StatusText = present ? $"{app.Name} installed." : $"{app.Name} was not installed — see its card.";
+                    ? Loc.F("winget finished with code 0x{0:X8}, and installed apps could not be checked afterwards.", exitCode)
+                    : Loc.F("Not installed: winget finished with code 0x{0:X8} and does not see {1} afterwards.", exitCode, app.Name);
+            Main.StatusText = present ? Loc.F("{0} installed.", app.Name) : Loc.F("{0} was not installed — see its card.", app.Name);
             LogService.Log($"Install finished in {elapsed}: {app.App.Id}, exit 0x{exitCode:X8}, detected afterwards={present}");
         }
         finally

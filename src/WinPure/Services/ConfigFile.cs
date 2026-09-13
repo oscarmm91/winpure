@@ -47,16 +47,16 @@ public static class ConfigFile
     public static Parsed Parse(string json, IEnumerable<string> catalogIds)
     {
         if (json.Length > MaxChars)
-            throw new InvalidDataException("This file is too large to be a WinPure configuration.");
+            throw new InvalidDataException(Loc.T("This file is too large to be a WinPure configuration."));
 
         Dto? dto;
         try { dto = JsonSerializer.Deserialize<Dto>(json); }
-        catch (JsonException) { throw new InvalidDataException("This file is not a WinPure configuration: it is not valid JSON."); }
+        catch (JsonException) { throw new InvalidDataException(Loc.T("This file is not a WinPure configuration: it is not valid JSON.")); }
 
         if (dto is null || dto.App != AppName)
-            throw new InvalidDataException("This file is not a WinPure configuration.");
+            throw new InvalidDataException(Loc.T("This file is not a WinPure configuration."));
         if (dto.Format != FormatVersion)
-            throw new InvalidDataException($"This configuration uses format {dto.Format}, which this version of WinPure cannot read.");
+            throw new InvalidDataException(Loc.F("This configuration uses format {0}, which this version of WinPure cannot read.", dto.Format));
 
         var catalog = new HashSet<string>(catalogIds, StringComparer.Ordinal);
         var ids = (dto.Tweaks ?? new List<string>())

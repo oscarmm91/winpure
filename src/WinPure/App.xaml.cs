@@ -13,7 +13,7 @@ public partial class App : Application
         DispatcherUnhandledException += (_, args) =>
         {
             LogService.Log($"UNHANDLED: {args.Exception}");
-            MessageBox.Show($"Unexpected error:\n{args.Exception.Message}\n\nDetails were written to %AppData%\\WinPure\\Logs.",
+            MessageBox.Show(Loc.F("Unexpected error:\n{0}\n\nDetails were written to %AppData%\\WinPure\\Logs.", args.Exception.Message),
                 "WinPure", MessageBoxButton.OK, MessageBoxImage.Error);
             args.Handled = true;
         };

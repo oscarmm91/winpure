@@ -29,6 +29,13 @@
     <InternalsVisibleTo Include="WinPure.EngineTests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The Spanish text (see Services/Loc.cs). Embedded in WinPure.dll itself, so the single-file exe carries it.
+         WithCulture="false" is required: MSBuild reads the ".es." in the name as a culture and would move the
+         file into an es\WinPure.resources.dll satellite instead, which SatelliteResourceLanguages=en then drops. -->
+    <EmbeddedResource Include="Resources\Strings.es.json" LogicalName="WinPure.Strings.es.json" WithCulture="false" />
+  </ItemGroup>
+
 </Project>
 
 

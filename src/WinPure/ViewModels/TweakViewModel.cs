@@ -9,9 +9,10 @@ public sealed class TweakViewModel : ObservableObject
 
     public TweakViewModel(Tweak tweak) => Tweak = tweak;
 
-    public string Name => Tweak.Name;
-    public string Description => Tweak.Description;
-    public string Help => string.IsNullOrEmpty(Tweak.Help) ? Tweak.Description : Tweak.Help;
+    // The catalog is written in English; the card shows the user's language.
+    public string Name => Loc.T(Tweak.Name);
+    public string Description => Loc.T(Tweak.Description);
+    public string Help => Loc.T(string.IsNullOrEmpty(Tweak.Help) ? Tweak.Description : Tweak.Help);
     public string Icon => Tweak.Icon;
     public TweakCategory Category => Tweak.Category;
     public PresetLevel Preset => Tweak.Preset;
@@ -35,11 +36,11 @@ public sealed class TweakViewModel : ObservableObject
     public bool IsOptimized => Status == TweakStatus.Optimized;
     public string StatusText => Status switch
     {
-        TweakStatus.Optimized => "Optimized",
-        TweakStatus.Pending => "Not applied",
+        TweakStatus.Optimized => Loc.T("Optimized"),
+        TweakStatus.Pending => Loc.T("Not applied"),
         // Before the scan it really is still scanning; afterwards, Unknown means the check
         // failed — saying "Scanning…" forever hid that from the user.
-        _ => _scanned ? "Couldn't detect" : "Scanning…",
+        _ => _scanned ? Loc.T("Couldn't detect") : Loc.T("Scanning…"),
     };
 
     private bool _isSelected;

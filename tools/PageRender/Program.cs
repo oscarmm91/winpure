@@ -12,15 +12,19 @@ using WinPure.ViewModels;
 // a real window comes back blank unless that window reached the foreground, and a real window on the
 // owner's screen is a real app — on 2026-09-12 someone clicked one during a capture and changed real
 // startup entries. This loads App.xaml's resources, takes MainWindow's content without showing it, and
-// draws it. Nothing is applied: toggles only change in memory, and the Install page only reads winget.
+// draws it: Dashboard, search, Windows Features, Install Apps, Startup Apps and Repair. Nothing is applied:
+// toggles only change in memory, the Install page only reads winget, and Startup only reads the Run keys
+// and Startup folders. Restore is left out on purpose: listing backups prepares their ProgramData folder.
 //
-// Usage: dotnet run --project tools\PageRender -- <output folder>
+// Usage: dotnet run --project tools\PageRender -- <output folder> [--es]
 internal static class Program
 {
     [STAThread]
     private static int Main(string[] args)
     {
-        string outDir = args.Length > 0 ? args[0] : Environment.CurrentDirectory;
+        // English unless asked: the app itself would follow this machine's Windows, which is in Spanish.
+        WinPure.Services.Loc.Use(args.Contains("--es") ? "es" : "en");
+        string outDir = args.FirstOrDefault(a => !a.StartsWith("--")) ?? Environment.CurrentDirectory;
         Directory.CreateDirectory(outDir);
         try
         {
@@ -50,6 +54,15 @@ internal static class Program
                 Pump(TimeSpan.FromMilliseconds(500));
             Console.WriteLine($"installer check finished={installer.HasChecked} after {clock.Elapsed.TotalSeconds:0}s: {installer.Summary}");
             Render(root, Path.Combine(outDir, "04-install.png"));
+
+            // Startup reads the Run keys and Startup folders only. No full scan: that would also open the backup
+            // store in ProgramData, and this tool never touches anything the app keeps.
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is StartupViewModel);
+            ((StartupViewModel)vm.CurrentPage).Load(new WinPure.Services.ScanContext());
+            Render(root, Path.Combine(outDir, "05-startup.png"));
+
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is RepairViewModel);
+            Render(root, Path.Combine(outDir, "06-repair.png"));
             return 0;
         }
         catch (Exception ex)

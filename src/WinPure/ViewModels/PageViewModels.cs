@@ -6,8 +6,10 @@ namespace WinPure.ViewModels;
 
 public abstract class PageViewModel : ObservableObject
 {
-    public required string Title { get; init; }
-    public required string Subtitle { get; init; }
+    private readonly string _title = "", _subtitle = "";
+    // Translated here, once, so no page can forget to. What is passed in is the English key.
+    public required string Title { get => _title; init => _title = Loc.T(value); }
+    public required string Subtitle { get => _subtitle; init => _subtitle = Loc.T(value); }
 }
 
 /// <summary>A page of tweak cards: one category, or the search results (no category).</summary>
@@ -38,9 +40,21 @@ public sealed class BackupSessionViewModel : ObservableObject
     public required BackupSession Session { get; init; }
     public string Title => Session.CreatedUtc.ToLocalTime().ToString("dd MMM yyyy — HH:mm");
     public string Summary => Session.TweakNames.Count == 0
-        ? $"{Session.Entries.Count} changes"
-        : string.Join(", ", Session.TweakNames.Take(4)) + (Session.TweakNames.Count > 4 ? $"  (+{Session.TweakNames.Count - 4} more)" : "");
-    public string EntryCount => $"{Session.Entries.Count} registry/service entries";
+        ? (Session.Entries.Count == 1 ? Loc.T("1 change") : Loc.F("{0} changes", Session.Entries.Count))
+        : string.Join(", ", Session.TweakNames.Take(4).Select(DisplayName))
+          + (Session.TweakNames.Count > 4 ? "  " + Loc.F("(+{0} more)", Session.TweakNames.Count - 4) : "");
+    public string EntryCount => Session.Entries.Count == 1
+        ? Loc.T("1 registry/service entry")
+        : Loc.F("{0} registry/service entries", Session.Entries.Count);
+
+    /// <summary>
+    /// A backup records tweak names in English, so it reads the same whichever language made it; they are
+    /// translated here, where they are shown. A startup entry's name is the app's own and stays as it is.
+    /// </summary>
+    private static string DisplayName(string name) =>
+        name.StartsWith(StartupViewModel.TweakNamePrefix, StringComparison.Ordinal)
+            ? Loc.F("Startup: {0}", name[StartupViewModel.TweakNamePrefix.Length..])
+            : Loc.T(name);
 }
 
 public sealed class RestoreViewModel : PageViewModel

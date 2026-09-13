@@ -91,6 +91,16 @@ A new page for Windows' optional features, switched with DISM and undone to the 
 - **Turn on:** Windows Sandbox, Windows Subsystem for Linux and .NET Framework 3.5.
 - A feature query that fails reads as *Couldn't detect*, never *Already optimized*. A feature your Windows build does not include is left alone, and a feature read back from a backup file is checked before DISM ever runs.
 
+### WinPure in Spanish
+
+WinPure now speaks Spanish. It follows the language Windows is set to: Spanish Windows, Spanish app; any other language stays in English.
+
+- Everything on screen: every tweak's name, description and help, the presets, Startup Apps, Repair, Restore, Install Apps, and every check and confirmation shown before a change.
+- Search looks in both languages, so a setting you know by its English name is still found.
+- A tweak title too long for its card now wraps, and its help and restart icons move to the next line instead of being pushed out of sight.
+- Backups still record tweak names in English, so a backup reads the same whichever language made it; the Restore page shows the names in yours.
+- Text without a translation shows in English rather than as an empty space, and a broken translation falls back to English instead of stopping the app. The test suite fails whenever something on screen has no Spanish, a translation is left over from text that has changed, or a translation's placeholders differ from the English.
+
 ### 17 new tweaks
 
 Registry keys, scheduled tasks and policies were checked against a real Windows 11 25H2 machine (build 26200) before being added, and every one reverts to the value the machine actually had.

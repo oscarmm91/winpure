@@ -48,7 +48,7 @@ public sealed class TweakEngine
 
         foreach (var (tweak, apply) in changeList)
         {
-            progress?.Report($"{(apply ? "Applying" : "Reverting")}: {tweak.Name}");
+            progress?.Report(apply ? Loc.F("Applying: {0}", Loc.T(tweak.Name)) : Loc.F("Reverting: {0}", Loc.T(tweak.Name)));
             try
             {
                 if (apply) ApplyTweak(tweak, session);

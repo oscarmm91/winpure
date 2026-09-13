@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace WinPure.Services;
 
@@ -56,6 +57,8 @@ public interface IWingetBackend
     IReadOnlySet<string>? ReadInstalledIds();
     /// <summary>Installs one package and returns winget's exit code. Judge the result by reading the installed ids afterwards.</summary>
     int Install(string id);
+    /// <summary>Searches the winget catalog. Empty when winget is missing or nothing matched.</summary>
+    IReadOnlyList<Winget.SearchResult> Search(string query) => Array.Empty<Winget.SearchResult>();
 }
 
 public static class Winget
@@ -95,6 +98,44 @@ public static class Winget
         }
         return ids;
     }
+
+    /// <summary>One result from a `winget search`: its package id and display name.</summary>
+    public readonly record struct SearchResult(string Id, string Name);
+
+    /// <summary>
+    /// Reads the id and name out of `winget search`'s table without depending on its column HEADERS, which
+    /// are translated (Nombre/Versión/Origen on a Spanish machine). It finds the dashes line under the header
+    /// and, for each row below, takes the field that looks like a winget id — publisher.name — and the name.
+    /// </summary>
+    public static List<SearchResult> ParseSearch(string output)
+    {
+        var results = new List<SearchResult>();
+        var lines = output.Replace("\r", "").Split('\n');
+
+        int separator = -1;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string trimmed = lines[i].Trim();
+            int rule = trimmed.Count(c => c is '-' or '─' or '—');
+            if (rule >= 3 && rule >= trimmed.Length * 0.6) { separator = i; break; }
+        }
+        if (separator < 0) return results;
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = separator + 1; i < lines.Length; i++)
+        {
+            string row = lines[i].Trim();
+            if (row.Length == 0) continue;
+            var fields = Regex.Split(row, @"\s{2,}").Where(f => f.Length > 0).ToArray();
+            if (fields.Length < 2) continue;
+            // The id is not the name (field 0). Prefer a publisher.name id; fall back to any valid id.
+            string? id = fields.Skip(1).FirstOrDefault(f => IsValidId(f) && f.Contains('.'))
+                      ?? fields.Skip(1).FirstOrDefault(IsValidId);
+            if (id is null || !seen.Add(id)) continue;
+            results.Add(new SearchResult(id, fields[0]));
+        }
+        return results;
+    }
 }
 
 internal sealed class WingetCli : IWingetBackend
@@ -124,6 +165,21 @@ internal sealed class WingetCli : IWingetBackend
         {
             try { File.Delete(file); } catch { }
         }
+    }
+
+    public IReadOnlyList<Winget.SearchResult> Search(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return Array.Empty<Winget.SearchResult>();
+        // Read-only, so it may die with the app. --count caps it; --disable-interactivity drops the spinner.
+        var result = PowerShellRunner.Run(
+            $"winget search --query {PowerShellRunner.Quote(query)} --source winget --count 30 --disable-interactivity",
+            60_000, dieWithApp: true);
+        if (!result.Success)
+        {
+            LogService.Log($"winget search failed (exit {result.ExitCode}): {result.Error}");
+            return Array.Empty<Winget.SearchResult>();
+        }
+        return Winget.ParseSearch(result.Output);
     }
 
     public int Install(string id)

@@ -45,8 +45,21 @@ public sealed class InstallerViewModel : PageViewModel
 {
     public required MainViewModel Main { get; init; }
     public ObservableCollection<InstallableAppViewModel> Apps { get; } = new();
+    public ObservableCollection<InstallableAppViewModel> SearchResults { get; } = new();
     public RelayCommand InstallCommand { get; }
     public RelayCommand RefreshCommand { get; }
+    public RelayCommand SearchCommand { get; }
+
+    private IReadOnlySet<string>? _installed;
+
+    private string _searchQuery = "";
+    public string SearchQuery { get => _searchQuery; set => Set(ref _searchQuery, value); }
+
+    private string _searchSummary = "";
+    public string SearchSummary { get => _searchSummary; set => Set(ref _searchSummary, value); }
+
+    private bool _hasSearched;
+    public bool HasSearched { get => _hasSearched; set => Set(ref _hasSearched, value); }
 
     private string _summary = Loc.T("Checks which of these apps are installed when you open this page.");
     public string Summary { get => _summary; set => Set(ref _summary, value); }
@@ -64,6 +77,41 @@ public sealed class InstallerViewModel : PageViewModel
         InstallCommand = new RelayCommand(p => _ = InstallAsync((InstallableAppViewModel)p!),
             p => Main is { IsBusy: false } && !IsChecking && p is InstallableAppViewModel { CanInstall: true });
         RefreshCommand = new RelayCommand(_ => _ = RefreshAsync(), _ => Main is { IsBusy: false } && !IsChecking);
+        SearchCommand = new RelayCommand(_ => _ = SearchAsync(), _ => Main is { IsBusy: false } && !IsChecking && SearchQuery.Trim().Length > 0);
+    }
+
+    /// <summary>
+    /// Searches the whole winget catalog for anything, not just the curated list, so any app can be installed
+    /// from here. Results reuse the same card and install flow; an id winget already sees installed is marked so.
+    /// </summary>
+    public async Task SearchAsync()
+    {
+        string query = SearchQuery.Trim();
+        if (query.Length == 0 || IsChecking) return;
+        IsChecking = true;
+        SearchResults.Clear();
+        SearchSummary = Loc.F("Searching winget for \"{0}\"…", query);
+        try
+        {
+            var results = await Task.Run(() => Winget.Backend.Search(query));
+            foreach (var r in results)
+            {
+                var app = new InstallableApp(r.Id, r.Name, r.Id, "winget", ((char)0xE896).ToString());
+                var vm = new InstallableAppViewModel { App = app };
+                vm.IsInstalled = _installed?.Contains(r.Id) == true;
+                vm.StatusText = vm.IsInstalled ? Loc.T("Installed") : Loc.T("Not detected");
+                SearchResults.Add(vm);
+            }
+            HasSearched = true;
+            SearchSummary = results.Count == 0
+                ? Loc.F("winget found nothing for \"{0}\".", query)
+                : Loc.F("{0} result(s) from winget. These install from their publisher, like the list below.", results.Count);
+        }
+        finally
+        {
+            IsChecking = false;
+            System.Windows.Input.CommandManager.InvalidateRequerySuggested();
+        }
     }
 
     /// <summary>
@@ -79,6 +127,7 @@ public sealed class InstallerViewModel : PageViewModel
         try
         {
             var installed = await Task.Run(() => Winget.Backend.ReadInstalledIds());
+            _installed = installed;
             if (installed is null)
             {
                 Summary = Loc.T("winget is not available or did not answer, so installed apps cannot be checked. It comes with 'App Installer' from the Microsoft Store.");

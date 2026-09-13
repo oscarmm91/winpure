@@ -601,5 +601,10 @@
   "Queued crash dumps and Windows Error Reporting files. Only local diagnostics — safe to clear.": "Volcados de fallos en cola y archivos de Informe de errores de Windows. Solo diagnósticos locales — se pueden borrar sin problema.",
   "Compiled shader caches (DirectX, NVIDIA, AMD, Intel). Some games may stutter once while they rebuild.": "Cachés de sombreadores compilados (DirectX, NVIDIA, AMD, Intel). Algunos juegos pueden tironear una vez mientras se reconstruyen.",
   "Microsoft Defender's scan and detection history. Not its signatures — protection is unaffected.": "El historial de análisis y detecciones de Microsoft Defender. No sus firmas — la protección no se toca.",
-  "Permanently delete everything in the Recycle Bin. These are your own deleted files — this cannot be undone.": "Borra de forma permanente todo lo de la Papelera de reciclaje. Son tus propios archivos borrados — esto no se puede deshacer."
+  "Permanently delete everything in the Recycle Bin. These are your own deleted files — this cannot be undone.": "Borra de forma permanente todo lo de la Papelera de reciclaje. Son tus propios archivos borrados — esto no se puede deshacer.",
+  "Searching winget for \"{0}\"…": "Buscando \"{0}\" en winget…",
+  "winget found nothing for \"{0}\".": "winget no encontró nada para \"{0}\".",
+  "{0} result(s) from winget. These install from their publisher, like the list below.": "{0} resultado(s) de winget. Se instalan desde su fabricante, como la lista de abajo.",
+  "Search the winget catalog for any app to install": "Busca cualquier app para instalar en el catálogo de winget",
+  "Suggested apps": "Apps sugeridas"
 }

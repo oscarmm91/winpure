@@ -101,6 +101,7 @@ failures += AStoreWinPureMakesIsTrustedAndStaysShut() ? 0 : 1;
 failures += OldBackupsAreCopiedOnceAndLeftInPlace() ? 0 : 1;
 failures += ALockedLegacyBackupDoesNotBrickMigration() ? 0 : 1;
 failures += WingetIdsAreCheckedAndTheExportIsReadExactly() ? 0 : 1;
+failures += WingetSearchTableIsParsedWithoutDependingOnHeaders() ? 0 : 1;
 failures += AnInstallIsJudgedByWhatWingetSeesAfterwards() ? 0 : 1;
 failures += EveryVisibleTextHasASpanishTranslation() ? 0 : 1;
 failures += SpanishIsShownAndABrokenTranslationFallsBackToEnglish() ? 0 : 1;
@@ -1631,6 +1632,36 @@ bool PowerShellQuotingDoublesEveryQuote()
     return Report("PowerShell quoting doubles every kind of quote",
         actual == expected,
         $"quoted length {actual.Length} (expected {expected.Length}), exact={actual == expected}");
+}
+
+// winget search has no JSON, only a table with TRANSLATED headers (Nombre/Versión/Origen on this machine).
+// The parser must not rely on the header text — it finds the dashes rule and reads the id out of each row.
+bool WingetSearchTableIsParsedWithoutDependingOnHeaders()
+{
+    // A Spanish header, a box-drawing rule, real rows, a duplicate, and a trailing note with no id.
+    string output = string.Join("\n",
+        "Nombre               Id                          Versión    Origen",
+        "────────────────────────────────────",
+        "Visual Studio Code   Microsoft.VisualStudioCode  1.95.0     winget",
+        "7-Zip                7zip.7zip                   24.09      winget",
+        "Git                  Git.Git                     2.47.0     winget",
+        "Visual Studio Code   Microsoft.VisualStudioCode  1.95.0     winget",
+        "Se encontraron más resultados.");
+
+    var results = Winget.ParseSearch(output);
+    var ids = results.Select(r => r.Id).ToList();
+    bool ok = results.Count == 3
+        && ids[0] == "Microsoft.VisualStudioCode"
+        && ids.Contains("7zip.7zip") && ids.Contains("Git.Git")
+        && ids.Distinct(StringComparer.OrdinalIgnoreCase).Count() == 3
+        && results.First(r => r.Id == "7zip.7zip").Name == "7-Zip";
+
+    // Nothing but a header (no results) yields an empty list, not a crash.
+    bool empty = Winget.ParseSearch("Nombre  Id  Versión  Origen").Count == 0;
+
+    return Report("winget search is parsed without depending on its headers",
+        ok && empty,
+        $"parsed {results.Count} results (expected 3: {string.Join(", ", ids)}), header-only gives empty={empty}");
 }
 
 // Installed apps are read from winget's JSON export, whose ids are the same in every language, and

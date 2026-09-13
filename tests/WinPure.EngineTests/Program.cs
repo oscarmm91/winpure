@@ -1009,9 +1009,11 @@ bool AForgedBackupCannotReachBeyondWhatWinPureChanges()
 }
 
 // The real defence against forged backups: only SYSTEM and Administrators can write the folder, and the
-// owner cannot rewrite its permissions. Checked on a real folder from this unelevated process, which is
-// exactly the kind of program that must not be able to plant a backup. The probe folder stays behind in
-// %TEMP%: once locked, an unelevated test can no longer delete it, which is the point.
+// owner cannot rewrite its permissions. Checked by effect on a real folder, as this user without the Administrators
+// group: exactly the kind of program that must not be able to plant a backup. The attempts go through ReducedToken
+// because CI runs elevated, where this process itself may write anywhere. A folder of its own that the same token
+// must be able to write proves a refusal comes from the permissions, not from a token that can write nothing. The
+// probe folder stays behind in %TEMP%: once locked, an unelevated test can no longer delete it, which is the point.
 bool BackupsLiveWhereOnlyAdministratorsCanWrite()
 {
     var problems = new List<string>();
@@ -1034,28 +1036,76 @@ bool BackupsLiveWhereOnlyAdministratorsCanWrite()
     }
     if (!info.Exists) info.Create(BackupStore.ProtectedSecurity());
 
-    bool wrote = false, rewrotePermissions = false;
-    try { File.WriteAllText(Path.Combine(probe, "backup_planted.json"), "{}"); wrote = true; }
-    catch (UnauthorizedAccessException) { }
+    // The attack modelled is a folder owned by the user's own account. Created unelevated it already is. Created
+    // elevated its owner is Administrators, which the reduced token cannot use, and the owner half would pass untested.
+    var me = System.Security.Principal.WindowsIdentity.GetCurrent().User!;
+    var ownerSection = info.GetAccessControl(System.Security.AccessControl.AccessControlSections.Owner);
+    if (!me.Equals(ownerSection.GetOwner(typeof(System.Security.Principal.SecurityIdentifier))))
+    {
+        try
+        {
+            ownerSection.SetOwner(me);
+            info.SetAccessControl(ownerSection);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or InvalidOperationException) { }
+    }
+    var owner = info.GetAccessControl(System.Security.AccessControl.AccessControlSections.Owner).GetOwner(typeof(System.Security.Principal.SecurityIdentifier));
+    if (!me.Equals(owner)) problems.Add($"the protected folder is owned by {owner}, not by this user, so the owner was not tested");
+
+    string control = Path.Combine(Path.GetTempPath(), "winpure-acl-control");
+    if (Directory.Exists(control)) Directory.Delete(control, recursive: true);
+    Directory.CreateDirectory(control);
+
+    bool elevated = new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent())
+        .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
     try
     {
-        var sec = new DirectoryInfo(probe).GetAccessControl();
-        sec.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
-            System.Security.Principal.WindowsIdentity.GetCurrent().User!, System.Security.AccessControl.FileSystemRights.FullControl,
-            System.Security.AccessControl.AccessControlType.Allow));
-        new DirectoryInfo(probe).SetAccessControl(sec);
-        rewrotePermissions = true;
+        var (stillAdministrator, controlWrote, controlRewrote, wrote, rewrotePermissions) = ReducedToken.Run(() => (
+            new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent())
+                .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator),
+            TryWrite(control), TryGrantMyself(control), TryWrite(probe), TryGrantMyself(probe)));
+
+        if (stillAdministrator) problems.Add("the reduced token still counts as an administrator");
+        if (!controlWrote || !controlRewrote)
+            problems.Add($"without Administrators this user could not even change a folder of its own (write={controlWrote}, permissions={controlRewrote}), so a refusal proves nothing");
+        if (wrote) problems.Add("this user without Administrators wrote a file into the protected folder");
+        if (rewrotePermissions) problems.Add("this user without Administrators, as owner, granted itself access to the protected folder");
     }
-    catch (UnauthorizedAccessException) { }
-    catch (InvalidOperationException) { }
-    if (wrote) problems.Add("an unelevated process wrote a file into the protected folder");
-    if (rewrotePermissions) problems.Add("an unelevated owner granted itself access to the protected folder");
+    catch (Exception ex)
+    {
+        problems.Add($"could not act as this user without Administrators: {ex.GetType().Name}: {ex.Message}");
+    }
+    finally
+    {
+        try { Directory.Delete(control, recursive: true); } catch { }
+    }
 
     return Report("backups live where only administrators can write",
         problems.Count == 0,
         problems.Count == 0
-            ? "ProgramData by default; this unelevated test could neither write into a protected folder nor change its permissions"
+            ? $"ProgramData by default; as this user without Administrators (test elevated={elevated}), a folder of its own could be changed and the protected one could neither be written nor have its permissions changed"
             : string.Join(" | ", problems));
+
+    static bool TryWrite(string folder)
+    {
+        try { File.WriteAllText(Path.Combine(folder, "backup_planted.json"), "{}"); return true; }
+        catch (UnauthorizedAccessException) { return false; }
+    }
+
+    static bool TryGrantMyself(string folder)
+    {
+        try
+        {
+            var sec = new DirectoryInfo(folder).GetAccessControl();
+            sec.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+                System.Security.Principal.WindowsIdentity.GetCurrent().User!, System.Security.AccessControl.FileSystemRights.FullControl,
+                System.Security.AccessControl.AccessControlType.Allow));
+            new DirectoryInfo(folder).SetAccessControl(sec);
+            return true;
+        }
+        catch (UnauthorizedAccessException) { return false; }
+        catch (InvalidOperationException) { return false; }
+    }
 }
 
 // Backups from before the move live in the user's AppData. They are copied into the protected folder

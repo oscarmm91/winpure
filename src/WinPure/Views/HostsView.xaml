@@ -1,0 +1,57 @@
+<UserControl x:Class="WinPure.Views.HostsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:WinPure.Views">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,18,0,12">
+            <TextBlock Text="{Binding Title}" FontSize="28" FontWeight="SemiBold"
+                       Foreground="{StaticResource Brush.TextPrimary}"/>
+            <TextBlock Text="{Binding Subtitle}" FontSize="13" Margin="0,6,0,0" TextWrapping="Wrap"
+                       Foreground="{StaticResource Brush.TextSecondary}" MaxWidth="720" HorizontalAlignment="Left"/>
+        </StackPanel>
+
+        <Border Grid.Row="1" Background="{StaticResource Brush.Card}" CornerRadius="8" Padding="14,10" Margin="0,0,6,12"
+                BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE7BA;" FontFamily="{StaticResource Font.Icon}" FontSize="14"
+                           Foreground="#E8A85C" VerticalAlignment="Center"/>
+                <TextBlock Text="{l:Tr 'The hosts file maps names to IP addresses before DNS is asked. A bad entry can block or misdirect a site — WinPure backs the file up before every save, and you can reset it to the Windows default.'}"
+                           Margin="10,0,0,0" FontSize="12.5" VerticalAlignment="Center"
+                           TextWrapping="Wrap" Foreground="{StaticResource Brush.TextSecondary}" MaxWidth="700"/>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="2" Background="{StaticResource Brush.Card}" CornerRadius="8" Margin="0,0,6,10"
+                BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}">
+            <TextBox Text="{Binding Content, UpdateSourceTrigger=PropertyChanged}"
+                     Background="Transparent" BorderThickness="0"
+                     Foreground="{StaticResource Brush.TextPrimary}" CaretBrush="{StaticResource Brush.TextPrimary}"
+                     FontFamily="Cascadia Mono, Consolas, Courier New" FontSize="12.5"
+                     AcceptsReturn="True" AcceptsTab="True" TextWrapping="NoWrap"
+                     HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                     Padding="12" SpellCheck.IsEnabled="False"/>
+        </Border>
+
+        <Grid Grid.Row="3" Margin="0,0,6,14">
+            <TextBlock Text="{Binding Status}" VerticalAlignment="Center" FontSize="12"
+                       Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" MaxWidth="420"
+                       HorizontalAlignment="Left"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Style="{StaticResource SubtleButton}" Command="{Binding UndoCommand}"
+                        Content="{l:Tr 'Undo last save'}"/>
+                <Button Style="{StaticResource SubtleButton}" Command="{Binding ResetCommand}" Margin="8,0,0,0"
+                        Content="{l:Tr 'Reset to Windows default'}"/>
+                <Button Style="{StaticResource PrimaryButton}" Command="{Binding SaveCommand}"
+                        Margin="8,0,0,0" Content="{l:Tr 'Save hosts file'}"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -86,6 +86,10 @@ internal static class Program
             var dclock = System.Diagnostics.Stopwatch.StartNew();
             while (!dns.HasLoaded && dclock.Elapsed < TimeSpan.FromSeconds(30)) Pump(TimeSpan.FromMilliseconds(500));
             Render(root, Path.Combine(outDir, "10-dns.png"));
+
+            // Hosts reads the current hosts file (read-only) when opened.
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is HostsViewModel);
+            Render(root, Path.Combine(outDir, "11-hosts.png"));
             return 0;
         }
         catch (Exception ex)

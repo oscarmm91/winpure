@@ -40,6 +40,9 @@
             <DataTemplate DataType="{x:Type vm:DnsViewModel}">
                 <views:DnsView/>
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:HostsViewModel}">
+                <views:HostsView/>
+            </DataTemplate>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

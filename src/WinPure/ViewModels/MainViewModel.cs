@@ -59,6 +59,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly StartupViewModel _startup;
     private readonly CleanupViewModel _cleanup;
     private readonly DnsViewModel _dns;
+    private readonly HostsViewModel _hosts;
     private readonly InstallerViewModel _installer;
 
     /// <summary>The Remove Apps banner, also shown above search results that include an app removal.</summary>
@@ -150,6 +151,14 @@ public sealed class MainViewModel : ObservableObject
             Main = this,
         };
         NavItems.Add(new NavItem { Label = "DNS", Glyph = ((char)0xE968).ToString(), Page = _dns });
+        _hosts = new HostsViewModel
+        {
+            Title = "Hosts file",
+            Subtitle = "Edit the Windows hosts file — the local map of names to IP addresses that is consulted before DNS. "
+                     + "WinPure backs it up before every save and can reset it to the Windows default.",
+            Main = this,
+        };
+        NavItems.Add(new NavItem { Label = "Hosts", Glyph = ((char)0xE8A5).ToString(), Page = _hosts });
         NavItems.Add(new NavItem { Label = "Restore", Glyph = "", Page = _restore });
 
         // The two pages whose changes Restore cannot undo sit together at the bottom, apart from everything else.
@@ -224,6 +233,7 @@ public sealed class MainViewModel : ObservableObject
             if (value.Page == _installer && !_installer.HasChecked) _ = _installer.RefreshAsync();
             if (value.Page == _cleanup && !_cleanup.HasMeasured) _ = _cleanup.MeasureAllAsync();
             if (value.Page == _dns && !_dns.HasLoaded) _ = _dns.LoadAsync();
+            if (value.Page == _hosts && !_hosts.HasLoaded) _hosts.Load();
             OnPropertyChanged();
             OnPropertyChanged(nameof(CurrentPage));
             UpdatePendingCount();   // the Apply bar counts this page's pending changes (startup vs tweaks)

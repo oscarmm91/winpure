@@ -117,6 +117,7 @@ failures += ApplyingToFutureUsersWritesTheTemplateAndRestoreUndoesIt() ? 0 : 1;
 failures += TheFutureUsersPolicyOnlyAllowsCatalogHkcuValues() ? 0 : 1;
 failures += CleanupMeasuresClearsAndSkipsLockedFiles() ? 0 : 1;
 failures += CleanupFolderKindDeletesTheWholeFolder() ? 0 : 1;
+failures += HostsEditorBacksUpBeforeSavingAndCanUndoOrReset() ? 0 : 1;
 failures += DnsCapturesCurrentServersAndRestorePutsThemBack() ? 0 : 1;
 failures += AServiceCanBeSetToManualNotJustDisabled() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
@@ -1501,6 +1502,54 @@ bool DnsCapturesCurrentServersAndRestorePutsThemBack()
         problems.Count == 0
             ? "both adapters switched to the preset, their prior servers captured in one backup, and Restore set them back; the policy allows only IP lists or DHCP"
             : string.Join(" | ", problems));
+}
+
+// The hosts editor copies the current file to a backup before writing, so a save can be undone; and it can
+// rewrite the stock Windows default. Runs against a throwaway file, never the real (admin-only) hosts.
+bool HostsEditorBacksUpBeforeSavingAndCanUndoOrReset()
+{
+    string dir = Path.Combine(Path.GetTempPath(), "winpure-hosts-" + Guid.NewGuid().ToString("N")[..8]);
+    Directory.CreateDirectory(dir);
+    string file = Path.Combine(dir, "hosts");
+    var problems = new List<string>();
+    try
+    {
+        File.WriteAllText(file, "127.0.0.1 original.example\r\n");
+        HostsService.PathForTests = file;
+
+        if (HostsService.Read() is not string r0 || !r0.Contains("original.example")) problems.Add("Read did not return the current file");
+        if (HostsService.HasBackup) problems.Add("there should be no backup before the first save");
+
+        // A locked file must read as null (unknown), never as an empty string.
+        using (var _ = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.None))
+            if (HostsService.Read() is not null) problems.Add("a locked hosts file should read as null, not empty");
+
+        var r1 = HostsService.Save("0.0.0.0 blocked.example\r\n");
+        if (!r1.Ok) problems.Add($"save failed: {r1.Error}");
+        if (!File.ReadAllText(file).Contains("blocked.example")) problems.Add("new content was not written");
+        if (!HostsService.HasBackup) problems.Add("save did not create a backup");
+        if (!File.ReadAllText(HostsService.Backups()[0]).Contains("original.example")) problems.Add("the newest backup does not hold the previous content");
+
+        // Multi-level undo: Reset then Save must NOT lose the original — walking undo back recovers it.
+        HostsService.ResetToDefault();                    // backs up "blocked", writes default
+        HostsService.Save("1.1.1.1 later.example\r\n");    // backs up default, writes later
+        if (!File.ReadAllText(file).Contains("later.example")) problems.Add("second save did not write");
+        HostsService.RestoreBackup();                     // undo -> default
+        if (!File.ReadAllText(file).Contains("Microsoft TCP/IP for Windows")) problems.Add("first undo did not restore the default");
+        HostsService.RestoreBackup();                     // undo -> blocked
+        if (!File.ReadAllText(file).Contains("blocked.example")) problems.Add("second undo did not restore the blocked content");
+        HostsService.RestoreBackup();                     // undo -> original
+        if (!File.ReadAllText(file).Contains("original.example")) problems.Add("third undo did not recover the original content (data-loss risk)");
+
+        var reset = HostsService.ResetToDefault();
+        if (!reset.Ok || !File.ReadAllText(file).Contains("Microsoft TCP/IP for Windows")) problems.Add("reset did not write the Windows default");
+    }
+    catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
+    finally { HostsService.PathForTests = null; try { Directory.Delete(dir, recursive: true); } catch { } }
+
+    return Report("the hosts editor backs up before saving and can undo or reset",
+        problems.Count == 0,
+        problems.Count == 0 ? "backs up before every save; a locked file reads as null; multi-level undo recovers the original; reset writes the Windows default" : string.Join(" | ", problems));
 }
 
 // A Folder-kind cleanup target (Windows.old) deletes the WHOLE folder, not just its contents, and is a

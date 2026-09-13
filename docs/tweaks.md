@@ -66,6 +66,7 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Disable Geolocation Service | Balanced | `lfsvc` | Manual |
 | Disable Fax Service | Balanced | `Fax` | Manual |
 | Disable Bluetooth Support | Manual | `bthserv` | Manual |
+| Set Windows AI Fabric to Manual | Manual | `WSAIFabricSvc` (start mode set to Manual, not Disabled) | Automatic |
 
 ## 🚀 Performance
 
@@ -120,6 +121,8 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Keep Edge tabs out of Alt+Tab | Balanced | `Explorer\Advanced!MultiTaskingAltTabFilter = 3` |
 | Never combine taskbar buttons | Balanced | `Explorer\Advanced!TaskbarGlomLevel = 2`, `MMTaskbarGlomLevel = 2` |
 | Remove "- Shortcut" from new shortcut names | Balanced | `Explorer\NamingTemplates!ShortcutNameTemplate = "%s.lnk"` |
+| Hide Gallery from the navigation pane | Balanced | `HKCU\Software\Classes\CLSID\{e88865ea-...}!System.IsPinnedToNameSpaceTree = 0` (undo deletes it) |
+| Hide Home from the navigation pane | Manual | `HKCU\Software\Classes\CLSID\{f874310e-...}!System.IsPinnedToNameSpaceTree = 0` (undo deletes it) |
 
 ## 🖱️ Context Menu
 
@@ -132,6 +135,8 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Remove 'Ask Copilot' | Safe | Blocked shell extension `{CB3B0003-8088-4EDE-8769-8B354AB2FF8C}` |
 | Remove 'Share' | Manual | Deletes the `ModernSharing` handler under `AllFileSystemObjects` (recreated on revert) |
 | Remove 'Give access to' | Safe | Deletes the 6 `Sharing` handlers: files, folders, background, drives & both library folders |
+| Remove 'Cast to device' | Manual | Blocked shell extension `{7AD84985-87B4-4a16-BE58-8B72A5B390F7}` (Play To Menu) |
+| Remove 'Include in library' | Manual | Deletes the `Library Location` handler under `Folder\ShellEx\ContextMenuHandlers` (recreated on revert) |
 | Allow the Context Menu on More Than 15 Files | Balanced | `CurrentVersion\Explorer!MultipleInvokePromptMinimum = 300` |
 
 ## 🧩 Windows Features

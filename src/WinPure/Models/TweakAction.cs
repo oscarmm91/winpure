@@ -239,22 +239,32 @@ public sealed class RegistryKeyAction : TweakAction
     }
 }
 
-/// <summary>Disables a Windows service (registry Start = 4 + stop). Revert restores the stock start mode.</summary>
+/// <summary>Sets a Windows service start mode (registry Start; Disabled also stops it). Revert restores the stock start mode.</summary>
 public sealed class ServiceAction : TweakAction
 {
     public required string ServiceName { get; init; }
     /// <summary>2 = Automatic, 3 = Manual, 4 = Disabled.</summary>
     public required int DefaultStartMode { get; init; }
 
+    /// <summary>Start mode this tweak sets. Default 4 (Disabled); 3 (Manual) leaves the service
+    /// available on demand — the conservative choice for a still-wanted service.</summary>
+    public int ApplyStartMode { get; init; } = 4;
+
     private string ServiceKey => $@"HKLM\SYSTEM\CurrentControlSet\Services\{ServiceName}";
+
+    /// <summary>Pure state check, split out so it can be tested without a real service. A start mode at
+    /// least as restrictive as the target counts as applied (higher Start starts later/never:
+    /// 2 Automatic &lt; 3 Manual &lt; 4 Disabled), so a Manual target never shows Pending over — nor loosens —
+    /// a stricter Disabled state the user set themselves.</summary>
+    internal static bool AppliedGivenStart(int start, int applyMode) => start >= applyMode;
 
     public override bool? IsApplied(ScanContext ctx)
     {
         try
         {
             var start = ReadValue(ServiceKey, "Start", out _);
-            if (start is null) return true; // service not present → nothing to disable
-            return (int)start == 4;
+            if (start is null) return true; // service not present → nothing to change
+            return AppliedGivenStart((int)start, ApplyStartMode);
         }
         catch { return null; }
     }
@@ -278,7 +288,11 @@ public sealed class ServiceAction : TweakAction
     public override void Apply()
     {
         if (ReadValue(ServiceKey, "Start", out _) is null) return; // not installed
-        WriteValue(ServiceKey, "Start", 4, Microsoft.Win32.RegistryValueKind.DWord);
+        WriteValue(ServiceKey, "Start", ApplyStartMode, Microsoft.Win32.RegistryValueKind.DWord);
+        // Only a Disabled target is force-stopped now: setting a service to Manual leaves it
+        // running until it is next stopped and simply stops it auto-starting at the next boot,
+        // which is the conservative behaviour for a service the user may still want on demand.
+        if (ApplyStartMode != 4) return;
         // The start mode above is what actually sticks across reboots. Stopping it now is
         // best-effort: a busy service with dependents may refuse, and that is not a failure
         // of the tweak — but it must not be swallowed either.

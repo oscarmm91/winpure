@@ -71,7 +71,7 @@ Copilot, Windows AI & Recall, Click to Do, Paint's AI features, Game Bar capture
 </details>
 
 <details>
-<summary>⚙️ <b>Services</b> — 9 tweaks</summary>
+<summary>⚙️ <b>Services</b> — 10 tweaks</summary>
 <br/>
 SysMain (SuperFetch), Windows Search indexing, Print Spooler, Remote Registry, Error Reporting, Connected Devices Platform, Geolocation, Fax, Bluetooth — each disabled service is snapshotted with its original start mode.
 <br/><br/>
@@ -87,7 +87,7 @@ Faster app timeouts & shutdown, foreground-app priority, window animations, hibe
 </details>
 
 <details>
-<summary>🎨 <b>UI & Personalization</b> — 27 tweaks</summary>
+<summary>🎨 <b>UI & Personalization</b> — 29 tweaks</summary>
 <br/>
 Dark mode, Snap Assist flyout, Start Menu suggestions/most-used/recently-added, "new app" badge, file extensions, hidden files, Widgets/Task View/Chat taskbar buttons, taskbar alignment, End Task on right-click, Aero Shake, search highlights, NumLock at sign-in, Spotlight wallpaper, "What's new" screens after updates, the F1 help key.
 <br/><br/>
@@ -95,7 +95,7 @@ Dark mode, Snap Assist flyout, Start Menu suggestions/most-used/recently-added, 
 </details>
 
 <details>
-<summary>🖱️ <b>Context Menu</b> — 8 tweaks</summary>
+<summary>🖱️ <b>Context Menu</b> — 10 tweaks</summary>
 <br/>
 Restore the classic Windows 10 right-click menu, remove "Edit with Clipchamp / Notepad / Photos", "Ask Copilot", "Share" and "Give access to", and lift the 15-file limit on right-click options.
 <br/><br/>

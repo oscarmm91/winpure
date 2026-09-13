@@ -835,6 +835,22 @@ public static class TweakCatalog
             "Disable the legacy fax service.", "Fax", 3);
         yield return Service("svc-bluetooth", PresetLevel.Manual, "Disable Bluetooth Support",
             "Disable Bluetooth services. Only if you never use Bluetooth.", "bthserv", 3);
+
+        // Manual (3), not Disabled (4): this AI infrastructure service is set on-demand rather than
+        // turned off, so anything that genuinely needs it can still start it. Measured Running /
+        // Automatic on this 26H2 26200 machine; revert restores Automatic.
+        yield return new Tweak
+        {
+            Id = "svc-ai-fabric", Category = TweakCategory.Services, Preset = PresetLevel.Manual,
+            Name = "Set Windows AI Fabric to Manual",
+            Description = "Stop the Windows AI Fabric service (WSAIFabricSvc) from starting automatically. It can still start on demand.",
+            Help = "Sets the service start mode to Manual (3) instead of Automatic. Fits the catalog's other AI opt-outs (Copilot, Windows AI). Not fully disabled, so it stays available if something asks for it; undo restores Automatic.",
+            Icon = Glyph(0xE99A),
+            Actions = new TweakAction[]
+            {
+                new ServiceAction { ServiceName = "WSAIFabricSvc", DefaultStartMode = 2, ApplyStartMode = 3 },
+            },
+        };
     }
 
     // ------------------------------------------------------------------ Performance
@@ -1447,6 +1463,35 @@ public static class TweakCatalog
                 Str(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\NamingTemplates", "ShortcutNameTemplate", "%s.lnk", null),
             },
         };
+
+        // The machine-level default (HKLM classes) is IsPinnedToNameSpaceTree = 1 (shown). A per-user
+        // override of 0 in HKCU\Software\Classes shadows it via the HKCR merge; undo deletes the
+        // override (absent by default here). RequiresExplorerRestart so the nav pane refreshes.
+        yield return new Tweak
+        {
+            Id = "ui-hide-gallery", Category = TweakCategory.UI, Preset = PresetLevel.Balanced,
+            Name = "Hide Gallery from the navigation pane",
+            Description = "Remove the Gallery node from File Explorer's left-hand navigation tree.",
+            Help = "Sets System.IsPinnedToNameSpaceTree to 0 on the Gallery CLSID under HKCU\\Software\\Classes; the value is absent by default, so undo deletes it.",
+            Icon = Glyph(0xEB9F), RequiresExplorerRestart = true,
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Classes\CLSID\{e88865ea-0e1c-4e20-9aa6-edcd0212c87c}", "System.IsPinnedToNameSpaceTree", 0, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "ui-hide-home", Category = TweakCategory.UI, Preset = PresetLevel.Manual,
+            Name = "Hide Home from the navigation pane",
+            Description = "Remove the Home node from File Explorer's left-hand navigation tree.",
+            Help = "Sets System.IsPinnedToNameSpaceTree to 0 on the Home CLSID under HKCU\\Software\\Classes; the value is absent by default, so undo deletes it. Pairs well with 'Open File Explorer to This PC'.",
+            Icon = Glyph(0xE80F), RequiresExplorerRestart = true,
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Classes\CLSID\{f874310e-b6b7-47dc-bc84-b9e6b38f5903}", "System.IsPinnedToNameSpaceTree", 0, null),
+            },
+        };
     }
 
     // ------------------------------------------------------------------ Windows Features
@@ -1682,6 +1727,37 @@ public static class TweakCatalog
                 // so without these two the entry still shows up on right-click there.
                 new RegistryKeyAction { KeyPath = @"HKCR\LibraryFolder\background\shellex\ContextMenuHandlers\Sharing", DeleteOnApply = true, KeyDefaultValue = "{f81e9010-6ea4-11ce-a7ff-00aa003ca9f6}" },
                 new RegistryKeyAction { KeyPath = @"HKCR\UserLibraryFolder\shellex\ContextMenuHandlers\Sharing", DeleteOnApply = true, KeyDefaultValue = "{f81e9010-6ea4-11ce-a7ff-00aa003ca9f6}" },
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "ctx-cast-to-device", Category = TweakCategory.ContextMenu, Preset = PresetLevel.Manual,
+            Name = "Remove 'Cast to device'",
+            Description = "Remove the 'Cast to device' (DLNA Play To) entry from the right-click menu.",
+            Help = "Blocks the Play To Menu shell extension {7AD84985-87B4-4a16-BE58-8B72A5B390F7} via the same Shell Extensions\\Blocked mechanism as the other context-menu removals; undo deletes the block.",
+            Icon = Glyph(0xEC15), RequiresExplorerRestart = true,
+            Actions = new TweakAction[]
+            {
+                BlockShellExtension("{7AD84985-87B4-4a16-BE58-8B72A5B390F7}", "WinPure: remove Cast to device context entry"),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "ctx-include-in-library", Category = TweakCategory.ContextMenu, Preset = PresetLevel.Manual,
+            Name = "Remove 'Include in library'",
+            Description = "Remove the legacy 'Include in library' entry from the folder right-click menu.",
+            Help = "Deletes the Library Location handler key (same pattern as 'Remove Share'); the backup re-creates it on undo. HKCR resolves to HKLM\\Software\\Classes on this machine.",
+            Icon = Glyph(0xE8F1), RequiresExplorerRestart = true,
+            Actions = new TweakAction[]
+            {
+                new RegistryKeyAction
+                {
+                    KeyPath = @"HKCR\Folder\ShellEx\ContextMenuHandlers\Library Location",
+                    DeleteOnApply = true,
+                    KeyDefaultValue = "{3dad6c5d-2167-4cae-9914-f99e41c12cfa}",
+                },
             },
         };
     }

@@ -117,6 +117,7 @@ failures += ApplyingToFutureUsersWritesTheTemplateAndRestoreUndoesIt() ? 0 : 1;
 failures += TheFutureUsersPolicyOnlyAllowsCatalogHkcuValues() ? 0 : 1;
 failures += CleanupMeasuresClearsAndSkipsLockedFiles() ? 0 : 1;
 failures += DnsCapturesCurrentServersAndRestorePutsThemBack() ? 0 : 1;
+failures += AServiceCanBeSetToManualNotJustDisabled() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
 
@@ -1494,6 +1495,33 @@ bool DnsCapturesCurrentServersAndRestorePutsThemBack()
         problems.Count == 0
             ? "both adapters switched to the preset, their prior servers captured in one backup, and Restore set them back; the policy allows only IP lists or DHCP"
             : string.Join(" | ", problems));
+}
+
+// A service tweak can target Manual (3), not only Disabled (4): "applied" then means the start mode
+// equals what the tweak sets, so Automatic is not mistaken for applied and Manual is not mistaken for Disabled.
+bool AServiceCanBeSetToManualNotJustDisabled()
+{
+    bool logic =
+        ServiceAction.AppliedGivenStart(3, 3) &&    // Manual target met
+        !ServiceAction.AppliedGivenStart(2, 3) &&   // still Automatic → not applied
+        ServiceAction.AppliedGivenStart(4, 3) &&    // already Disabled satisfies a Manual target — never loosen it
+        ServiceAction.AppliedGivenStart(4, 4) &&    // classic Disabled target met
+        !ServiceAction.AppliedGivenStart(3, 4);     // Manual is not enough for a Disable tweak
+
+    var svc = TweakCatalog.Build().First(t => t.Id == "svc-ai-fabric")
+        .Actions.OfType<ServiceAction>().Single();
+    bool wired = svc.ServiceName == "WSAIFabricSvc" && svc.ApplyStartMode == 3 && svc.DefaultStartMode == 2;
+
+    // Every other service tweak still disables (4); only AI Fabric is the softer Manual.
+    bool othersDisable = TweakCatalog.Build()
+        .SelectMany(t => t.Actions).OfType<ServiceAction>()
+        .Where(a => a.ServiceName != "WSAIFabricSvc")
+        .All(a => a.ApplyStartMode == 4);
+
+    return Report("a service can be set to Manual, not just Disabled", logic && wired && othersDisable,
+        logic && wired && othersDisable
+            ? "AI Fabric targets Manual (3) reverting to Automatic (2); every other service tweak still targets Disabled (4)"
+            : $"logic={logic} wired={wired} othersDisable={othersDisable}");
 }
 
 // The Cleanup service measures a folder's size, clears its CONTENTS (keeping the folder), skips files it

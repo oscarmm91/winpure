@@ -34,7 +34,8 @@ public sealed class TweakEngine
     /// </summary>
     public List<TweakResult> ApplyChanges(
         IEnumerable<(Tweak tweak, bool apply)> changes,
-        IProgress<string>? progress = null)
+        IProgress<string>? progress = null,
+        bool alsoFutureUsers = false)
     {
         var changeList = changes.ToList();
         var session = _backupManager.CreateSession();
@@ -62,6 +63,24 @@ public sealed class TweakEngine
             {
                 LogService.Log($"FAILED {(apply ? "apply" : "revert")} {tweak.Name}: {ex.Message}");
                 results.Add(new TweakResult { Tweak = tweak, Success = false, WasApply = apply, Message = ex.Message });
+            }
+        }
+
+        // "Apply to future users": mirror the per-user values of the tweaks that were actually applied into
+        // the Default profile template. Only the ones that succeeded, so a failed apply is never carried to
+        // new accounts. FutureUsers captures each template value before changing it and flushes the snapshot
+        // (the same before-the-change invariant), and it logs rather than throws, so it cannot undo the work
+        // already done for the current user.
+        if (alsoFutureUsers)
+        {
+            var applied = results.Where(r => r.Success && r.WasApply).Select(r => (r.Tweak, apply: true));
+            try
+            {
+                FutureUsers.Apply(FutureUsers.WritesFor(applied), session, () => _backupManager.SaveSession(session));
+            }
+            catch (Exception ex)
+            {
+                LogService.Log($"Apply to future users could not be completed: {ex.Message}");
             }
         }
 

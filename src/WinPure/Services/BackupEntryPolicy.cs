@@ -21,13 +21,13 @@ internal static class BackupEntryPolicy
 
     private sealed record Allowed(
         Dictionary<string, string> Values, Dictionary<string, string?> Keys, HashSet<string> Services,
-        HashSet<string> Tasks, HashSet<string> Features, HashSet<string> StartupKeys);
+        HashSet<string> Tasks, HashSet<string> Features, HashSet<string> StartupKeys, HashSet<string> FutureUserTargets);
 
     private static readonly Lazy<Allowed> FromCatalog = new(() =>
     {
         var ignoreCase = StringComparer.OrdinalIgnoreCase;
         var allowed = new Allowed(new(ignoreCase), new(ignoreCase), new(ignoreCase), new(ignoreCase), new(ignoreCase),
-            new(StartupScanner.ApprovedKeys.Select(Normalize), ignoreCase));
+            new(StartupScanner.ApprovedKeys.Select(Normalize), ignoreCase), FutureUsers.AllowedTargets());
         foreach (var action in TweakCatalog.Build().SelectMany(t => t.Actions))
         {
             switch (action)
@@ -115,6 +115,15 @@ internal static class BackupEntryPolicy
                 reason = "WinPure never changes this Windows feature";
                 return false;
 
+            case "future-user-value":
+                // A value mirrored into the Default profile template. Only the catalog's own HKCU values,
+                // by their path relative to the hive and value name, may be written back there.
+                if (entry.KeyPath is null || entry.ValueName is null) return true; // restoring it does nothing
+                if (UnderTestKeyRelative(entry.KeyPath)) return true;
+                if (allowed.FutureUserTargets.Contains(entry.KeyPath + "!" + entry.ValueName)) return true;
+                reason = "WinPure never writes this value into the profile template";
+                return false;
+
             case "system-state":
                 // Kind and state are validated in SystemState.Restore, the only way this type is restored.
                 return true;
@@ -129,6 +138,16 @@ internal static class BackupEntryPolicy
         TestKeyPrefix is { } prefix &&
         (keyPath.Equals(prefix, StringComparison.OrdinalIgnoreCase) ||
          keyPath.StartsWith(prefix + @"\", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>The future-user template stores keys relative to the hive (HKCU stripped); match the test key that way too.</summary>
+    private static bool UnderTestKeyRelative(string relativeKeyPath)
+    {
+        if (TestKeyPrefix is not { } prefix) return false;
+        int idx = prefix.IndexOf((char)92);
+        string relativePrefix = idx < 0 ? prefix : prefix[(idx + 1)..];
+        return relativeKeyPath.Equals(relativePrefix, StringComparison.OrdinalIgnoreCase) ||
+               relativeKeyPath.StartsWith(relativePrefix + @"\", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool IsTwelveByteHex(string value) =>
         value.Length == 24 && value.All(Uri.IsHexDigit);

@@ -290,6 +290,13 @@ public sealed class MainViewModel : ObservableObject
     private int _pendingCount;
     public int PendingCount { get => _pendingCount; set { if (Set(ref _pendingCount, value)) OnPropertyChanged(nameof(ApplyHint)); } }
 
+    private bool _applyToFutureUsers;
+    /// <summary>When on, the reversible HKCU tweaks being applied are also written into the Default profile template.</summary>
+    public bool ApplyToFutureUsers { get => _applyToFutureUsers; set => Set(ref _applyToFutureUsers, value); }
+
+    /// <summary>True when at least one pending, ticked change is a reversible per-user tweak that can reach new accounts.</summary>
+    public bool FutureUsersApplies => AllTweaks.Any(t => t.IsDirty && t.IsSelected && FutureUsers.IsEligible(t.Tweak));
+
     public string ApplyHint => CurrentPage is StartupViewModel
         // The Startup page has no Apply step — promising one there would be a lie.
         // Kept to roughly the length of the line below: the status bar shares this row with
@@ -318,6 +325,7 @@ public sealed class MainViewModel : ObservableObject
     private void UpdatePendingCount()
     {
         PendingCount = AllTweaks.Count(t => t.IsDirty);
+        OnPropertyChanged(nameof(FutureUsersApplies));
         foreach (var item in NavItems)
             if (item.Page is CategoryPageViewModel page)
                 item.PendingCount = page.Tweaks.Count(t => t.IsDirty);
@@ -548,11 +556,20 @@ public sealed class MainViewModel : ObservableObject
             if (answer != MessageBoxResult.Yes) return;
         }
 
+        bool futureUsers = ApplyToFutureUsers && FutureUsers.WritesFor(changes).Count > 0;
+        if (futureUsers)
+        {
+            var answer = MessageBox.Show(
+                Loc.T("These per-user settings will also be written into the Default profile, so accounts created later start with them. This changes C:\\Users\\Default and is undone from Restore. Continue?"),
+                Loc.T("WinPure — Apply to future users"), MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes);
+            if (answer != MessageBoxResult.Yes) return;
+        }
+
         IsBusy = true;
         var progress = new Progress<string>(msg => StatusText = msg);
         try
         {
-            var results = await Task.Run(() => _engine.ApplyChanges(changes, progress));
+            var results = await Task.Run(() => _engine.ApplyChanges(changes, progress, futureUsers));
             if (results.Any(r => r.Success && r.Tweak.NotifiesThemeChange))
                 NativeMethods.BroadcastThemeChange();
             int failed = results.Count(r => !r.Success);

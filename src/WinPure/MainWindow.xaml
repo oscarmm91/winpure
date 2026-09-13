@@ -133,6 +133,11 @@
                                    Foreground="{StaticResource Brush.TextSecondary}" VerticalAlignment="Center"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <CheckBox IsChecked="{Binding ApplyToFutureUsers}" VerticalAlignment="Center" Margin="0,0,18,0"
+                                  Visibility="{Binding FutureUsersApplies, Converter={StaticResource BoolToVisibility}}"
+                                  Foreground="{StaticResource Brush.TextSecondary}"
+                                  Content="{l:Tr 'Apply to new user accounts too'}"
+                                  ToolTip="{l:Tr 'Writes these per-user settings into the Default profile, so accounts created later start with them. Undone from Restore.'}"/>
                         <TextBlock Text="{Binding StatusText}" FontSize="12" Margin="0,0,18,0"
                                    Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center"
                                    MaxWidth="420" TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusText}"/>

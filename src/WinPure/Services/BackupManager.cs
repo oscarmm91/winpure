@@ -260,6 +260,12 @@ public sealed class BackupManager
                 OptionalFeatures.Restore(entry.ValueName, entry.Value);
                 break;
             }
+            case "future-user-value":
+            {
+                // Undo a value WinPure mirrored into the Default profile template.
+                FutureUsers.RestoreEntry(entry);
+                break;
+            }
         }
     }
 
@@ -289,6 +295,7 @@ public sealed class BackupManager
             "scheduled-task" => $"task {e.TaskPath}",
             "system-state" => $"{e.ValueName} setting",
             "optional-feature" => $"Windows feature {e.ValueName}",
+            "future-user-value" => $"profile template {e.KeyPath}!{e.ValueName}",
             _ => e.Type
         };
 }

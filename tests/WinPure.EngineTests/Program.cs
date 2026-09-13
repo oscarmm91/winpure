@@ -110,6 +110,9 @@ failures += EdgeTweaksAreManualPoliciesThatUndoByRemoving() ? 0 : 1;
 failures += EveryAppliedTweakIsNamedInItsBackup() ? 0 : 1;
 failures += TheApplyHintSaysWhenAnAppRemovalIsPending() ? 0 : 1;
 failures += TheAppRemovalConfirmationDefaultsToNo() ? 0 : 1;
+failures += OnlyReversibleHkcuTweaksReachFutureUsers() ? 0 : 1;
+failures += ApplyingToFutureUsersWritesTheTemplateAndRestoreUndoesIt() ? 0 : 1;
+failures += TheFutureUsersPolicyOnlyAllowsCatalogHkcuValues() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
 
@@ -1290,6 +1293,119 @@ bool AStoreWinPureMakesIsTrustedAndStaysShut()
         problems.Count == 0
             ? "elevated: the store is administrator-owned and trusted, WriteProtected/MigrateLegacy write trusted files, and a non-administrator cannot write, re-own or rename it"
             : string.Join(" | ", problems));
+}
+
+// "Apply to future users" only reaches reversible tweaks whose values live under HKCU: machine-wide changes
+// already affect every account, and app removals are per-machine and irreversible.
+bool OnlyReversibleHkcuTweaksReachFutureUsers()
+{
+    var hkcuReversible = ToyTweak("fu-hkcu", applyValue: 1, defaultValue: 0, valueName: "Mirrored");
+    var hklm = new Tweak
+    {
+        Id = "fu-hklm", Category = TweakCategory.Privacy, Name = "machine tweak", Description = "", Icon = "",
+        Actions = new TweakAction[] { new RegistryValueAction { KeyPath = @"HKLM\Software\WinPureTests", ValueName = "X", ApplyValue = 1 } },
+    };
+    var service = new Tweak
+    {
+        Id = "fu-svc", Category = TweakCategory.Services, Name = "a service", Description = "", Icon = "",
+        Actions = new TweakAction[] { new ServiceAction { ServiceName = "WinPureNoSuchService", DefaultStartMode = 3 } },
+    };
+    var removal = new Tweak
+    {
+        Id = "fu-removal", Category = TweakCategory.RemoveApps, Name = "an app", Description = "", Icon = "",
+        FullyReversible = false, Preset = PresetLevel.Manual,
+        Actions = new TweakAction[] { new RegistryValueAction { KeyPath = ToyKey, ValueName = "R", ApplyValue = 1 } },
+    };
+
+    bool eligibility = FutureUsers.IsEligible(hkcuReversible) && !FutureUsers.IsEligible(hklm)
+        && !FutureUsers.IsEligible(service) && !FutureUsers.IsEligible(removal);
+
+    var changes = new[]
+    {
+        (hkcuReversible, apply: true), (hklm, apply: true), (service, apply: true),
+        (removal, apply: true), (hkcuReversible, apply: false),   // the last is a revert, not an apply
+    };
+    // The revert entry would double-count the eligible tweak, so build a distinct "turn off" case.
+    var offCase = new[] { (ToyTweak("fu-off", 1, 0, "Off"), apply: false) };
+
+    var writes = FutureUsers.WritesFor(changes.Take(4));
+    var offWrites = FutureUsers.WritesFor(offCase);
+
+    bool onlyTheHkcuOne = writes.Count == 1 && writes[0].ValueName == "Mirrored" && writes[0].RelativeKey == @"Software\WinPureTests";
+    bool nothingWhenReverting = offWrites.Count == 0;
+
+    return Report("only reversible HKCU tweaks reach future users",
+        eligibility && onlyTheHkcuOne && nothingWhenReverting,
+        $"eligibility right={eligibility}; writes collected={writes.Count} (expected 1: {(writes.Count == 1 ? writes[0].RelativeKey + "!" + writes[0].ValueName : "-")}); reverting collects {offWrites.Count} (expected 0)");
+}
+
+// Applying with "future users" on writes the value into the Default template, backs up what was there, and
+// Restore puts the template back. Run against a throwaway hive (RegLoadAppKey needs no elevation for that),
+// never the real C:\Users\Default.
+bool ApplyingToFutureUsersWritesTheTemplateAndRestoreUndoesIt()
+{
+    Reset();
+    string hive = Path.Combine(Path.GetTempPath(), "winpure-fu-" + Guid.NewGuid().ToString("N")[..8], "NTUSER.DAT");
+    Directory.CreateDirectory(Path.GetDirectoryName(hive)!);
+    string? savedTemplate = FutureUsers.TemplatePath;
+    var problems = new List<string>();
+    try
+    {
+        FutureUsers.TemplatePath = hive;
+        FutureUsers.CreateTemplateFileForTests();
+
+        var tweak = ToyTweak("fu-roundtrip", applyValue: 7, defaultValue: 0, valueName: "MirroredValue");
+        var engine = new TweakEngine(new BackupManager());
+        engine.ApplyChanges(new[] { (tweak, apply: true) }, null, alsoFutureUsers: true);
+
+        object? inTemplate = FutureUsers.ReadTemplateValueForTests(@"Software\WinPureTests", "MirroredValue");
+        if (inTemplate is not int i || i != 7) problems.Add($"the template value after apply was {inTemplate ?? "(absent)"}, expected 7");
+
+        var session = new BackupManager().ListSessions().FirstOrDefault();
+        bool hasEntry = session?.Entries.Any(e => e.Type == FutureUsers.EntryType && e.ValueName == "MirroredValue") ?? false;
+        if (!hasEntry) problems.Add("the backup session has no future-user-value entry for the template write");
+
+        if (session is not null) new BackupManager().RestoreSession(session);
+        object? afterRestore = FutureUsers.ReadTemplateValueForTests(@"Software\WinPureTests", "MirroredValue");
+        if (afterRestore is not null) problems.Add($"after Restore the template value was {afterRestore}, expected absent (it did not exist before)");
+    }
+    catch (Exception ex)
+    {
+        problems.Add($"threw: {ex.GetType().Name}: {ex.Message}");
+    }
+    finally
+    {
+        FutureUsers.TemplatePath = savedTemplate!;
+        try { Directory.Delete(Path.GetDirectoryName(hive)!, recursive: true); } catch { }
+        Reset();
+    }
+
+    return Report("applying to future users writes the template and Restore undoes it",
+        problems.Count == 0,
+        problems.Count == 0
+            ? "the value was written into the template, captured in the backup, and removed again on Restore"
+            : string.Join(" | ", problems));
+}
+
+// A forged backup must not be able to write any value it likes into the Default template as administrator:
+// only the catalog's own HKCU values, by their hive-relative path, are allowed back.
+bool TheFutureUsersPolicyOnlyAllowsCatalogHkcuValues()
+{
+    string? target = FutureUsers.AllowedTargets().FirstOrDefault();
+    var forged = new BackupEntry { Type = FutureUsers.EntryType, TweakId = "forged", KeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run", ValueName = "Evil", Value = "evil.exe", Kind = "String", Existed = true };
+    bool forgedRefused = !BackupEntryPolicy.IsAllowed(forged, out _);
+
+    bool catalogAllowed = true;
+    if (target is not null)
+    {
+        int bang = target.LastIndexOf('!');
+        var genuine = new BackupEntry { Type = FutureUsers.EntryType, TweakId = "t", KeyPath = target[..bang], ValueName = target[(bang + 1)..] };
+        catalogAllowed = BackupEntryPolicy.IsAllowed(genuine, out _);
+    }
+
+    return Report("the future-users policy only allows catalog HKCU values",
+        forgedRefused && catalogAllowed && target is not null,
+        $"forged template write refused={forgedRefused} (expected True), a genuine catalog target ({target ?? "none found!"}) allowed={catalogAllowed}");
 }
 
 // Helpers for the origin tests. Static: they capture nothing, so every refusal is the OS deciding, not the

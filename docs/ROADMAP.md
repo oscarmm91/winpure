@@ -37,9 +37,12 @@ the *Microsoft Edge* page: 7 tweaks, all Manual until someone checks `edge://pol
 in with a personal Microsoft account. From Phase 4, Windows optional features are built; OEM bloatware
 is not. From Phase 5, export/import, the winget installer and **the "no way back" section** are built,
 the last as the *Remove Apps* page: every app removal left the presets, and the page shows no preset
-buttons. **Apply to future users** is waiting on one measurement: whether the Default profile hive can be
-loaded privately (`RegLoadAppKey`) needs an elevated probe on a copy of it, and a mistake leaves new
-profiles broken. Phase 6 search and pending badges are built. Phase 7 (Spanish) is built.
+buttons. **Apply to future users** is built: a checkbox on the Apply bar writes the reversible HKCU tweaks
+being applied into the Default profile (`C:\Users\Default\NTUSER.DAT`) with `RegLoadAppKey`, backed up and
+undoable from Restore. The one measurement it was waiting on — that the real template loads privately and a
+write survives in the primary file — was taken elevated on copies (`tools/TemplateProbe`, 2026-09-13) and
+passed. Phase 6 search and pending badges are built. Phase 7 (Spanish) is built. The backup store was also
+hardened to trust a backup by its owner (Administrators/SYSTEM), not the shape of its permissions.
 
 ---
 
@@ -114,7 +117,10 @@ promotions. NewTabPageBingChatEnabled was left out because it only touches the E
   so it must never share a page or a preset with the reversible catalog.
 - **Apply to future users** via the `Default` profile hive. Genuinely useful and genuinely
   dangerous: a badly unloaded hive can leave a profile unusable. Needs the same
-  capture-before-touching discipline as the engine.
+  capture-before-touching discipline as the engine. **Built**: a checkbox on the Apply bar mirrors the
+  reversible HKCU tweaks being applied into `C:\Users\Default\NTUSER.DAT` via `RegLoadAppKey`
+  (`Services/FutureUsers.cs`); each template value is captured into the same backup session before it is
+  changed, so Restore undoes it, and only the catalog's own HKCU values may be written back.
 - **The "no way back" section** itself — the home for app removal and anything else that cannot
   be undone, with explicit confirmation and never pre-ticked. **Built** as the *Remove Apps* page:
   18 removals (the Store apps, Xbox and OneDrive) left Balanced and Aggressive, the page shows no

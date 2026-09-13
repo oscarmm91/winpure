@@ -81,6 +81,11 @@ public sealed class MainViewModel : ObservableObject
             Main = this,
             OsInfo = GetOsInfo(),
         };
+        // The count cards open a filtered list of what they count; the Backups card jumps to Restore.
+        _dashboard.ShowAllCommand = new RelayCommand(_ => ShowStatusFilter(null), _ => !IsBusy);
+        _dashboard.ShowOptimizedCommand = new RelayCommand(_ => ShowStatusFilter(TweakStatus.Optimized), _ => !IsBusy);
+        _dashboard.ShowPendingCommand = new RelayCommand(_ => ShowStatusFilter(TweakStatus.Pending), _ => !IsBusy);
+        _dashboard.ShowBackupsCommand = new RelayCommand(_ => CurrentNav = NavItems.First(n => n.Page == _restore), _ => !IsBusy);
         _restore = new RestoreViewModel
         {
             Title = "Restore / Backup",
@@ -185,10 +190,11 @@ public sealed class MainViewModel : ObservableObject
         get => _currentNav;
         set
         {
-            if (IsSearching)
+            if (IsSearching || _searchPage is not null)
             {
-                // Picking a page in the sidebar leaves the search results — including the page
-                // the search started from, whose button was unchecked while searching.
+                // Picking a page in the sidebar leaves the search results — or a Dashboard filter view,
+                // which is the same transient slot with no search text — including the page the search
+                // started from, whose button was unchecked while searching.
                 _searchText = "";
                 _searchPage = null;
                 OnPropertyChanged(nameof(SearchText));
@@ -244,6 +250,52 @@ public sealed class MainViewModel : ObservableObject
     }
 
     public bool IsSearching => !string.IsNullOrWhiteSpace(_searchText);
+
+    /// <summary>
+    /// Shows a transient page listing every tweak with the given status (or all of them), reusing the search
+    /// page's slot. Clicking any sidebar item leaves it. This is what the Dashboard count cards open.
+    /// </summary>
+    public void ShowStatusFilter(TweakStatus? status)
+    {
+        var matches = status is null ? AllTweaks.ToList() : AllTweaks.Where(t => t.Status == status.Value).ToList();
+        _searchText = "";
+        _searchPage = BuildFilterPage(status, matches);
+        _currentNav.SetCurrentSilently(false);
+        OnPropertyChanged(nameof(SearchText));
+        OnPropertyChanged(nameof(IsSearching));
+        OnPropertyChanged(nameof(CurrentPage));
+        UpdatePendingCount();
+    }
+
+    private CategoryPageViewModel BuildFilterPage(TweakStatus? status, List<TweakViewModel> matches)
+    {
+        string title = status switch
+        {
+            TweakStatus.Pending => Loc.N("Pending changes"),
+            TweakStatus.Optimized => Loc.N("Already optimized"),
+            _ => Loc.N("All tweaks"),
+        };
+        string subtitle = status switch
+        {
+            TweakStatus.Pending => matches.Count == 1
+                ? Loc.T("1 tweak you have not applied, from every category. Tick the ones you want and Apply.")
+                : Loc.F("{0} tweaks you have not applied, from every category. Tick the ones you want and Apply.", matches.Count),
+            TweakStatus.Optimized => matches.Count == 1
+                ? Loc.T("1 tweak already applied on this PC, from every category.")
+                : Loc.F("{0} tweaks already applied on this PC, from every category.", matches.Count),
+            _ => Loc.F("Every one of WinPure's {0} tweaks, from every category.", matches.Count),
+        };
+        var page = new CategoryPageViewModel
+        {
+            Title = title,
+            Subtitle = subtitle,
+            Main = this,
+            ShowsPresets = !matches.Any(t => !t.FullyReversible),
+            Warning = matches.Any(t => !t.FullyReversible) ? RemoveAppsWarning : "",
+        };
+        foreach (var tweak in matches) page.Tweaks.Add(tweak);
+        return page;
+    }
 
     private CategoryPageViewModel BuildSearchPage(string query)
     {

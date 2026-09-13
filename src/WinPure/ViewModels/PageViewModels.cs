@@ -41,6 +41,12 @@ public sealed class DashboardViewModel : PageViewModel
     public int BackupCount { get => _backupCount; set => Set(ref _backupCount, value); }
 
     public string OsInfo { get; init; } = "";
+
+    // Clicking a count card opens a filtered list. Set by MainViewModel, which owns the tweaks and pages.
+    public RelayCommand? ShowAllCommand { get; set; }
+    public RelayCommand? ShowOptimizedCommand { get; set; }
+    public RelayCommand? ShowPendingCommand { get; set; }
+    public RelayCommand? ShowBackupsCommand { get; set; }
 }
 
 public sealed class BackupSessionViewModel : ObservableObject

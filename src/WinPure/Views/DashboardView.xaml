@@ -4,6 +4,30 @@
              xmlns:l="clr-namespace:WinPure.Views"
              xmlns:models="clr-namespace:WinPure.Models">
 
+    <UserControl.Resources>
+        <!-- A count card that behaves like a button: same look, hand cursor, accent border on hover. -->
+        <Style x:Key="StatCard" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="{StaticResource Brush.Card}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Brush.CardBorder}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1" CornerRadius="8" Padding="18,16">
+                            <ContentPresenter HorizontalAlignment="Left"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource Brush.Accent}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="0,18,6,12">
             <TextBlock Text="{l:Tr 'Dashboard'}" FontSize="28" FontWeight="SemiBold"
@@ -13,17 +37,17 @@
 
             <!-- stats -->
             <UniformGrid Columns="4" Margin="0,24,0,0">
-                <Border Background="{StaticResource Brush.Card}" CornerRadius="8" Padding="18,16" Margin="0,0,10,0"
-                        BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}">
+                <Button Style="{StaticResource StatCard}" Margin="0,0,10,0" Command="{Binding ShowAllCommand}"
+                        ToolTip="{l:Tr 'Show every tweak'}">
                     <StackPanel>
                         <TextBlock Text="&#xE9D2;" FontFamily="{StaticResource Font.Icon}" FontSize="18" Foreground="#5CA9E8"/>
                         <TextBlock Text="{Binding TotalCount}" FontSize="30" FontWeight="SemiBold" Margin="0,8,0,0"
                                    Foreground="{StaticResource Brush.TextPrimary}"/>
                         <TextBlock Text="{l:Tr 'Available tweaks'}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}"/>
                     </StackPanel>
-                </Border>
-                <Border Background="{StaticResource Brush.Card}" CornerRadius="8" Padding="18,16" Margin="0,0,10,0"
-                        BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}">
+                </Button>
+                <Button Style="{StaticResource StatCard}" Margin="0,0,10,0" Command="{Binding ShowOptimizedCommand}"
+                        ToolTip="{l:Tr 'Show what is already optimized'}">
                     <StackPanel>
                         <TextBlock Text="&#xE930;" FontFamily="{StaticResource Font.Icon}" FontSize="18"
                                    Foreground="{StaticResource Brush.GreenText}"/>
@@ -31,9 +55,9 @@
                                    Foreground="{StaticResource Brush.GreenText}"/>
                         <TextBlock Text="{l:Tr 'Already optimized'}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}"/>
                     </StackPanel>
-                </Border>
-                <Border Background="{StaticResource Brush.Card}" CornerRadius="8" Padding="18,16" Margin="0,0,10,0"
-                        BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}">
+                </Button>
+                <Button Style="{StaticResource StatCard}" Margin="0,0,10,0" Command="{Binding ShowPendingCommand}"
+                        ToolTip="{l:Tr 'Show what you have not applied yet'}">
                     <StackPanel>
                         <TextBlock Text="&#xEA6A;" FontFamily="{StaticResource Font.Icon}" FontSize="18"
                                    Foreground="{StaticResource Brush.Orange}"/>
@@ -41,9 +65,9 @@
                                    Foreground="{StaticResource Brush.TextPrimary}"/>
                         <TextBlock Text="{l:Tr 'Pending'}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}"/>
                     </StackPanel>
-                </Border>
-                <Border Background="{StaticResource Brush.Card}" CornerRadius="8" Padding="18,16"
-                        BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}">
+                </Button>
+                <Button Style="{StaticResource StatCard}" Command="{Binding ShowBackupsCommand}"
+                        ToolTip="{l:Tr 'Open your backups'}">
                     <StackPanel>
                         <TextBlock Text="&#xE81C;" FontFamily="{StaticResource Font.Icon}" FontSize="18"
                                    Foreground="{StaticResource Brush.TextSecondary}"/>
@@ -51,7 +75,7 @@
                                    Foreground="{StaticResource Brush.TextPrimary}"/>
                         <TextBlock Text="{l:Tr 'Backups'}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}"/>
                     </StackPanel>
-                </Border>
+                </Button>
             </UniformGrid>
 
             <!-- presets -->

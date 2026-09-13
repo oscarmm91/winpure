@@ -606,5 +606,16 @@
   "winget found nothing for \"{0}\".": "winget no encontró nada para \"{0}\".",
   "{0} result(s) from winget. These install from their publisher, like the list below.": "{0} resultado(s) de winget. Se instalan desde su fabricante, como la lista de abajo.",
   "Search the winget catalog for any app to install": "Busca cualquier app para instalar en el catálogo de winget",
-  "Suggested apps": "Apps sugeridas"
+  "Suggested apps": "Apps sugeridas",
+  "Pending changes": "Cambios pendientes",
+  "All tweaks": "Todos los ajustes",
+  "1 tweak you have not applied, from every category. Tick the ones you want and Apply.": "1 ajuste que no has aplicado, de todas las categorías. Marca los que quieras y Aplica.",
+  "{0} tweaks you have not applied, from every category. Tick the ones you want and Apply.": "{0} ajustes que no has aplicado, de todas las categorías. Marca los que quieras y Aplica.",
+  "1 tweak already applied on this PC, from every category.": "1 ajuste ya aplicado en esta PC, de todas las categorías.",
+  "{0} tweaks already applied on this PC, from every category.": "{0} ajustes ya aplicados en esta PC, de todas las categorías.",
+  "Every one of WinPure's {0} tweaks, from every category.": "Los {0} ajustes de WinPure, de todas las categorías.",
+  "Show every tweak": "Ver todos los ajustes",
+  "Show what is already optimized": "Ver lo que ya está optimizado",
+  "Show what you have not applied yet": "Ver lo que aún no has aplicado",
+  "Open your backups": "Abrir tus respaldos"
 }

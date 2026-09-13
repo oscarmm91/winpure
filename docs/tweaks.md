@@ -28,6 +28,15 @@ All registry/service changes are snapshotted to `%ProgramData%\WinPure\Backups\`
 | Don't Share Your Language List With Websites | Balanced | `International\User Profile!HttpAcceptLanguageOptOut = 1` |
 | Disable Diagnostic Data Tasks | Aggressive | Disables *StartupAppTask*, *Autochk\Proxy*, *DiskDiagnosticDataCollector*, *MapsToastTask* & *MapsUpdateTask* (MareBackup left alone: it feeds Windows Backup) |
 | Disable CEIP & Feedback Tasks | Aggressive | Disables *Consolidator*, *UsbCeip*, *DmClient* scheduled tasks |
+| Hide OneDrive ads in File Explorer | Balanced | `Explorer\Advanced!ShowSyncProviderNotifications = 0` — turns off the OneDrive/Office banners |
+| Hide account nags in Start | Balanced | `Explorer\Advanced!Start_AccountNotifications = 0` |
+| Turn off Windows tips notifications | Balanced | `ContentDeliveryManager!SubscribedContent-338389Enabled = 0` |
+| Disable Remote Assistance | Balanced | `Control\Remote Assistance!fAllowToGetHelp = 0` — no inbound Remote Assistance (distinct from RDP) |
+| Hide Microsoft 365 ads in Settings | Balanced | `CloudContent!DisableConsumerAccountStateContent = 1` (policy) |
+| Disable cloud-optimized content | Aggressive | `CloudContent!DisableCloudOptimizedContent = 1` (policy) |
+| Disable Find My Device | Manual | `Policies\Microsoft\FindMyDevice!AllowFindMyDevice = 0` (policy) |
+| Disable app compatibility telemetry | Aggressive | `AppCompat!AITEnable = 0`, `DisableInventory = 1` (policies; PCA left alone) |
+| Disable automatic sign-in after updates | Manual | `Policies\System!DisableAutomaticRestartSignOn = 1` (ARSO off) |
 
 ## 📦 Apps & AI
 
@@ -77,6 +86,7 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Don't Get Updates As Soon As They're Available | Balanced | `WindowsUpdate\UX\Settings!IsContinuousInnovationOptedIn = 0` — security updates unaffected |
 | Enable Daily Registry Backup | Manual | `Configuration Manager!EnablePeriodicBackup = 1` |
 | Sync the Clock With pool.ntp.org | Manual | `W32Time\Parameters!NtpServer = pool.ntp.org,0x9` (same flags as stock: only the server changes) |
+| Keep driver updates out of Windows Update | Balanced | `WindowsUpdate!ExcludeWUDriversInQualityUpdate = 1` (policy) — WU stops pushing driver updates |
 
 ## 🎨 UI & Personalization
 
@@ -101,6 +111,8 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Align Taskbar Left | Manual | `TaskbarAl = 0` |
 | End Task on Taskbar Right-Click | Safe | `TaskbarDeveloperSettings!TaskbarEndTask = 1` |
 | Disable Aero Shake | Safe | `DisallowShaking = 1` |
+| Speed up menu animations | Balanced | `Control Panel\Desktop!MenuShowDelay = 0` — instant submenus (stock 400 ms) |
+| Stop the Sticky Keys shortcut prompt | Manual | Accessibility `Flags`: StickyKeys 506, Keyboard Response 122, ToggleKeys 58 — turns off the 5×-Shift popup, not the feature |
 
 ## 🖱️ Context Menu
 

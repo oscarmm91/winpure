@@ -105,8 +105,13 @@ de tocar); las irreversibles van en secciones marcadas, sin falso deshacer.
   una lista filtrada; Respaldos salta a Restaurar), (3) *Arranque* en lote (un solo respaldo). Los tres con
   prueba/render.
 - **Fase 1 — Limpieza** (bucket A): **HECHO** (13-sep-2026). Página *Limpieza* con 10 categorías vetadas (temp, caché de WU, DO, navegadores multi-perfil, miniaturas, INetCache, volcados/WER, sombreadores GPU, historial de Defender, Papelera), vista previa de tamaño, salta archivos en uso, confirmación por defecto No. `Services/CleanupService.cs` + `CleanupCatalog.cs`. Pendiente opcional: Windows.old y DISM StartComponentCleanup (necesitan toma de posesión / comando largo).
-- **Fase 2 — Auditoría de tweaks** (bucket H): Sonnets minan cada repo, proponen tweaks nuevos; revisor
-  adversario; los aprobados se portan con prueba en rojo. Sube el catálogo de 111 a lo que aguante la verdad.
+- **Fase 2 — Auditoría de tweaks** (bucket H): **EN CURSO** (13-sep-2026). Primer lote: **12 tweaks nuevos
+  verificados** (catálogo 111 → 123). 9 de Privacidad (anuncios de OneDrive/365, avisos de cuenta, Asistencia
+  remota, contenido de nube, Buscar mi dispositivo, telemetría de compatibilidad, ARSO), 1 de Rendimiento
+  (excluir controladores de WU), 2 de Interfaz (MenuShowDelay, aviso de Teclas especiales). Cada clave HKCU
+  comprobada en la máquina y cada directiva HKLM cruzada contra su `.admx` (clase Machine, no marcada por el
+  informe ADMX). docs/tweaks.md + README sincronizados (la prueba de docs lo verifica). Quedan ~más candidatos
+  vetados en `scratchpad/mine-digest.txt` (contexto de menú, más privacidad/perf) para siguientes lotes.
 - **Fase 3 — Red/DNS/HOSTS** (buckets C, D).
 - **Fase 4 — Memoria + utilidades** (buckets B, G).
 - **Fase 5 — Catálogo de apps más grande + dashboard en vivo** (buckets I, F).

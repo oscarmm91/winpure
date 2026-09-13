@@ -57,7 +57,7 @@ Selecting a preset only marks the toggles — **nothing changes until you click 
 > 📚 Full tweak reference with registry details: [docs/tweaks.md](docs/tweaks.md)
 
 <details>
-<summary>🔒 <b>Privacy & Telemetry</b> — 21 tweaks</summary>
+<summary>🔒 <b>Privacy & Telemetry</b> — 30 tweaks</summary>
 <br/>
 Telemetry (AllowTelemetry → 0), diagnostics data, DiagTrack service, outbound telemetry firewall block, Bing in Start Menu, silent app installs, Consumer Features, Delivery Optimization, background apps, Activity History, location tracking, app-launch tracking, Advertising ID, Windows Feedback, online speech recognition, inking/typing personalization, Compatibility-Appraiser & CEIP scheduled tasks, search history, the language list websites can read, diagnostic data tasks.
 <br/><br/>
@@ -79,7 +79,7 @@ SysMain (SuperFetch), Windows Search indexing, Print Spooler, Remote Registry, E
 </details>
 
 <details>
-<summary>🚀 <b>Performance</b> — 15 tweaks</summary>
+<summary>🚀 <b>Performance</b> — 16 tweaks</summary>
 <br/>
 Faster app timeouts & shutdown, foreground-app priority, window animations, hibernation, High Performance power plan, fullscreen optimizations, mouse acceleration, long paths, Remote Desktop, Fast Startup, early optional updates, daily registry backup, NTP time server, Reserved Storage.
 <br/><br/>
@@ -87,7 +87,7 @@ Faster app timeouts & shutdown, foreground-app priority, window animations, hibe
 </details>
 
 <details>
-<summary>🎨 <b>UI & Personalization</b> — 19 tweaks</summary>
+<summary>🎨 <b>UI & Personalization</b> — 21 tweaks</summary>
 <br/>
 Dark mode, Snap Assist flyout, Start Menu suggestions/most-used/recently-added, "new app" badge, file extensions, hidden files, Widgets/Task View/Chat taskbar buttons, taskbar alignment, End Task on right-click, Aero Shake, search highlights, NumLock at sign-in, Spotlight wallpaper, "What's new" screens after updates, the F1 help key.
 <br/><br/>

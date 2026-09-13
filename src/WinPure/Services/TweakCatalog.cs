@@ -81,6 +81,126 @@ public static class TweakCatalog
             },
         };
 
+        // --- Audit additions (13-sep-2026): verified on 26H2 26200, keys distinct from the above. ---
+
+        yield return new Tweak
+        {
+            Id = "privacy-onedrive-ads", Category = TweakCategory.Privacy, Preset = PresetLevel.Balanced,
+            Name = "Hide OneDrive ads in File Explorer",
+            Description = "Turn off the OneDrive and Office promotions File Explorer shows as \"sync provider\" banners.",
+            Help = "Sets ShowSyncProviderNotifications to 0. Those banners advertise OneDrive and Microsoft 365; turning them off does not affect a OneDrive you actually use.",
+            Icon = Glyph(0xE774),
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "ShowSyncProviderNotifications", 0, 1),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "privacy-start-account-nags", Category = TweakCategory.Privacy, Preset = PresetLevel.Balanced,
+            Name = "Hide account nags in Start",
+            Description = "Remove the Microsoft-account backup and sign-in prompts shown in the Start menu.",
+            Help = "Sets Start_AccountNotifications to 0. These are the account/backup upsell notifications on Start; the value is absent by default, so undo deletes it.",
+            Icon = Glyph(0xE77B),
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Start_AccountNotifications", 0, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "privacy-tips-notifications", Category = TweakCategory.Privacy, Preset = PresetLevel.Balanced,
+            Name = "Turn off Windows tips notifications",
+            Description = "Stop the periodic \"tips, tricks and suggestions\" notifications Windows shows.",
+            Help = "Sets ContentDeliveryManager!SubscribedContent-338389Enabled to 0. This is the suggestions notification feed, distinct from the other suggested-content surfaces WinPure already covers.",
+            Icon = Glyph(0xE7E7),
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-338389Enabled", 0, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "privacy-remote-assistance", Category = TweakCategory.Privacy, Preset = PresetLevel.Balanced,
+            Name = "Disable Remote Assistance",
+            Description = "Turn off inbound Windows Remote Assistance connections.",
+            Help = "Sets fAllowToGetHelp to 0. This is \"Allow Remote Assistance connections to this computer\", a real attack-surface reduction — distinct from Remote Desktop, which has its own tweak.",
+            Icon = Glyph(0xE8AF),
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKLM\SYSTEM\CurrentControlSet\Control\Remote Assistance", "fAllowToGetHelp", 0, 1),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "privacy-settings-365-ads", Category = TweakCategory.Privacy, Preset = PresetLevel.Balanced,
+            Name = "Hide Microsoft 365 ads in Settings",
+            Description = "Remove the Microsoft 365 and account upsell cards on the Settings home page.",
+            Help = "Sets the DisableConsumerAccountStateContent policy to 1 (declared in CloudContent.admx). Undo deletes the value.",
+            Icon = Glyph(0xE8A5),
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent", "DisableConsumerAccountStateContent", 1, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "privacy-cloud-optimized-content", Category = TweakCategory.Privacy, Preset = PresetLevel.Aggressive,
+            Name = "Disable cloud-optimized content",
+            Description = "Block cloud-delivered \"optimized\" suggested content on Start and the lock screen.",
+            Help = "Sets the DisableCloudOptimizedContent policy to 1 (declared in CloudContent.admx). Distinct from Disable Consumer Features. Undo deletes the value.",
+            Icon = Glyph(0xE753),
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent", "DisableCloudOptimizedContent", 1, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "privacy-find-my-device", Category = TweakCategory.Privacy, Preset = PresetLevel.Manual,
+            Name = "Disable Find My Device",
+            Description = "Turn off Find My Device, which periodically records this PC's location so you can locate it.",
+            Help = "Sets the AllowFindMyDevice policy to 0 (declared in FindMy.admx). Manual on purpose: turning off device-location recovery is a real trade-off you should choose. Undo deletes the value.",
+            Icon = Glyph(0xE81D),
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKLM\SOFTWARE\Policies\Microsoft\FindMyDevice", "AllowFindMyDevice", 0, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "privacy-appcompat-telemetry", Category = TweakCategory.Privacy, Preset = PresetLevel.Aggressive,
+            Name = "Disable app compatibility telemetry",
+            Description = "Turn off the Application Impact Telemetry and application-inventory collectors.",
+            Help = "Sets AITEnable to 0 and DisableInventory to 1 (both declared in AppCompat.admx). Only the telemetry values — the Program Compatibility Assistant itself is left alone.",
+            Icon = Glyph(0xE9D9),
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\AppCompat", "AITEnable", 0, null),
+                Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\AppCompat", "DisableInventory", 1, null),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "privacy-arso", Category = TweakCategory.Privacy, Preset = PresetLevel.Manual,
+            Name = "Disable automatic sign-in after updates",
+            Description = "Stop Windows from silently signing you back in to finish setup after an update reboot.",
+            Help = "Sets the DisableAutomaticRestartSignOn policy to 1 (declared in WinLogon.admx). Manual because it changes what happens at the lock screen after a reboot. Undo deletes the value.",
+            Icon = Glyph(0xE72E),
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System", "DisableAutomaticRestartSignOn", 1, null),
+            },
+        };
+
         yield return new Tweak
         {
             Id = "privacy-diagtrack", Category = TweakCategory.Privacy, Preset = PresetLevel.Aggressive,
@@ -934,6 +1054,19 @@ public static class TweakCatalog
                 Str(@"HKLM\SYSTEM\CurrentControlSet\Services\W32Time\Parameters", "NtpServer", "pool.ntp.org,0x9", "time.windows.com,0x9"),
             },
         };
+
+        yield return new Tweak
+        {
+            Id = "perf-exclude-wu-drivers", Category = TweakCategory.Performance, Preset = PresetLevel.Balanced,
+            Name = "Keep driver updates out of Windows Update",
+            Description = "Stop Windows Update from installing driver updates alongside quality updates.",
+            Help = "Sets the ExcludeWUDriversInQualityUpdate policy to 1 (declared in WindowsUpdate.admx). Windows still installs its own drivers during setup; this only stops WU pushing driver updates that can break a working GPU or audio driver. Undo deletes the value.",
+            Icon = Glyph(0xE896),
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate", "ExcludeWUDriversInQualityUpdate", 1, null),
+            },
+        };
     }
 
     // ------------------------------------------------------------------ UI & Personalization
@@ -1192,6 +1325,34 @@ public static class TweakCatalog
                     DeleteOnApply = false,
                     KeyDefaultValue = "",
                 },
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "ui-menu-show-delay", Category = TweakCategory.UI, Preset = PresetLevel.Balanced,
+            Name = "Speed up menu animations",
+            Description = "Make submenus and right-click menus open instantly instead of after a short delay.",
+            Help = "Sets Control Panel\\Desktop!MenuShowDelay to 0 (stock is 400 ms). Pure responsiveness; no side effects. Undo restores the delay you had.",
+            Icon = Glyph(0xE7A7),
+            Actions = new TweakAction[]
+            {
+                Str(@"HKCU\Control Panel\Desktop", "MenuShowDelay", "0", "400"),
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "ui-sticky-keys-prompt", Category = TweakCategory.UI, Preset = PresetLevel.Manual,
+            Name = "Stop the Sticky Keys shortcut prompt",
+            Description = "Turn off the pop-up that appears when you press Shift five times, and the Filter/Toggle Keys chimes.",
+            Help = "Clears the activation-shortcut bit in the Sticky, Filter and Toggle Keys Flags (Accessibility). It only turns off the shortcut prompt — the accessibility features themselves still work if you enable them in Settings. Undo restores the flags you had.",
+            Icon = Glyph(0xE765),
+            Actions = new TweakAction[]
+            {
+                Str(@"HKCU\Control Panel\Accessibility\StickyKeys", "Flags", "506", "510"),
+                Str(@"HKCU\Control Panel\Accessibility\Keyboard Response", "Flags", "122", "126"),
+                Str(@"HKCU\Control Panel\Accessibility\ToggleKeys", "Flags", "58", "62"),
             },
         };
     }

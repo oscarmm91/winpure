@@ -100,8 +100,9 @@ de tocar); las irreversibles van en secciones marcadas, sin falso deshacer.
 
 ## Fases propuestas (orden sugerido)
 
-- **Fase 0 — arreglos de UX chicos y claros** (rápido, no necesita el mega-loop): (1) buscador winget,
-  (2) tarjetas del dashboard clicables → lista, (3) arranque en lote. *(Oscar: ¿los hago ya, antes del loop?)*
+- **Fase 0 — arreglos de UX chicos y claros**: (1) buscador winget, (2) tarjetas del dashboard clicables →
+  lista, (3) arranque en lote. **Decisión de Oscar (13-sep-2026): van DENTRO del mega-loop**, no antes. El de
+  arranque en lote es el primero por hacer (hoy genera respaldos de más).
 - **Fase 1 — Limpieza** (bucket A): página *Limpieza* con vista previa de tamaño, categorías seguras primero.
 - **Fase 2 — Auditoría de tweaks** (bucket H): Sonnets minan cada repo, proponen tweaks nuevos; revisor
   adversario; los aprobados se portan con prueba en rojo. Sube el catálogo de 111 a lo que aguante la verdad.
@@ -130,8 +131,7 @@ Resueltas por Oscar el 13-sep-2026:
 - **Resto del plan**: aprobado ("todo lo demás está bien").
 
 Pendientes, chicas, no bloquean el plan:
-1. **Fase 0 (los 3 arreglos de UX): ¿ya, antes del mega-loop, o dentro del loop?** (El de *Arranque* en lote
-   conviene pronto: hoy genera respaldos de más.)
+1. **Fase 0 (los 3 arreglos de UX): DENTRO del loop** (decidido 13-sep-2026). Nada se hace antes.
 2. **Snake-oil**: salvo que Oscar diga lo contrario, se **rechaza** limpiador de registro, tweaks "gamer"
    opacos sin revert e instaladores de dominios raros (no romper máquinas ni engañar).
 3. **Limpiador de RAM**: por defecto entra como **herramienta manual con explicación honesta** (en Windows

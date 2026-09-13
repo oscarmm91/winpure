@@ -118,6 +118,7 @@ failures += TheFutureUsersPolicyOnlyAllowsCatalogHkcuValues() ? 0 : 1;
 failures += CleanupMeasuresClearsAndSkipsLockedFiles() ? 0 : 1;
 failures += CleanupFolderKindDeletesTheWholeFolder() ? 0 : 1;
 failures += HostsEditorBacksUpBeforeSavingAndCanUndoOrReset() ? 0 : 1;
+failures += FreeingMemoryReportsBeforeAndAfterWithoutTouchingRealMemory() ? 0 : 1;
 failures += DnsCapturesCurrentServersAndRestorePutsThemBack() ? 0 : 1;
 failures += AServiceCanBeSetToManualNotJustDisabled() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
@@ -1502,6 +1503,33 @@ bool DnsCapturesCurrentServersAndRestorePutsThemBack()
         problems.Count == 0
             ? "both adapters switched to the preset, their prior servers captured in one backup, and Restore set them back; the policy allows only IP lists or DHCP"
             : string.Join(" | ", problems));
+}
+
+// The memory tool reports before/after snapshots around a purge, computes used = total - available, and
+// runs against a fake backend so a test never trims real process working sets or clears the standby list.
+bool FreeingMemoryReportsBeforeAndAfterWithoutTouchingRealMemory()
+{
+    var fake = new FakeMemoryBackend { Total = 16_000, Avail = 4_000 };
+    var prev = MemoryService.Swap(fake);
+    var problems = new List<string>();
+    try
+    {
+        var info = new MemoryInfo(16_000, 4_000);
+        if (info.UsedBytes != 12_000) problems.Add($"UsedBytes={info.UsedBytes}, expected 12000");
+        if (info.LoadPercent != 75) problems.Add($"LoadPercent={info.LoadPercent}, expected 75");
+        if (new MemoryInfo(0, 0).LoadPercent != 0) problems.Add("LoadPercent of a zero total should be 0, not a divide-by-zero");
+
+        var (before, after) = MemoryService.Clean();
+        if (before.AvailableBytes != 4_000) problems.Add($"before snapshot available={before.AvailableBytes}, expected 4000");
+        if (!fake.Purged) problems.Add("Clean did not call Purge on the backend");
+        if (after.AvailableBytes <= before.AvailableBytes) problems.Add("the after snapshot did not reflect the purge");
+    }
+    catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
+    finally { MemoryService.Swap(prev); }
+
+    return Report("freeing memory reports before/after and never touches real memory in tests",
+        problems.Count == 0,
+        problems.Count == 0 ? "used = total - available; load% guards divide-by-zero; Clean queried, purged, requeried through the fake backend" : string.Join(" | ", problems));
 }
 
 // The hosts editor copies the current file to a backup before writing, so a save can be undone; and it can
@@ -3127,6 +3155,15 @@ sealed class FakeDnsBackend : IDnsBackend
     public IReadOnlyList<DnsAdapter> ReadAdapters() => Adapters;
     public void SetServers(string adapterName, string[] servers) => Sets.Add((adapterName, servers));
     public void FlushCache() { }
+}
+
+/// <summary>Memory readings held in a field, so tests never trim real process working sets.</summary>
+sealed class FakeMemoryBackend : IMemoryBackend
+{
+    public ulong Total = 16_000, Avail = 4_000;
+    public bool Purged;
+    public MemoryInfo Query() => new(Total, Avail);
+    public void Purge() { Purged = true; Avail += 2_000; }   // pretend the trim freed some
 }
 
 /// <summary>Windows features held in memory, so tests never run DISM.</summary>

@@ -58,6 +58,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly RestoreViewModel _restore;
     private readonly StartupViewModel _startup;
     private readonly CleanupViewModel _cleanup;
+    private readonly MemoryViewModel _memory;
     private readonly DnsViewModel _dns;
     private readonly HostsViewModel _hosts;
     private readonly InstallerViewModel _installer;
@@ -144,6 +145,14 @@ public sealed class MainViewModel : ObservableObject
             Main = this,
         };
         NavItems.Add(new NavItem { Label = "Clean up", Glyph = ((char)0xEA99).ToString(), Page = _cleanup });
+        _memory = new MemoryViewModel
+        {
+            Title = "Free up memory",
+            Subtitle = "Trim app memory and clear the standby cache to lower RAM use. Windows already manages memory well, "
+                     + "so this is a manual, honest nudge — any gain is usually short-lived.",
+            Main = this,
+        };
+        NavItems.Add(new NavItem { Label = "Memory", Glyph = ((char)0xE950).ToString(), Page = _memory });
         _dns = new DnsViewModel(_engine)
         {
             Title = "DNS servers",
@@ -234,6 +243,7 @@ public sealed class MainViewModel : ObservableObject
             if (value.Page == _cleanup && !_cleanup.HasMeasured) _ = _cleanup.MeasureAllAsync();
             if (value.Page == _dns && !_dns.HasLoaded) _ = _dns.LoadAsync();
             if (value.Page == _hosts && !_hosts.HasLoaded) _hosts.Load();
+            if (value.Page == _memory) _memory.Load();   // re-read RAM each time the page opens
             OnPropertyChanged();
             OnPropertyChanged(nameof(CurrentPage));
             UpdatePendingCount();   // the Apply bar counts this page's pending changes (startup vs tweaks)

@@ -90,6 +90,10 @@ internal static class Program
             // Hosts reads the current hosts file (read-only) when opened.
             vm.CurrentNav = vm.NavItems.First(n => n.Page is HostsViewModel);
             Render(root, Path.Combine(outDir, "11-hosts.png"));
+
+            // Memory reads current RAM use (read-only) when opened; it never runs the purge.
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is MemoryViewModel);
+            Render(root, Path.Combine(outDir, "12-memory.png"));
             return 0;
         }
         catch (Exception ex)

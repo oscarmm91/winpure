@@ -750,5 +750,8 @@
   "Windows reclaims memory on its own; freeing it manually usually helps only for a moment.": "Windows recupera la memoria por su cuenta; liberarla a mano suele ayudar solo por un momento.",
   "Freeing up memory…": "Liberando memoria…",
   "Freed {0}. Windows will use it again as it needs to.": "Se liberaron {0}. Windows la volverá a usar conforme la necesite.",
-  "Little was reclaimed — Windows was already managing memory efficiently.": "Se recuperó poco — Windows ya administraba la memoria de forma eficiente."
+  "Little was reclaimed — Windows was already managing memory efficiently.": "Se recuperó poco — Windows ya administraba la memoria de forma eficiente.",
+  "System": "Sistema",
+  "Disk": "Disco",
+  "{0} free of {1}": "{0} libres de {1}"
 }

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using WinPure.Models;
 using WinPure.Services;
 
@@ -47,6 +48,39 @@ public sealed class DashboardViewModel : PageViewModel
     public RelayCommand? ShowOptimizedCommand { get; set; }
     public RelayCommand? ShowPendingCommand { get; set; }
     public RelayCommand? ShowBackupsCommand { get; set; }
+
+    // ---- Live system stats: refreshed by a timer in MainViewModel while the dashboard is open ----
+    private MemoryInfo _ram;
+    public int RamPercent => _ram.LoadPercent;
+    public string RamText => Loc.F("{0} of {1} in use ({2}%)",
+        CleanupViewModel.FormatBytes((long)_ram.UsedBytes),
+        CleanupViewModel.FormatBytes((long)_ram.TotalBytes),
+        _ram.LoadPercent);
+
+    private long _diskFree, _diskTotal;
+    public int DiskPercent => _diskTotal == 0 ? 0 : (int)Math.Round(100.0 * (_diskTotal - _diskFree) / _diskTotal);
+    public string DiskText => Loc.F("{0} free of {1}",
+        CleanupViewModel.FormatBytes(_diskFree), CleanupViewModel.FormatBytes(_diskTotal));
+
+    /// <summary>Re-reads RAM and system-drive free space. Cheap, read-only, safe to call on a timer.</summary>
+    public void RefreshLive()
+    {
+        _ram = MemoryService.Query();
+        try
+        {
+            var root = Path.GetPathRoot(Environment.SystemDirectory);
+            if (!string.IsNullOrEmpty(root))
+            {
+                var d = new DriveInfo(root);
+                if (d.IsReady) { _diskFree = d.AvailableFreeSpace; _diskTotal = d.TotalSize; }
+            }
+        }
+        catch { }
+        OnPropertyChanged(nameof(RamPercent));
+        OnPropertyChanged(nameof(RamText));
+        OnPropertyChanged(nameof(DiskPercent));
+        OnPropertyChanged(nameof(DiskText));
+    }
 }
 
 public sealed class BackupSessionViewModel : ObservableObject

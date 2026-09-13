@@ -78,6 +78,47 @@
                 </Button>
             </UniformGrid>
 
+            <!-- live system stats -->
+            <Border Background="{StaticResource Brush.Card}" CornerRadius="8" Padding="18,16" Margin="0,14,0,0"
+                    BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}">
+                <StackPanel>
+                    <TextBlock Text="{l:Tr 'System'}" FontSize="13" FontWeight="SemiBold"
+                               Foreground="{StaticResource Brush.TextPrimary}"/>
+
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="64"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="{l:Tr 'Memory'}" FontSize="12.5" VerticalAlignment="Center"
+                                   Foreground="{StaticResource Brush.TextSecondary}"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="{Binding RamText}" FontSize="12" HorizontalAlignment="Right"
+                                       Foreground="{StaticResource Brush.TextSecondary}"/>
+                            <ProgressBar Value="{Binding RamPercent, Mode=OneWay}" Maximum="100" Height="8" Margin="0,4,0,0"
+                                         Foreground="{StaticResource Brush.Accent}" Background="{StaticResource Brush.CardBorder}"
+                                         BorderThickness="0"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="64"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="{l:Tr 'Disk'}" FontSize="12.5" VerticalAlignment="Center"
+                                   Foreground="{StaticResource Brush.TextSecondary}"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="{Binding DiskText}" FontSize="12" HorizontalAlignment="Right"
+                                       Foreground="{StaticResource Brush.TextSecondary}"/>
+                            <ProgressBar Value="{Binding DiskPercent, Mode=OneWay}" Maximum="100" Height="8" Margin="0,4,0,0"
+                                         Foreground="{StaticResource Brush.Accent}" Background="{StaticResource Brush.CardBorder}"
+                                         BorderThickness="0"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
             <!-- presets -->
             <DockPanel Margin="0,28,0,10">
                 <TextBlock Text="{l:Tr 'Quick presets'}" DockPanel.Dock="Left" FontSize="12.5"

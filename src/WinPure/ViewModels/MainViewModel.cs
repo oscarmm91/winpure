@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Windows;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using WinPure.Models;
 using WinPure.Services;
@@ -59,6 +60,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly StartupViewModel _startup;
     private readonly CleanupViewModel _cleanup;
     private readonly MemoryViewModel _memory;
+    private readonly DispatcherTimer _liveTimer;
     private readonly DnsViewModel _dns;
     private readonly HostsViewModel _hosts;
     private readonly InstallerViewModel _installer;
@@ -188,6 +190,13 @@ public sealed class MainViewModel : ObservableObject
         _currentNav = NavItems[0];
         _currentNav.SetCurrentSilently(true);
 
+        // The dashboard shows live RAM and disk figures; refresh them every 2 s, but only while it is the
+        // page on screen (the setter stops the timer on navigation away). The app opens on the dashboard.
+        _liveTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        _liveTimer.Tick += (_, _) => _dashboard.RefreshLive();
+        _dashboard.RefreshLive();
+        _liveTimer.Start();
+
         ApplyCommand = new RelayCommand(_ => _ = ApplyChangesAsync(), _ => !IsBusy && PendingCount > 0);
         RescanCommand = new RelayCommand(_ => _ = ScanAsync(), _ => !IsBusy);
         SelectPresetCommand = new RelayCommand(p => SelectPreset((PresetLevel)p!), _ => !IsBusy);
@@ -229,6 +238,7 @@ public sealed class MainViewModel : ObservableObject
                 {
                     value.SetCurrentSilently(true);
                     OnPropertyChanged(nameof(CurrentPage));
+                    SyncLiveTimer();        // the filter view is gone; the dashboard may be visible again
                     UpdatePendingCount();   // the Apply bar counts this page's pending changes
                     return;
                 }
@@ -244,10 +254,20 @@ public sealed class MainViewModel : ObservableObject
             if (value.Page == _dns && !_dns.HasLoaded) _ = _dns.LoadAsync();
             if (value.Page == _hosts && !_hosts.HasLoaded) _hosts.Load();
             if (value.Page == _memory) _memory.Load();   // re-read RAM each time the page opens
+            SyncLiveTimer();
             OnPropertyChanged();
             OnPropertyChanged(nameof(CurrentPage));
             UpdatePendingCount();   // the Apply bar counts this page's pending changes (startup vs tweaks)
         }
+    }
+
+    /// <summary>The live RAM/disk timer ticks only while the dashboard is the page actually on screen —
+    /// keyed on CurrentPage, so a Dashboard-launched search or filter view (which keeps CurrentNav on the
+    /// dashboard) still stops it.</summary>
+    private void SyncLiveTimer()
+    {
+        if (CurrentPage == _dashboard) { _dashboard.RefreshLive(); _liveTimer?.Start(); }
+        else _liveTimer?.Stop();
     }
 
     public string OsInfo { get; } = GetOsInfo();
@@ -272,6 +292,7 @@ public sealed class MainViewModel : ObservableObject
             if (!Set(ref _searchText, value ?? "")) return;
             _currentNav.SetCurrentSilently(!IsSearching);
             _searchPage = IsSearching ? BuildSearchPage(_searchText.Trim()) : null;
+            SyncLiveTimer();   // searching from the dashboard hides its live stats
             OnPropertyChanged(nameof(IsSearching));
             OnPropertyChanged(nameof(CurrentPage));
             OnPropertyChanged(nameof(ApplyHint));
@@ -290,6 +311,7 @@ public sealed class MainViewModel : ObservableObject
         _searchText = "";
         _searchPage = BuildFilterPage(status, matches);
         _currentNav.SetCurrentSilently(false);
+        SyncLiveTimer();   // a filter view replaces the dashboard's live stats
         OnPropertyChanged(nameof(SearchText));
         OnPropertyChanged(nameof(IsSearching));
         OnPropertyChanged(nameof(CurrentPage));

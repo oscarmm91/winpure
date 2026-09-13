@@ -103,7 +103,7 @@ de tocar); las irreversibles van en secciones marcadas, sin falso deshacer.
 - **Fase 0 — arreglos de UX chicos y claros**: (1) buscador winget, (2) tarjetas del dashboard clicables →
   lista, (3) arranque en lote. **Decisión de Oscar (13-sep-2026): van DENTRO del mega-loop**, no antes. El de
   arranque en lote es el primero por hacer (hoy genera respaldos de más).
-- **Fase 1 — Limpieza** (bucket A): página *Limpieza* con vista previa de tamaño, categorías seguras primero.
+- **Fase 1 — Limpieza** (bucket A): **HECHO** (13-sep-2026). Página *Limpieza* con 10 categorías vetadas (temp, caché de WU, DO, navegadores multi-perfil, miniaturas, INetCache, volcados/WER, sombreadores GPU, historial de Defender, Papelera), vista previa de tamaño, salta archivos en uso, confirmación por defecto No. `Services/CleanupService.cs` + `CleanupCatalog.cs`. Pendiente opcional: Windows.old y DISM StartComponentCleanup (necesitan toma de posesión / comando largo).
 - **Fase 2 — Auditoría de tweaks** (bucket H): Sonnets minan cada repo, proponen tweaks nuevos; revisor
   adversario; los aprobados se portan con prueba en rojo. Sube el catálogo de 111 a lo que aguante la verdad.
 - **Fase 3 — Red/DNS/HOSTS** (buckets C, D).

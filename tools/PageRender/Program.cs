@@ -71,6 +71,14 @@ internal static class Program
 
             vm.CurrentNav = vm.NavItems.First(n => n.Page is CategoryPageViewModel { Category: TweakCategory.Edge });
             Render(root, Path.Combine(outDir, "08-edge.png"));
+
+            // Cleanup measures folder sizes read-only when opened; wait for it, then draw the sizes.
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is CleanupViewModel);
+            var cleanup = (CleanupViewModel)vm.CurrentPage;
+            var cclock = System.Diagnostics.Stopwatch.StartNew();
+            while (!cleanup.HasMeasured && cclock.Elapsed < TimeSpan.FromSeconds(40)) Pump(TimeSpan.FromMilliseconds(500));
+            Console.WriteLine($"cleanup measured={cleanup.HasMeasured} after {cclock.Elapsed.TotalSeconds:0}s");
+            Render(root, Path.Combine(outDir, "09-cleanup.png"));
             return 0;
         }
         catch (Exception ex)

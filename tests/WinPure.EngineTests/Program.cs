@@ -114,6 +114,7 @@ failures += TheAppRemovalConfirmationDefaultsToNo() ? 0 : 1;
 failures += OnlyReversibleHkcuTweaksReachFutureUsers() ? 0 : 1;
 failures += ApplyingToFutureUsersWritesTheTemplateAndRestoreUndoesIt() ? 0 : 1;
 failures += TheFutureUsersPolicyOnlyAllowsCatalogHkcuValues() ? 0 : 1;
+failures += CleanupMeasuresClearsAndSkipsLockedFiles() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
 
@@ -1448,6 +1449,63 @@ bool TheFutureUsersPolicyOnlyAllowsCatalogHkcuValues()
         $"forged template write refused={forgedRefused} (expected True), a genuine catalog target ({target ?? "none found!"}) allowed={catalogAllowed}");
 }
 
+// The Cleanup service measures a folder's size, clears its CONTENTS (keeping the folder), skips files it
+// cannot delete (in use) without failing, and honours a glob and "*" wildcard path segments.
+bool CleanupMeasuresClearsAndSkipsLockedFiles()
+{
+    string root = Path.Combine(Path.GetTempPath(), "winpure-clean-" + Guid.NewGuid().ToString("N")[..8]);
+    Directory.CreateDirectory(root);
+    var problems = new List<string>();
+    FileStream? locked = null;
+    try
+    {
+        File.WriteAllBytes(Path.Combine(root, "a.txt"), new byte[100]);
+        Directory.CreateDirectory(Path.Combine(root, "sub"));
+        File.WriteAllBytes(Path.Combine(root, "sub", "b.txt"), new byte[200]);
+        string lockedPath = Path.Combine(root, "locked.bin");
+        File.WriteAllBytes(lockedPath, new byte[50]);
+        locked = new FileStream(lockedPath, FileMode.Open, FileAccess.Read, FileShare.None);   // no delete share
+
+        var target = new CleanupTarget { Id = "t", Name = "n", Description = "d", Roots = new[] { root } };
+        long measured = CleanupService.Measure(target);
+        if (measured != 350) problems.Add($"measured {measured}, expected 350");
+
+        var result = CleanupService.Clean(target);
+        if (!Directory.Exists(root)) problems.Add("the folder itself was deleted (only its contents should go)");
+        if (File.Exists(Path.Combine(root, "a.txt")) || Directory.Exists(Path.Combine(root, "sub"))) problems.Add("contents were not cleared");
+        if (!File.Exists(lockedPath)) problems.Add("a locked file was deleted — it should be skipped");
+        if (result.Skipped < 1) problems.Add($"skipped={result.Skipped}, expected >=1 (the locked file)");
+        if (result.Bytes != 300) problems.Add($"freed={result.Bytes}, expected 300 (a+b, not the locked 50)");
+
+        // Glob: only matching files, folders untouched.
+        string g = Path.Combine(root, "g");
+        Directory.CreateDirectory(g);
+        File.WriteAllBytes(Path.Combine(g, "keep.txt"), new byte[10]);
+        File.WriteAllBytes(Path.Combine(g, "drop.log"), new byte[10]);
+        CleanupService.Clean(new CleanupTarget { Id = "g", Name = "n", Description = "d", Roots = new[] { g }, Globs = new[] { "*.log" } });
+        if (!File.Exists(Path.Combine(g, "keep.txt")) || File.Exists(Path.Combine(g, "drop.log")))
+            problems.Add("glob clean did not delete only the matching files");
+
+        // Wildcard "*" path segment expands to every subfolder.
+        Directory.CreateDirectory(Path.Combine(root, "p1", "Cache"));
+        Directory.CreateDirectory(Path.Combine(root, "p2", "Cache"));
+        int expanded = CleanupService.ExpandRoots(new[] { Path.Combine(root, "*", "Cache") }).Count();
+        if (expanded != 2) problems.Add($"the wildcard root expanded to {expanded} folders, expected 2");
+    }
+    catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
+    finally
+    {
+        locked?.Dispose();
+        try { Directory.Delete(root, recursive: true); } catch { }
+    }
+
+    return Report("cleanup measures, clears contents, keeps the folder, skips locked files",
+        problems.Count == 0,
+        problems.Count == 0
+            ? "measured 350; cleared contents but kept the folder; the in-use file was skipped and 300 bytes freed; glob and wildcard roots work"
+            : string.Join(" | ", problems));
+}
+
 // Helpers for the origin tests. Static: they capture nothing, so every refusal is the OS deciding, not the
 // test. Each returns true when the action SUCCEEDED (which, for the store, is the bad outcome).
 static bool TrySetOwner(string path, SecurityIdentifier sid)
@@ -2127,6 +2185,11 @@ bool EveryVisibleTextHasASpanishTranslation()
     {
         Add(app.Description, $"{app.Id} description");
         Add(app.Group, "install page group");
+    }
+    foreach (var target in CleanupCatalog.Build())
+    {
+        Add(target.Name, $"{target.Id} name");
+        Add(target.Description, $"{target.Id} description");
     }
     // Sidebar labels and page titles translate themselves when set, so read them back — in English, here.
     foreach (var nav in new WinPure.ViewModels.MainViewModel().NavItems)

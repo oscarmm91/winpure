@@ -34,6 +34,9 @@
             <DataTemplate DataType="{x:Type vm:InstallerViewModel}">
                 <views:InstallerView/>
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:CleanupViewModel}">
+                <views:CleanupView/>
+            </DataTemplate>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

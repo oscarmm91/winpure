@@ -57,6 +57,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly DashboardViewModel _dashboard;
     private readonly RestoreViewModel _restore;
     private readonly StartupViewModel _startup;
+    private readonly CleanupViewModel _cleanup;
     private readonly InstallerViewModel _installer;
 
     /// <summary>The Remove Apps banner, also shown above search results that include an app removal.</summary>
@@ -128,6 +129,14 @@ public sealed class MainViewModel : ObservableObject
                 Main = this,
             },
         });
+        _cleanup = new CleanupViewModel
+        {
+            Title = "Clean up",
+            Subtitle = "Free disk space by deleting caches and junk Windows recreates as needed. Cleaning is permanent — "
+                     + "there is no backup for a deleted cache — so it is not undone by Restore. Rows marked \"your files\" are your own data.",
+            Main = this,
+        };
+        NavItems.Add(new NavItem { Label = "Clean up", Glyph = ((char)0xEA99).ToString(), Page = _cleanup });
         NavItems.Add(new NavItem { Label = "Restore", Glyph = "", Page = _restore });
 
         // The two pages whose changes Restore cannot undo sit together at the bottom, apart from everything else.
@@ -199,6 +208,7 @@ public sealed class MainViewModel : ObservableObject
             value.SetCurrentSilently(true);
             if (value.Page == _restore) LoadBackups();
             if (value.Page == _installer && !_installer.HasChecked) _ = _installer.RefreshAsync();
+            if (value.Page == _cleanup && !_cleanup.HasMeasured) _ = _cleanup.MeasureAllAsync();
             OnPropertyChanged();
             OnPropertyChanged(nameof(CurrentPage));
             UpdatePendingCount();   // the Apply bar counts this page's pending changes (startup vs tweaks)

@@ -53,14 +53,12 @@ public sealed class SafeModeViewModel : PageViewModel
 
         try
         {
+            // Set throws unless bcdedit returned exit 0, which is the reliable, language-invariant proof the flag
+            // was written. Trust that — do NOT re-read and re-parse bcdedit's (localized) text to second-guess a
+            // success, or a localized "safeboot" label would make the page claim "nothing changed" after it did.
             SafeModeService.Set(mode);
-            _state = SafeModeService.Read();          // judge by the real state, not by the fact we ran
+            _state = mode;
             OnPropertyChanged(nameof(StateText));
-            if (_state == SafeBoot.Off)
-            {
-                Status = Loc.T("The safe-boot flag was not set — nothing changed.");
-                return;
-            }
             Status = Loc.T("Safe Mode is set for the next restart.");
             OfferRestart();
         }
@@ -75,13 +73,13 @@ public sealed class SafeModeViewModel : PageViewModel
         if (!Main.ConfirmDespiteGuards(Loc.T("restore normal boot"), SystemGuards.ForRepair)) return;
         try
         {
+            // After deletevalue the safeboot element is absent whether it cleared a set flag or was already gone —
+            // either way the next boot is normal. (Set(Off) tolerates the "element not found" exit for that reason.)
             SafeModeService.Set(SafeBoot.Off);
-            _state = SafeModeService.Read();
+            _state = SafeBoot.Off;
             OnPropertyChanged(nameof(StateText));
-            Status = _state == SafeBoot.Off
-                ? Loc.T("Normal boot restored. Restart to leave Safe Mode.")
-                : Loc.T("The safe-boot flag is still set — see the log.");
-            if (_state == SafeBoot.Off) OfferRestart();
+            Status = Loc.T("Normal boot restored. Restart to leave Safe Mode.");
+            OfferRestart();
         }
         catch (Exception ex)
         {

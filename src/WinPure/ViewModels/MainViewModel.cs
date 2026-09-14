@@ -68,6 +68,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly DnsViewModel _dns;
     private readonly HostsViewModel _hosts;
     private readonly PathViewModel _path;
+    private readonly FileLinkViewModel _fileLink;
     private readonly InstallerViewModel _installer;
     private readonly UninstallerViewModel _uninstaller;
 
@@ -214,6 +215,14 @@ public sealed class MainViewModel : ObservableObject
             Main = this,
         };
         NavItems.Add(new NavItem { Label = "PATH", Glyph = ((char)0xE8FD).ToString(), Page = _path });
+        _fileLink = new FileLinkViewModel
+        {
+            Title = "Move folder",
+            Subtitle = "Move a big folder to another drive to free space on this one, leaving a junction behind so programs "
+                     + "still find it. The data is copied and verified before the original is removed, so nothing is lost.",
+            Main = this,
+        };
+        NavItems.Add(new NavItem { Label = "Move folder", Glyph = ((char)0xE71B).ToString(), Page = _fileLink });
         NavItems.Add(new NavItem { Label = "Restore", Glyph = "", Page = _restore });
 
         // The two pages whose changes Restore cannot undo sit together at the bottom, apart from everything else.

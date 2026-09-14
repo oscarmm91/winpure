@@ -119,6 +119,10 @@ internal static class Program
             // Safe Mode reads the current safeboot state when opened (best-effort; unelevated it reads Off).
             vm.CurrentNav = vm.NavItems.First(n => n.Page is SafeModeViewModel);
             Render(root, Path.Combine(outDir, "18-safemode.png"));
+
+            // Move folder is inert until the user picks folders (nothing runs on open).
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is FileLinkViewModel);
+            Render(root, Path.Combine(outDir, "19-movefolder.png"));
             return 0;
         }
         catch (Exception ex)

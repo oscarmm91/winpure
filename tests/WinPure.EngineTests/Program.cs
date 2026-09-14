@@ -125,6 +125,7 @@ failures += HardwareInfoIsReadOnlyAndLabelled() ? 0 : 1;
 failures += PathEditorFlagsEntriesBacksUpBeforeWritingAndRestores() ? 0 : 1;
 failures += UninstallerJudgesByEffectAndParsesCommands() ? 0 : 1;
 failures += SafeModeBuildsCorrectArgsAndAlwaysRestoresNormal() ? 0 : 1;
+failures += MoveFolderCopiesVerifiesBeforeDeletingAndRefusesSystemFolders() ? 0 : 1;
 failures += DnsCapturesCurrentServersAndRestorePutsThemBack() ? 0 : 1;
 failures += AServiceCanBeSetToManualNotJustDisabled() ? 0 : 1;
 failures += CreatingAContextMenuKeyIsUndoneByDeletingIt() ? 0 : 1;
@@ -1696,6 +1697,66 @@ bool UninstallerJudgesByEffectAndParsesCommands()
     return Report("the uninstaller judges success by the list, not by running",
         problems.Count == 0,
         problems.Count == 0 ? "IsGone reads the list after running; a survived uninstall is not called gone; commands split without a shell" : string.Join(" | ", problems));
+}
+
+// Move-folder copies and VERIFIES before deleting the original (so an interrupted move never loses data), refuses
+// system-critical folders and same-drive moves, and leaves a junction that resolves to the new location. Runs
+// against a fake filesystem so nothing real is moved or deleted.
+bool MoveFolderCopiesVerifiesBeforeDeletingAndRefusesSystemFolders()
+{
+    var problems = new List<string>();
+    try
+    {
+        // Guards (no backend needed).
+        string win = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        if (WinPure.Services.FileLinkService.RejectSource(win) is null) problems.Add("the Windows folder was not refused");
+        if (WinPure.Services.FileLinkService.RejectSource(System.IO.Path.Combine(win, "System32")) is null) problems.Add("a folder inside Windows was not refused");
+        var root = System.IO.Path.GetPathRoot(win);
+        if (WinPure.Services.FileLinkService.RejectSource(root!) is null) problems.Add("a drive root was not refused");
+        if (WinPure.Services.FileLinkService.RejectSource(@"D:\Games\Big") is not null) problems.Add("a normal folder was wrongly refused");
+
+        // Happy path across drives: copy, verify, delete, junction.
+        var fake = new FakeFileLinkBackend();
+        fake.Dirs.Add(@"D:\Games\Big"); fake.Dirs.Add(@"E:\Store");
+        fake.RobocopyCode = 1; // 0-7 = success
+        var prev = WinPure.Services.FileLinkService.Swap(fake);
+        try
+        {
+            var r = WinPure.Services.FileLinkService.MoveToAnotherDrive(@"D:\Games\Big", @"E:\Store");
+            if (!r.Ok) problems.Add("move across drives failed: " + r.Message);
+            if (!fake.DeletedSource) problems.Add("the source was not deleted after a verified copy");
+            if (fake.ReparseTarget(@"D:\Games\Big") != @"E:\Store\Big") problems.Add("the junction does not point to the new location");
+
+            // A FAILED copy (robocopy 8+) must NEVER delete the source — no data loss.
+            var f2 = new FakeFileLinkBackend { RobocopyCode = 8 };
+            f2.Dirs.Add(@"D:\Games\Big"); f2.Dirs.Add(@"E:\Store");
+            WinPure.Services.FileLinkService.Swap(f2);
+            var r2 = WinPure.Services.FileLinkService.MoveToAnotherDrive(@"D:\Games\Big", @"E:\Store");
+            if (r2.Ok) problems.Add("a failed copy was reported as success");
+            if (f2.DeletedSource) problems.Add("DATA LOSS: the source was deleted after a failed copy");
+
+            // Same-drive move refused before any copy starts.
+            var f3 = new FakeFileLinkBackend();
+            f3.Dirs.Add(@"C:\A\Big"); f3.Dirs.Add(@"C:\B");
+            WinPure.Services.FileLinkService.Swap(f3);
+            var r3 = WinPure.Services.FileLinkService.MoveToAnotherDrive(@"C:\A\Big", @"C:\B");
+            if (r3.Ok) problems.Add("a same-drive move was allowed");
+            if (f3.RobocopyCalls != 0) problems.Add("a same-drive move started copying");
+
+            // Not enough free space refused before copying.
+            var f4 = new FakeFileLinkBackend { Size = 1_000_000, Free = 10 };
+            f4.Dirs.Add(@"D:\Big"); f4.Dirs.Add(@"E:\Store");
+            WinPure.Services.FileLinkService.Swap(f4);
+            var r4 = WinPure.Services.FileLinkService.MoveToAnotherDrive(@"D:\Big", @"E:\Store");
+            if (r4.Ok || f4.RobocopyCalls != 0) problems.Add("a move without enough free space was allowed");
+        }
+        finally { WinPure.Services.FileLinkService.Swap(prev); }
+    }
+    catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
+
+    return Report("move folder copies and verifies before deleting, and refuses system folders",
+        problems.Count == 0,
+        problems.Count == 0 ? "copy-verify-delete-link across drives; a failed copy never deletes; system folders, same-drive and low-space moves refused" : string.Join(" | ", problems));
 }
 
 // Safe Mode builds bcdedit's arguments from constants (never user input), passes {current} verbatim, reads the
@@ -3499,6 +3560,28 @@ sealed class FakeMemoryBackend : IMemoryBackend
     public bool Purged;
     public MemoryInfo Query() => new(Total, Avail);
     public void Purge() { Purged = true; Avail += 2_000; }   // pretend the trim freed some
+}
+
+/// <summary>Filesystem operations held in fields, so a test never moves or deletes real data.</summary>
+sealed class FakeFileLinkBackend : IFileLinkBackend
+{
+    public HashSet<string> Dirs { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> Links { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public long Size = 100, Free = 1_000_000;
+    public int RobocopyCode = 1;
+    public int RobocopyCalls;
+    public bool DeletedSource;
+
+    private static string N(string p) => p.TrimEnd('\\');
+    public bool DirectoryExists(string p) => Dirs.Contains(N(p)) || Links.ContainsKey(N(p));
+    public bool Exists(string p) => DirectoryExists(p);
+    public bool IsReparsePoint(string p) => Links.ContainsKey(N(p));
+    public long FolderSize(string p) => Size;
+    public long FreeSpace(string p) => Free;
+    public int Robocopy(string s, string d) { RobocopyCalls++; if (RobocopyCode < 8) Dirs.Add(N(d)); return RobocopyCode; }
+    public void DeleteDirectory(string p) { DeletedSource = true; Dirs.Remove(N(p)); }
+    public void CreateJunction(string link, string target) => Links[N(link)] = N(target);
+    public string? ReparseTarget(string p) => Links.TryGetValue(N(p), out var t) ? t : null;
 }
 
 /// <summary>A safe-boot state held in a field, so a test never touches the real BCD.</summary>

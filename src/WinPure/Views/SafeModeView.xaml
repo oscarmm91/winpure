@@ -15,7 +15,7 @@
                 <StackPanel>
                     <TextBlock Text="{Binding StateText}" FontSize="15" FontWeight="SemiBold"
                                Foreground="{StaticResource Brush.TextPrimary}"/>
-                    <TextBlock Text="{l:Tr 'Safe Mode starts Windows with only the essential drivers and services — useful for troubleshooting. To get back to a normal Windows, come back here and choose Restore normal boot, then restart. This page also works while you are in Safe Mode.'}"
+                    <TextBlock Text="{l:Tr 'Safe Mode starts Windows with only the essential drivers and services — useful for troubleshooting. To get back to a normal Windows, come back here and choose Restore normal boot, then restart — this page works in Safe Mode too. If you ever cannot open WinPure, undo it in System Configuration (msconfig) on the Boot tab.'}"
                                FontSize="12" Margin="0,8,0,0" TextWrapping="Wrap"
                                Foreground="{StaticResource Brush.TextSecondary}"/>
                 </StackPanel>

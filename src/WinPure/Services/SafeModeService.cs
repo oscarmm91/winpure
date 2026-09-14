@@ -91,8 +91,11 @@ internal sealed class BcdCli : ISafeModeBackend
             foreach (var a in args) psi.ArgumentList.Add(a);
             using var process = Process.Start(psi);
             if (process is null) return (false, "bcdedit did not start");
-            string output = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
+            // Drain both streams while waiting, so a full stderr buffer cannot deadlock a blocking read.
+            var outTask = process.StandardOutput.ReadToEndAsync();
+            var errTask = process.StandardError.ReadToEndAsync();
             process.WaitForExit(15_000);
+            string output = outTask.GetAwaiter().GetResult() + errTask.GetAwaiter().GetResult();
             return (process.ExitCode == 0, output);
         }
         catch (Exception ex)

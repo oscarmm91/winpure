@@ -1,0 +1,72 @@
+<UserControl x:Class="WinPure.Views.PowerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:WinPure.Views">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,18,6,12">
+            <TextBlock Text="{Binding Title}" FontSize="28" FontWeight="SemiBold"
+                       Foreground="{StaticResource Brush.TextPrimary}"/>
+            <TextBlock Text="{Binding Subtitle}" FontSize="13" Margin="0,6,0,0" TextWrapping="Wrap"
+                       Foreground="{StaticResource Brush.TextSecondary}" MaxWidth="720" HorizontalAlignment="Left"/>
+
+            <!-- Schedule shutdown / restart -->
+            <Border Background="{StaticResource Brush.Card}" CornerRadius="8" Padding="18,16" Margin="0,20,0,12"
+                    BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}">
+                <StackPanel>
+                    <TextBlock Text="{l:Tr 'Schedule shutdown or restart'}" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{StaticResource Brush.TextPrimary}"/>
+                    <TextBlock Text="{l:Tr 'Uses the Windows timer, so it still happens if you close WinPure. Cancel it here anytime before it runs.'}"
+                               FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
+                               Foreground="{StaticResource Brush.TextSecondary}" MaxWidth="620" HorizontalAlignment="Left"/>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                        <RadioButton Content="{l:Tr 'Shut down'}" GroupName="pwr" IsChecked="{Binding IsShutdown, Mode=TwoWay}"
+                                     Foreground="{StaticResource Brush.TextPrimary}" VerticalContentAlignment="Center"/>
+                        <RadioButton Content="{l:Tr 'Restart'}" GroupName="pwr" IsChecked="{Binding IsRestart, Mode=TwoWay}"
+                                     Margin="20,0,0,0" Foreground="{StaticResource Brush.TextPrimary}" VerticalContentAlignment="Center"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{l:Tr 'In'}" VerticalAlignment="Center" Foreground="{StaticResource Brush.TextSecondary}"/>
+                        <TextBox Text="{Binding DelayMinutes, UpdateSourceTrigger=PropertyChanged}" Width="64" Margin="8,0,8,0"
+                                 Background="{StaticResource Brush.CardBorder}" Foreground="{StaticResource Brush.TextPrimary}"
+                                 BorderThickness="0" Padding="8,5" HorizontalContentAlignment="Center"
+                                 CaretBrush="{StaticResource Brush.TextPrimary}"/>
+                        <TextBlock Text="{l:Tr 'minutes (0 = right now)'}" VerticalAlignment="Center"
+                                   Foreground="{StaticResource Brush.TextSecondary}"/>
+                    </StackPanel>
+
+                    <CheckBox Content="{l:Tr 'Force apps to close without saving'}" Margin="0,14,0,0"
+                              IsChecked="{Binding ForceCloseApps, Mode=TwoWay}"
+                              Foreground="{StaticResource Brush.TextSecondary}"/>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                        <Button Style="{StaticResource PrimaryButton}" Command="{Binding ScheduleCommand}"
+                                Content="{l:Tr 'Schedule'}"/>
+                        <Button Style="{StaticResource SubtleButton}" Command="{Binding CancelCommand}" Margin="8,0,0,0"
+                                Content="{l:Tr 'Cancel scheduled'}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Right now -->
+            <Border Background="{StaticResource Brush.Card}" CornerRadius="8" Padding="18,16" Margin="0,0,0,12"
+                    BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}">
+                <StackPanel>
+                    <TextBlock Text="{l:Tr 'Right now'}" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{StaticResource Brush.TextPrimary}"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                        <Button Style="{StaticResource SubtleButton}" Command="{Binding SleepCommand}" Content="{l:Tr 'Sleep'}"/>
+                        <Button Style="{StaticResource SubtleButton}" Command="{Binding HibernateCommand}" Margin="8,0,0,0" Content="{l:Tr 'Hibernate'}"/>
+                        <Button Style="{StaticResource SubtleButton}" Command="{Binding LockCommand}" Margin="8,0,0,0" Content="{l:Tr 'Lock'}"/>
+                        <Button Style="{StaticResource SubtleButton}" Command="{Binding SignOutCommand}" Margin="8,0,0,0" Content="{l:Tr 'Sign out'}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="{Binding Status}" FontSize="12.5" Margin="2,2,0,0" TextWrapping="Wrap"
+                       Foreground="{StaticResource Brush.TextSecondary}"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

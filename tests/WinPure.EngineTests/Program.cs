@@ -119,6 +119,7 @@ failures += CleanupMeasuresClearsAndSkipsLockedFiles() ? 0 : 1;
 failures += CleanupFolderKindDeletesTheWholeFolder() ? 0 : 1;
 failures += HostsEditorBacksUpBeforeSavingAndCanUndoOrReset() ? 0 : 1;
 failures += FreeingMemoryReportsBeforeAndAfterWithoutTouchingRealMemory() ? 0 : 1;
+failures += PowerActionsGoToTheBackendWithoutTouchingTheRealMachine() ? 0 : 1;
 failures += DnsCapturesCurrentServersAndRestorePutsThemBack() ? 0 : 1;
 failures += AServiceCanBeSetToManualNotJustDisabled() ? 0 : 1;
 failures += CreatingAContextMenuKeyIsUndoneByDeletingIt() ? 0 : 1;
@@ -1505,6 +1506,50 @@ bool DnsCapturesCurrentServersAndRestorePutsThemBack()
         problems.Count == 0
             ? "both adapters switched to the preset, their prior servers captured in one backup, and Restore set them back; the policy allows only IP lists or DHCP"
             : string.Join(" | ", problems));
+}
+
+// Power actions route to the swappable backend with the right arguments, and only Shutdown/Restart carry a
+// timed delay. Runs against a fake backend so a test never shuts the machine down.
+bool PowerActionsGoToTheBackendWithoutTouchingTheRealMachine()
+{
+    var fake = new FakePowerBackend();
+    var prev = PowerService.Swap(fake);
+    var problems = new List<string>();
+    try
+    {
+        if (!PowerService.SupportsDelay(PowerAction.Shutdown) || !PowerService.SupportsDelay(PowerAction.Restart))
+            problems.Add("Shutdown/Restart should support a timed delay");
+        if (PowerService.SupportsDelay(PowerAction.Sleep) || PowerService.SupportsDelay(PowerAction.Lock))
+            problems.Add("Sleep/Lock should not claim a timed delay (Windows has no timer for them)");
+
+        // The delay is bounded so a typo'd huge number can never overflow minutes*60 and clamp to an
+        // immediate shutdown behind a dialog that claimed it was far in the future.
+        if (!PowerService.TryParseDelayMinutes("60", out int m) || m != 60) problems.Add("60 should parse to 60");
+        if (!PowerService.TryParseDelayMinutes("0", out _)) problems.Add("0 (right now) should parse");
+        if (!PowerService.TryParseDelayMinutes("10080", out _)) problems.Add("10080 (one week, the cap) should parse");
+        if (PowerService.TryParseDelayMinutes("10081", out _)) problems.Add("over the one-week cap should be rejected");
+        if (PowerService.TryParseDelayMinutes("40000000", out _)) problems.Add("a huge overflow-risk delay must be rejected");
+        if (PowerService.TryParseDelayMinutes("-5", out _)) problems.Add("a negative delay must be rejected");
+        if (PowerService.TryParseDelayMinutes("abc", out _)) problems.Add("a non-numeric delay must be rejected");
+
+        PowerService.Run(PowerAction.Shutdown, 300, force: false);
+        PowerService.Run(PowerAction.Restart, 60, force: true);
+        PowerService.Run(PowerAction.Sleep, 0, force: false);
+        PowerService.Run(PowerAction.Hibernate, 0, force: false);
+        PowerService.Run(PowerAction.Lock, 0, force: false);
+        PowerService.Run(PowerAction.SignOut, 0, force: false);
+        PowerService.Abort();
+
+        var expected = new[] { "shutdown:300:False", "restart:60:True", "sleep", "hibernate", "lock", "signout", "abort" };
+        if (!fake.Calls.SequenceEqual(expected))
+            problems.Add($"calls were [{string.Join(", ", fake.Calls)}], expected [{string.Join(", ", expected)}]");
+    }
+    catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
+    finally { PowerService.Swap(prev); }
+
+    return Report("power actions go to the backend, never the real machine in tests",
+        problems.Count == 0,
+        problems.Count == 0 ? "each action reached the backend with the right args; only Shutdown/Restart carry the delay; the real machine is untouched" : string.Join(" | ", problems));
 }
 
 // The memory tool reports before/after snapshots around a purge, computes used = total - available, and
@@ -3198,6 +3243,18 @@ sealed class FakeDnsBackend : IDnsBackend
     public IReadOnlyList<DnsAdapter> ReadAdapters() => Adapters;
     public void SetServers(string adapterName, string[] servers) => Sets.Add((adapterName, servers));
     public void FlushCache() { }
+}
+
+/// <summary>Records power actions instead of performing them, so a test never shuts the machine down.</summary>
+sealed class FakePowerBackend : IPowerBackend
+{
+    public List<string> Calls { get; } = new();
+    public (bool Ok, string? Error) ShutdownOrRestart(bool restart, int delaySeconds, bool force)
+    { Calls.Add($"{(restart ? "restart" : "shutdown")}:{delaySeconds}:{force}"); return (true, null); }
+    public (bool Ok, string? Error) Abort() { Calls.Add("abort"); return (true, null); }
+    public bool Sleep(bool hibernate) { Calls.Add(hibernate ? "hibernate" : "sleep"); return true; }
+    public bool Lock() { Calls.Add("lock"); return true; }
+    public (bool Ok, string? Error) SignOut() { Calls.Add("signout"); return (true, null); }
 }
 
 /// <summary>Memory readings held in a field, so tests never trim real process working sets.</summary>

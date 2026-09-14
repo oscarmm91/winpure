@@ -60,6 +60,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly StartupViewModel _startup;
     private readonly CleanupViewModel _cleanup;
     private readonly MemoryViewModel _memory;
+    private readonly PowerViewModel _power;
     private readonly DispatcherTimer _liveTimer;
     private readonly DnsViewModel _dns;
     private readonly HostsViewModel _hosts;
@@ -155,6 +156,13 @@ public sealed class MainViewModel : ObservableObject
             Main = this,
         };
         NavItems.Add(new NavItem { Label = "Memory", Glyph = ((char)0xE950).ToString(), Page = _memory });
+        _power = new PowerViewModel
+        {
+            Title = "Power",
+            Subtitle = "Schedule a shutdown or restart, or sleep, hibernate, lock and sign out right now.",
+            Main = this,
+        };
+        NavItems.Add(new NavItem { Label = "Power", Glyph = ((char)0xE7E8).ToString(), Page = _power });
         _dns = new DnsViewModel(_engine)
         {
             Title = "DNS servers",

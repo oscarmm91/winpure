@@ -94,6 +94,10 @@ internal static class Program
             // Memory reads current RAM use (read-only) when opened; it never runs the purge.
             vm.CurrentNav = vm.NavItems.First(n => n.Page is MemoryViewModel);
             Render(root, Path.Combine(outDir, "12-memory.png"));
+
+            // Power page is inert until a button is clicked (nothing runs on open).
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is PowerViewModel);
+            Render(root, Path.Combine(outDir, "13-power.png"));
             return 0;
         }
         catch (Exception ex)

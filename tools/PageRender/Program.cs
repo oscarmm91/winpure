@@ -110,6 +110,11 @@ internal static class Program
             // PATH editor lists the user PATH (read-only analysis) when opened.
             vm.CurrentNav = vm.NavItems.First(n => n.Page is PathViewModel);
             Render(root, Path.Combine(outDir, "16-path.png"));
+
+            // Uninstaller reads installed programs (read-only) when opened.
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is UninstallerViewModel);
+            System.Threading.Thread.Sleep(400); // give the async read a moment
+            Render(root, Path.Combine(outDir, "17-uninstall.png"));
             return 0;
         }
         catch (Exception ex)

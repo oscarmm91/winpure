@@ -1,0 +1,64 @@
+<UserControl x:Class="WinPure.Views.UninstallerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:WinPure.Views">
+
+    <Grid Margin="0,18,6,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="{Binding Title}" FontSize="28" FontWeight="SemiBold"
+                       Foreground="{StaticResource Brush.TextPrimary}"/>
+            <TextBlock Text="{Binding Subtitle}" FontSize="13" Margin="0,6,0,0" TextWrapping="Wrap"
+                       Foreground="{StaticResource Brush.TextSecondary}" MaxWidth="740" HorizontalAlignment="Left"/>
+
+            <TextBox Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" Margin="0,14,0,0" Padding="8,6"
+                     Background="{StaticResource Brush.Card}" Foreground="{StaticResource Brush.TextPrimary}"
+                     BorderBrush="{StaticResource Brush.CardBorder}" BorderThickness="1"
+                     ToolTip="{l:Tr 'Filter programs'}"/>
+            <TextBlock Text="{Binding Summary}" FontSize="12.5" Margin="0,8,0,10" TextWrapping="Wrap"
+                       Foreground="{StaticResource Brush.TextSecondary}"/>
+        </StackPanel>
+
+        <Border Grid.Row="1" Background="{StaticResource Brush.Card}" CornerRadius="8" Margin="0,0,0,12"
+                BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14,8">
+                <ItemsControl ItemsSource="{Binding Programs}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,5" Visibility="{Binding IsVisibleUnderFilter, Converter={StaticResource BoolToVisibility}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis"
+                                               Foreground="{StaticResource Brush.TextPrimary}"/>
+                                    <TextBlock Text="{Binding Detail}" FontSize="11" TextTrimming="CharacterEllipsis"
+                                               Foreground="{StaticResource Brush.TextSecondary}"/>
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="{Binding StatusText}" FontSize="11.5" VerticalAlignment="Center"
+                                           Margin="10,0" TextWrapping="Wrap" MaxWidth="240"
+                                           Foreground="{StaticResource Brush.TextSecondary}"/>
+                                <Button Grid.Column="2" Style="{StaticResource SubtleButton}" VerticalAlignment="Center"
+                                        Command="{Binding DataContext.UninstallCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}" IsEnabled="{Binding CanUninstall}"
+                                        Content="{l:Tr 'Uninstall'}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,14">
+            <Button Style="{StaticResource SubtleButton}" Command="{Binding RefreshCommand}"
+                    Content="{l:Tr 'Refresh'}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

@@ -90,7 +90,14 @@ public static class PathService
             if (string.IsNullOrEmpty(rootPath)) return PathIssue.Unverifiable;
             var drive = new DriveInfo(rootPath);
             if (!drive.IsReady || drive.DriveType != DriveType.Fixed) return PathIssue.Unverifiable;
-            return Directory.Exists(expanded) ? PathIssue.None : PathIssue.Missing;
+            // Directory.Exists would return false for "access denied" or "path too long" just as for "not there",
+            // and a Missing entry is pre-ticked for removal — that would flag a folder that DOES exist. Tell the
+            // two apart: only a real not-found is Missing; "couldn't tell" is Unverifiable (never auto-removed),
+            // the same third state as a disconnected drive. (An unreadable fact must never trigger a removal.)
+            try { _ = File.GetAttributes(expanded); return PathIssue.None; }
+            catch (DirectoryNotFoundException) { return PathIssue.Missing; }
+            catch (FileNotFoundException) { return PathIssue.Missing; }
+            catch { return PathIssue.Unverifiable; }
         }
         catch { return PathIssue.Unverifiable; }
     }

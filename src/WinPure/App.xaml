@@ -60,6 +60,10 @@
             <DataTemplate DataType="{x:Type vm:PathViewModel}">
                 <views:PathView/>
             </DataTemplate>
+
+            <DataTemplate DataType="{x:Type vm:UninstallerViewModel}">
+                <views:UninstallerView/>
+            </DataTemplate>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

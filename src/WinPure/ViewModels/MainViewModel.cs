@@ -68,6 +68,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly HostsViewModel _hosts;
     private readonly PathViewModel _path;
     private readonly InstallerViewModel _installer;
+    private readonly UninstallerViewModel _uninstaller;
 
     /// <summary>The Remove Apps banner, also shown above search results that include an app removal.</summary>
     private const string RemoveAppsWarning = "WinPure cannot undo anything on this page: Restore does not bring an app back. To get one back, reinstall it yourself, from the Microsoft Store (OneDrive from microsoft.com).";
@@ -219,6 +220,13 @@ public sealed class MainViewModel : ObservableObject
             Main = this,
         };
         NavItems.Add(new NavItem { Label = "Install", Glyph = ((char)0xE896).ToString(), Page = _installer });
+        _uninstaller = new UninstallerViewModel
+        {
+            Title = "Uninstall Apps",
+            Subtitle = "Remove any installed program by running its own uninstaller. Like removing a preinstalled app, this is not undone by Restore.",
+            Main = this,
+        };
+        NavItems.Add(new NavItem { Label = "Uninstall", Glyph = ((char)0xECC9).ToString(), Page = _uninstaller });
 
         foreach (var item in NavItems) item.Owner = this;
         _currentNav = NavItems[0];
@@ -284,6 +292,7 @@ public sealed class MainViewModel : ObservableObject
             value.SetCurrentSilently(true);
             if (value.Page == _restore) LoadBackups();
             if (value.Page == _installer && !_installer.HasChecked) _ = _installer.RefreshAsync();
+            if (value.Page == _uninstaller && !_uninstaller.HasChecked) _ = _uninstaller.RefreshAsync();
             if (value.Page == _cleanup && !_cleanup.HasMeasured) _ = _cleanup.MeasureAllAsync();
             if (value.Page == _dns && !_dns.HasLoaded) _ = _dns.LoadAsync();
             if (value.Page == _hosts && !_hosts.HasLoaded) _hosts.Load();

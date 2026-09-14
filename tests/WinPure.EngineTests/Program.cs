@@ -123,6 +123,7 @@ failures += PowerActionsGoToTheBackendWithoutTouchingTheRealMachine() ? 0 : 1;
 failures += DiagnosticsExportsASystemBundleWithoutTouchingTheSystem() ? 0 : 1;
 failures += HardwareInfoIsReadOnlyAndLabelled() ? 0 : 1;
 failures += PathEditorFlagsEntriesBacksUpBeforeWritingAndRestores() ? 0 : 1;
+failures += UninstallerJudgesByEffectAndParsesCommands() ? 0 : 1;
 failures += DnsCapturesCurrentServersAndRestorePutsThemBack() ? 0 : 1;
 failures += AServiceCanBeSetToManualNotJustDisabled() ? 0 : 1;
 failures += CreatingAContextMenuKeyIsUndoneByDeletingIt() ? 0 : 1;
@@ -1649,6 +1650,48 @@ bool PathEditorFlagsEntriesBacksUpBeforeWritingAndRestores()
     return Report("the PATH editor flags entries, backs up before writing, and Restore puts it back",
         problems.Count == 0,
         problems.Count == 0 ? "cautious flags (disconnected drive left alone), snapshot-before-write, and a clean restore" : string.Join(" | ", problems));
+}
+
+// The uninstaller judges success by the list read AFTER running, never by the fact that it ran — an uninstaller
+// can return success and leave the program behind. Runs against a fake backend so no real uninstaller executes.
+bool UninstallerJudgesByEffectAndParsesCommands()
+{
+    var fake = new FakeUninstallBackend();
+    fake.Items.Add(new InstalledProgram("k1", "App One", "1.0", "Pub", "\"C:\\u.exe\" /S", false));
+    fake.Items.Add(new InstalledProgram("k2", "App Two", "2.0", "Pub", "MsiExec.exe /X{ABC}", false));
+    var prev = WinPure.Services.UninstallService.Swap(fake);
+    var problems = new List<string>();
+    try
+    {
+        var list = WinPure.Services.UninstallService.Read();
+        if (list.Count != 2) problems.Add($"expected 2 programs, got {list.Count}");
+
+        // A real uninstall: the program is gone -> IsGone true.
+        fake.ActuallyRemove = true;
+        WinPure.Services.UninstallService.Run(list[0]);
+        if (!WinPure.Services.UninstallService.IsGone(list[0], WinPure.Services.UninstallService.Read()))
+            problems.Add("a removed program was not judged gone");
+
+        // A FAILED uninstall (ran, but the program is still there) must NOT be judged gone.
+        fake.ActuallyRemove = false;
+        int before = fake.RunCount;
+        WinPure.Services.UninstallService.Run(list[1]);
+        if (fake.RunCount != before + 1) problems.Add("Run was not invoked");
+        if (WinPure.Services.UninstallService.IsGone(list[1], WinPure.Services.UninstallService.Read()))
+            problems.Add("a program that survived its uninstaller was wrongly judged gone");
+
+        // The command is split into exe + args WITHOUT a shell, so nothing is re-parsed.
+        var (e1, a1) = WinPure.Services.UninstallRegistry.SplitCommand("\"C:\\Program Files\\App\\unins.exe\" /SILENT /X");
+        if (e1 != "C:\\Program Files\\App\\unins.exe" || a1 != "/SILENT /X") problems.Add($"quoted split wrong: '{e1}' | '{a1}'");
+        var (e2, a2) = WinPure.Services.UninstallRegistry.SplitCommand("MsiExec.exe /X{ABC}");
+        if (e2 != "MsiExec.exe" || a2 != "/X{ABC}") problems.Add($"bare split wrong: '{e2}' | '{a2}'");
+    }
+    catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
+    finally { WinPure.Services.UninstallService.Swap(prev); }
+
+    return Report("the uninstaller judges success by the list, not by running",
+        problems.Count == 0,
+        problems.Count == 0 ? "IsGone reads the list after running; a survived uninstall is not called gone; commands split without a shell" : string.Join(" | ", problems));
 }
 
 // Power actions route to the swappable backend with the right arguments, and only Shutdown/Restart carry a
@@ -3407,6 +3450,16 @@ sealed class FakeMemoryBackend : IMemoryBackend
     public bool Purged;
     public MemoryInfo Query() => new(Total, Avail);
     public void Purge() { Purged = true; Avail += 2_000; }   // pretend the trim freed some
+}
+
+/// <summary>An installed-program list held in a field, so a test never runs a real uninstaller.</summary>
+sealed class FakeUninstallBackend : IUninstallBackend
+{
+    public List<InstalledProgram> Items { get; } = new();
+    public bool ActuallyRemove = true;
+    public int RunCount;
+    public IReadOnlyList<InstalledProgram> Read() => Items.ToList();
+    public void Run(InstalledProgram p) { RunCount++; if (ActuallyRemove) Items.RemoveAll(x => x.Key == p.Key); }
 }
 
 /// <summary>Windows features held in memory, so tests never run DISM.</summary>

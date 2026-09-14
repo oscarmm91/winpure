@@ -44,7 +44,7 @@ public sealed class PowerViewModel : PageViewModel
     }
 
     private bool Ask(string prompt) =>
-        MessageBox.Show(prompt, Loc.T("WinPure — Power"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No)
+        WinPure.Views.WinPureDialog.Show(prompt, Loc.T("WinPure — Power"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No)
             == MessageBoxResult.Yes;
 
     private void Fire(PowerAction action)
@@ -69,7 +69,7 @@ public sealed class PowerViewModel : PageViewModel
         string verb = IsRestart ? Loc.T("restart") : Loc.T("shut down");
         if (!Main.ConfirmDespiteGuards(IsRestart ? Loc.T("restart the PC") : Loc.T("shut down the PC"), SystemGuards.ForRepair)) return;
         string when = minutes == 0 ? Loc.T("right now") : Loc.F("in {0} minute(s)", minutes);
-        var answer = MessageBox.Show(
+        var answer = WinPure.Views.WinPureDialog.Show(
             Loc.F("Schedule the PC to {0} {1}? {2}You can cancel it here before it happens.",
                 verb, when, ForceCloseApps ? Loc.T("Open apps will be closed without saving. ") : ""),
             Loc.T("WinPure — Power"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);

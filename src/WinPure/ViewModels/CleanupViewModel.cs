@@ -94,7 +94,7 @@ public sealed class CleanupViewModel : PageViewModel
         string body = destructive
             ? Loc.F("This permanently deletes the following, which include your own files or the ability to roll back a Windows update. It cannot be undone:\n\n  • {0}\n\nClean now?", names)
             : Loc.F("This permanently deletes the following caches to free space. Windows recreates them as needed:\n\n  • {0}\n\nClean now?", names);
-        var answer = MessageBox.Show(body, Loc.T("WinPure — Clean up"),
+        var answer = WinPure.Views.WinPureDialog.Show(body, Loc.T("WinPure — Clean up"),
             MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) return;
 

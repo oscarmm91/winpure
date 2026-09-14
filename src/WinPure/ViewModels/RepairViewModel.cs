@@ -99,7 +99,7 @@ public sealed class RepairViewModel : PageViewModel
         if (!Main.ConfirmDespiteGuards(Loc.F("run \"{0}\"", vm.Name), SystemGuards.ForRepair)) return;
         if (tool.ConfirmText is not null)
         {
-            var answer = MessageBox.Show(Loc.T(tool.ConfirmText), $"WinPure — {vm.Name}",
+            var answer = WinPure.Views.WinPureDialog.Show(Loc.T(tool.ConfirmText), $"WinPure — {vm.Name}",
                 MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (answer != MessageBoxResult.Yes) return;
         }
@@ -138,7 +138,7 @@ public sealed class RepairViewModel : PageViewModel
                 Main.StatusText = Loc.F("{0}: done in {1}.", vm.Name, elapsed);
                 LogService.Log($"Repair finished in {elapsed}: {tool.Name} — {lastLine}");
                 if (tool.RequiresRestart)
-                    MessageBox.Show(Loc.T("Restart your PC for the changes to take full effect."), "WinPure",
+                    WinPure.Views.WinPureDialog.Show(Loc.T("Restart your PC for the changes to take full effect."), "WinPure",
                         MessageBoxButton.OK, MessageBoxImage.Information);
             }
             else if (result.Cancelled)

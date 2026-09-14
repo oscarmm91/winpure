@@ -309,6 +309,9 @@ public sealed class MainViewModel : ObservableObject
                 }
             }
             if (value == _currentNav) return;
+            // The Undo banner belongs to the screen where you just applied; leaving that screen retires it, so it
+            // can never sit stale over another page (e.g. after you apply again on Startup or DNS).
+            HideUndo();
             var old = _currentNav;
             _currentNav = value;
             old?.SetCurrentSilently(false);
@@ -559,6 +562,7 @@ public sealed class MainViewModel : ObservableObject
     {
         _undoTimer.Stop();
         ShowUndoBanner = false;
+        _lastBackupSession = null;   // nothing left to undo once the banner is gone; disables UndoLastCommand
     }
 
     private void UpdatePendingCount()
@@ -723,7 +727,7 @@ public sealed class MainViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show(Loc.F("The configuration could not be saved:\n\n{0}", ex.Message), Loc.T("WinPure — Export configuration"),
+            WinPure.Views.WinPureDialog.Show(Loc.F("The configuration could not be saved:\n\n{0}", ex.Message), Loc.T("WinPure — Export configuration"),
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
@@ -747,7 +751,7 @@ public sealed class MainViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show(ex.Message, Loc.T("WinPure — Import configuration"), MessageBoxButton.OK, MessageBoxImage.Warning);
+            WinPure.Views.WinPureDialog.Show(ex.Message, Loc.T("WinPure — Import configuration"), MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -800,7 +804,7 @@ public sealed class MainViewModel : ObservableObject
         var relevant = (select ?? SystemGuards.ForApply)(_guards);
         if (relevant.Count == 0) return true;
 
-        var answer = MessageBox.Show(
+        var answer = WinPure.Views.WinPureDialog.Show(
             Loc.F("Before you {0}, WinPure found:\n\n{1}\n\nContinue anyway?", what, SystemGuards.Describe(relevant)),
             Loc.T("WinPure — Check before continuing"), MessageBoxButton.YesNo, MessageBoxImage.Warning,
             MessageBoxResult.No);
@@ -831,7 +835,7 @@ public sealed class MainViewModel : ObservableObject
         if (irreversible.Count > 0)
         {
             var names = string.Join("\n  • ", irreversible.Select(c => Loc.T(c.Tweak.Name)));
-            var answer = MessageBox.Show(
+            var answer = WinPure.Views.WinPureDialog.Show(
                 Loc.F("These changes uninstall apps, and WinPure cannot undo them. To get an app back you would reinstall it yourself, from the Microsoft Store (OneDrive from microsoft.com):\n\n  • {0}\n\nRemove them?", names),
                 Loc.T("WinPure — Confirm app removal"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
             if (answer != MessageBoxResult.Yes) return;
@@ -840,7 +844,7 @@ public sealed class MainViewModel : ObservableObject
         bool futureUsers = ApplyToFutureUsers && FutureUsers.WritesFor(changes).Count > 0;
         if (futureUsers)
         {
-            var answer = MessageBox.Show(
+            var answer = WinPure.Views.WinPureDialog.Show(
                 Loc.T("These per-user settings will also be written into the Default profile, so accounts created later start with them. This changes C:\\Users\\Default and is undone from Restore. Continue?"),
                 Loc.T("WinPure — Apply to future users"), MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes);
             if (answer != MessageBoxResult.Yes) return;
@@ -849,6 +853,8 @@ public sealed class MainViewModel : ObservableObject
         HideUndo();
         IsBusy = true;
         var progress = new Progress<string>(msg => StatusText = msg);
+        BackupSession? justMade = null;
+        int applied = 0;
         try
         {
             var results = await Task.Run(() => _engine.ApplyChanges(changes, progress, futureUsers));
@@ -857,7 +863,7 @@ public sealed class MainViewModel : ObservableObject
             if (results.Any(r => r.Success && r.Tweak.NotifiesMouseChange))
                 NativeMethods.ApplyMouseSettings();
             int failed = results.Count(r => !r.Success);
-            int applied = results.Count(r => r.Success);
+            applied = results.Count(r => r.Success);
             bool needsExplorer = results.Any(r => r.Success && r.Tweak.RequiresExplorerRestart);
             bool needsReboot = results.Any(r => r.Success && r.Tweak.RequiresRestart);
 
@@ -867,15 +873,13 @@ public sealed class MainViewModel : ObservableObject
                 ? Loc.T("Finished with 1 error — see the log in %AppData%\\WinPure\\Logs.")
                 : Loc.F("Finished with {0} errors — see the log in %AppData%\\WinPure\\Logs.", failed);
 
-            // The apply just made one backup session (newest on disk). If it captured anything reversible, offer a
-            // one-click Undo of exactly that batch. A removal-only batch captures nothing, so no false promise.
-            var justMade = _backupManager.ListSessions().FirstOrDefault();
-            if (applied > 0 && justMade is { Entries.Count: > 0 })
-                ShowUndo(justMade, applied);
+            // The apply just made one backup session (newest on disk). Remember it; the Undo banner is shown after
+            // the rescan below, once the busy veil is down. A removal-only batch captures nothing → no false promise.
+            justMade = _backupManager.ListSessions().FirstOrDefault();
 
             if (needsExplorer)
             {
-                var answer = MessageBox.Show(
+                var answer = WinPure.Views.WinPureDialog.Show(
                     Loc.T("Some changes need File Explorer to restart to take effect.\nRestart Explorer now?"),
                     "WinPure", MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (answer == MessageBoxResult.Yes)
@@ -883,7 +887,7 @@ public sealed class MainViewModel : ObservableObject
             }
             else if (needsReboot)
             {
-                MessageBox.Show(Loc.T("Some changes will take full effect after a reboot."), "WinPure",
+                WinPure.Views.WinPureDialog.Show(Loc.T("Some changes will take full effect after a reboot."), "WinPure",
                     MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
@@ -892,6 +896,10 @@ public sealed class MainViewModel : ObservableObject
             IsBusy = false;
         }
         await ScanAsync();
+
+        // Shown after the rescan so it appears over the settled page, not over the busy veil.
+        if (applied > 0 && justMade is { Entries.Count: > 0 })
+            ShowUndo(justMade, applied);
     }
 
     /// <summary>
@@ -903,6 +911,7 @@ public sealed class MainViewModel : ObservableObject
         if (startupPage.PendingCount == 0) return;
         if (!ConfirmDespiteGuards(Loc.T("change startup apps"), SystemGuards.ForStartup)) return;
 
+        HideUndo();   // the startup batch is its own thing; retire any banner from a previous tweak apply
         IsBusy = true;
         StatusText = Loc.T("Applying startup changes…");
         try
@@ -913,7 +922,7 @@ public sealed class MainViewModel : ObservableObject
                 ? (applied == 1 ? Loc.T("Done — 1 startup change applied.") : Loc.F("Done — {0} startup changes applied.", applied))
                 : Loc.F("{0} applied, {1} could not be changed — see the log in %AppData%\\WinPure\\Logs.", applied, failed);
             if (failed > 0)
-                MessageBox.Show(Loc.F("{0} startup change(s) could not be applied. See the log in %AppData%\\WinPure\\Logs.", failed),
+                WinPure.Views.WinPureDialog.Show(Loc.F("{0} startup change(s) could not be applied. See the log in %AppData%\\WinPure\\Logs.", failed),
                     "WinPure", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
@@ -938,7 +947,7 @@ public sealed class MainViewModel : ObservableObject
         // Restoring as the wrong user writes the per-user half of the backup into the wrong profile.
         if (!ConfirmDespiteGuards(Loc.T("restore this backup"), SystemGuards.ForRestore)) return;
 
-        var answer = MessageBox.Show(
+        var answer = WinPure.Views.WinPureDialog.Show(
             Loc.F("Restore the snapshot from {0}?\nAll {1} captured values will be written back.", vm.Title, vm.Session.Entries.Count),
             Loc.T("WinPure — Restore backup"), MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (answer != MessageBoxResult.Yes) return;
@@ -955,7 +964,7 @@ public sealed class MainViewModel : ObservableObject
         if (session is null) return;
         if (!ConfirmDespiteGuards(Loc.T("undo the changes you just applied"), SystemGuards.ForRestore)) return;
 
-        var answer = MessageBox.Show(
+        var answer = WinPure.Views.WinPureDialog.Show(
             _lastAppliedCount == 1
                 ? Loc.T("Undo the change you just applied? Its backed-up value is written back.")
                 : Loc.F("Undo the {0} changes you just applied? Their backed-up values are written back.", _lastAppliedCount),
@@ -994,7 +1003,7 @@ public sealed class MainViewModel : ObservableObject
         // list is that account's backups, not the signed-in user's — and deleting cannot be undone.
         if (!ConfirmDespiteGuards(Loc.T("delete this backup"), SystemGuards.ForRestore)) return;
 
-        var answer = MessageBox.Show(
+        var answer = WinPure.Views.WinPureDialog.Show(
             Loc.F("Delete the backup from {0}? This cannot be undone.", vm.Title),
             Loc.T("WinPure — Delete backup"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
         if (answer != MessageBoxResult.Yes) return;

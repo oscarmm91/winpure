@@ -103,7 +103,8 @@ public sealed class BackupSessionViewModel : ObservableObject
     public IReadOnlyList<string> Details =>
         Session.TweakNames.Count > 0
             ? Session.TweakNames.OrderBy(n => IrreversibleNames.Value.Contains(n) ? 0 : 1).Select(DisplayName).ToList()
-            : Session.Entries.Select(DescribeEntry).ToList();
+            // A DNS session captures one entry per adapter; collapse the repeats so it reads "DNS servers" once.
+            : Session.Entries.Select(DescribeEntry).Distinct().ToList();
 
     public bool HasDetails => Details.Count > 0;
 

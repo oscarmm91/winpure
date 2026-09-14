@@ -3025,13 +3025,18 @@ bool TheRestoreDetailListsEverythingABackupChanged()
     var problems = new List<string>();
     string removalName = TweakCatalog.Build().First(t => !t.FullyReversible).Name;
 
+    // More than four names, since the whole point is that the detail shows EVERYTHING while the Summary caps at four
+    // — a Take(4)-style regression must fail here.
+    var reversible = new[] { "Enable Dark Mode", "Disable Telemetry", "Show File Extensions", "Align Taskbar Left", "Faster App Timeouts" };
+    var names = new List<string>(reversible) { removalName };
     var named = new WinPure.ViewModels.BackupSessionViewModel
     {
-        Session = new BackupSession { Id = "b1", CreatedUtc = DateTime.UtcNow, TweakNames = new() { "Enable Dark Mode", removalName } },
+        Session = new BackupSession { Id = "b1", CreatedUtc = DateTime.UtcNow, TweakNames = names },
     };
     var details = named.Details;
-    if (details.Count != 2) problems.Add($"detail listed {details.Count} items, expected 2 (nothing truncated)");
-    if (!details.Any(d => d.Contains("Enable Dark Mode", StringComparison.Ordinal))) problems.Add("a reversible tweak name is missing from the detail");
+    if (details.Count != names.Count) problems.Add($"detail listed {details.Count} items, expected {names.Count} (nothing truncated)");
+    foreach (var r in reversible)
+        if (!details.Any(d => d.Contains(r, StringComparison.Ordinal))) problems.Add($"a reversible tweak name is missing from the detail: {r}");
     if (!details.Any(d => d.Contains(removalName, StringComparison.Ordinal) && d.Contains("not reinstalled", StringComparison.Ordinal)))
         problems.Add("the app removal is not marked as not reinstalled");
     if (details.Count > 0 && !details[0].Contains(removalName, StringComparison.Ordinal)) problems.Add("the app removal is not listed first");

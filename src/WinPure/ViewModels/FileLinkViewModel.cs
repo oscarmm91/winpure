@@ -66,7 +66,7 @@ public sealed class FileLinkViewModel : PageViewModel
             return;
         }
         if (!Main.ConfirmDespiteGuards(Loc.T("move a folder to another drive"), SystemGuards.ForRepair)) return;
-        var answer = System.Windows.MessageBox.Show(
+        var answer = WinPure.Views.WinPureDialog.Show(
             Loc.T("Move this folder to the other drive and leave a junction behind? The data is copied and verified BEFORE the original is removed, so nothing is lost if it is interrupted. Continue?"),
             Loc.T("WinPure — Move folder"), System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning, System.Windows.MessageBoxResult.No);
         if (answer != System.Windows.MessageBoxResult.Yes) return;

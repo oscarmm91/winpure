@@ -84,7 +84,7 @@ public sealed class PathViewModel : PageViewModel
     {
         if (!Entries.Any(e => e.IsSelected)) return;
         if (!Main.ConfirmDespiteGuards(Loc.T("edit the PATH"), SystemGuards.ForRepair)) return;
-        var answer = MessageBox.Show(
+        var answer = WinPure.Views.WinPureDialog.Show(
             Loc.T("Remove the ticked PATH entries? WinPure saves the whole PATH first, so Restore can put it back."),
             Loc.T("WinPure — PATH"), MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) return;

@@ -95,7 +95,7 @@ public sealed class UninstallerViewModel : PageViewModel
     {
         if (!vm.CanUninstall) return;
         if (!Main.ConfirmDespiteGuards(Loc.F("uninstall {0}", vm.Name), SystemGuards.ForRepair)) return;
-        var answer = MessageBox.Show(
+        var answer = WinPure.Views.WinPureDialog.Show(
             Loc.F("Uninstall {0}? This runs the program's own uninstaller. WinPure's Restore cannot undo this — to get the program back you would reinstall it.", vm.Name),
             Loc.T("WinPure — Uninstall program"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) return;

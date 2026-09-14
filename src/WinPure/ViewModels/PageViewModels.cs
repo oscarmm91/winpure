@@ -97,6 +97,26 @@ public sealed class BackupSessionViewModel : ObservableObject
         ? Loc.T("1 registry/service entry")
         : Loc.F("{0} registry/service entries", Session.Entries.Count);
 
+    // The full list of what this backup changed, for the expandable detail — the Summary shows only the first
+    // four. Tweak names read plainly to a person; a DNS/PATH session carries no names, so those fall back to a
+    // short per-entry description. Every removal is marked, since restoring the session does not reinstall it.
+    public IReadOnlyList<string> Details =>
+        Session.TweakNames.Count > 0
+            ? Session.TweakNames.OrderBy(n => IrreversibleNames.Value.Contains(n) ? 0 : 1).Select(DisplayName).ToList()
+            // A DNS session captures one entry per adapter; collapse the repeats so it reads "DNS servers" once.
+            : Session.Entries.Select(DescribeEntry).Distinct().ToList();
+
+    public bool HasDetails => Details.Count > 0;
+
+    private static string DescribeEntry(BackupEntry e) => e.Type switch
+    {
+        "dns" => Loc.T("DNS servers"),
+        "path" => Loc.T("PATH"),
+        "service" => Loc.F("Service: {0}", e.ServiceName ?? ""),
+        "scheduled-task" => Loc.F("Task: {0}", e.TaskPath ?? ""),
+        _ => e.ValueName ?? e.KeyPath ?? e.Type,
+    };
+
     /// <summary>
     /// A backup records tweak names in English, so it reads the same whichever language made it; they are
     /// translated here, where they are shown. A startup entry's name is the app's own and stays as it is.

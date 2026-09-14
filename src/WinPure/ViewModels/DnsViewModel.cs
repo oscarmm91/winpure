@@ -51,7 +51,7 @@ public sealed class DnsViewModel : PageViewModel
     {
         var preset = vm.Preset;
         if (!Main.ConfirmDespiteGuards(Loc.F("switch DNS to {0}", vm.Name), SystemGuards.ForRepair)) return;
-        var answer = MessageBox.Show(
+        var answer = WinPure.Views.WinPureDialog.Show(
             Loc.F("Set every network adapter's DNS to {0}? WinPure saves your current DNS first, so Restore can put it back.", vm.Name),
             Loc.T("WinPure — DNS servers"), MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes);
         if (answer != MessageBoxResult.Yes) return;

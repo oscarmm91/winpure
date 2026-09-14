@@ -93,15 +93,68 @@
                                FontSize="10.5" Foreground="{StaticResource Brush.TextTertiary}"/>
                 </StackPanel>
 
-                <!-- nav -->
-                <ItemsControl ItemsSource="{Binding NavItems}" Margin="0,4,0,0">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <RadioButton Style="{StaticResource NavButton}" GroupName="Nav"
-                                         IsChecked="{Binding IsCurrent, Mode=TwoWay}"/>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <!-- nav: Home pinned, then collapsible sections, all inside a scroller so nothing is cut off -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,4,0,0">
+                    <StackPanel>
+                        <!-- Home -->
+                        <RadioButton Style="{StaticResource NavButton}" GroupName="Nav" DataContext="{Binding HomeItem}"
+                                     IsChecked="{Binding IsCurrent, Mode=TwoWay}"/>
+
+                        <!-- sections -->
+                        <ItemsControl ItemsSource="{Binding NavGroups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,6,0,0">
+                                        <!-- section header: click to expand/collapse -->
+                                        <Button Command="{Binding ToggleCommand}" Cursor="Hand" HorizontalAlignment="Stretch">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border x:Name="Bg" Background="Transparent" Padding="20,7,14,5">
+                                                        <Grid>
+                                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding Header}" FontSize="10.5" FontWeight="SemiBold"
+                                                                           Foreground="{StaticResource Brush.TextTertiary}"/>
+                                                                <!-- pending badge, so a collapsed section still shows it has changes -->
+                                                                <Border Background="{StaticResource Brush.Accent}" CornerRadius="8" Margin="8,0,0,0"
+                                                                        Padding="6,0" MinWidth="16" Height="16"
+                                                                        Visibility="{Binding HasPending, Converter={StaticResource BoolToVisibility}}">
+                                                                    <TextBlock Text="{Binding PendingCount}" FontSize="10" Foreground="White"
+                                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                </Border>
+                                                            </StackPanel>
+                                                            <TextBlock x:Name="Chev" Text="&#xE70D;" FontFamily="{StaticResource Font.Icon}" FontSize="9"
+                                                                       Foreground="{StaticResource Brush.TextTertiary}"
+                                                                       HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                                        </Grid>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <DataTrigger Binding="{Binding IsExpanded}" Value="False">
+                                                            <Setter TargetName="Chev" Property="Text" Value="&#xE70E;"/>
+                                                        </DataTrigger>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="Bg" Property="Background" Value="{StaticResource Brush.SidebarHover}"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                        </Button>
+
+                                        <!-- section items -->
+                                        <ItemsControl ItemsSource="{Binding Items}"
+                                                      Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <RadioButton Style="{StaticResource NavButton}" GroupName="Nav"
+                                                                 IsChecked="{Binding IsCurrent, Mode=TwoWay}"/>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
             </DockPanel>
         </Border>
 
@@ -109,6 +162,7 @@
         <Grid Grid.Column="1" Background="{StaticResource Brush.Background}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="36"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
@@ -121,20 +175,56 @@
                 <Button Style="{StaticResource CloseButton}" Content="&#xE8BB;" Click="CloseClick"/>
             </StackPanel>
 
+            <!-- undo banner: a one-click revert of the batch just applied, right where the user is looking -->
+            <Border Grid.Row="1" Margin="36,6,36,0" Padding="16,10" CornerRadius="8"
+                    Background="{StaticResource Brush.GreenSoft}" BorderThickness="1" BorderBrush="{StaticResource Brush.Green}"
+                    Visibility="{Binding ShowUndoBanner, Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="&#xE930;" FontFamily="{StaticResource Font.Icon}" FontSize="15"
+                               Foreground="{StaticResource Brush.GreenText}" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="{Binding UndoBannerText}" Margin="10,0,12,0" FontSize="12.5"
+                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                               Foreground="{StaticResource Brush.TextPrimary}"/>
+                    <Button Grid.Column="2" Style="{StaticResource SubtleButton}" Command="{Binding UndoLastCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE7A7;" FontFamily="{StaticResource Font.Icon}" FontSize="12" VerticalAlignment="Center"/>
+                            <TextBlock Text="{l:Tr 'Undo'}" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="3" Style="{StaticResource SubtleButton}" Margin="8,0,0,0"
+                            Command="{Binding DismissUndoCommand}" ToolTip="{l:Tr 'Dismiss'}">
+                        <TextBlock Text="&#xE8BB;" FontFamily="{StaticResource Font.Icon}" FontSize="11" VerticalAlignment="Center"/>
+                    </Button>
+                </Grid>
+            </Border>
+
             <!-- active page -->
-            <ContentControl Grid.Row="1" Content="{Binding CurrentPage}" Margin="36,4,36,0"/>
+            <ContentControl Grid.Row="2" Content="{Binding CurrentPage}" Margin="36,4,36,0"/>
 
             <!-- apply bar -->
-            <Border Grid.Row="2" BorderBrush="{StaticResource Brush.Divider}" BorderThickness="0,1,0,0"
+            <Border Grid.Row="3" BorderBrush="{StaticResource Brush.Divider}" BorderThickness="0,1,0,0"
                     Padding="36,16" Background="{StaticResource Brush.Background}">
                 <Grid>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE930;" FontFamily="{StaticResource Font.Icon}" FontSize="15"
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <!-- Left hint fills the star column and ellipsizes instead of sliding under the right group.
+                         Two columns keep the two groups apart; before, they shared one cell and overlapped. -->
+                    <DockPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock DockPanel.Dock="Left" Text="&#xE930;" FontFamily="{StaticResource Font.Icon}" FontSize="15"
                                    Foreground="{StaticResource Brush.TextSecondary}" VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding ApplyHint}" Margin="10,0,0,0" FontSize="12.5"
-                                   Foreground="{StaticResource Brush.TextSecondary}" VerticalAlignment="Center"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                   Foreground="{StaticResource Brush.TextSecondary}" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding ApplyHint}"/>
+                    </DockPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                         <CheckBox IsChecked="{Binding ApplyToFutureUsers}" VerticalAlignment="Center" Margin="0,0,18,0"
                                   Visibility="{Binding FutureUsersApplies, Converter={StaticResource BoolToVisibility}}"
                                   Foreground="{StaticResource Brush.TextSecondary}"
@@ -155,7 +245,7 @@
             </Border>
 
             <!-- busy veil -->
-            <Border Grid.Row="1" Grid.RowSpan="2" Background="#990F0F0F"
+            <Border Grid.Row="2" Grid.RowSpan="2" Background="#990F0F0F"
                     Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <ProgressBar IsIndeterminate="True" Width="240" Height="4" Foreground="{StaticResource Brush.Accent}"

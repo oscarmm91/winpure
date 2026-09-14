@@ -143,7 +143,7 @@
                         BorderThickness="1" BorderBrush="{StaticResource Brush.Accent}">
                     <StackPanel>
                         <TextBlock Text="{l:Tr 'Balanced'}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
-                        <TextBlock Text="{l:Tr 'Safe + optional services off, Click to Do off, Delivery Optimization off, faster shutdown.'}"
+                        <TextBlock Text="{l:Tr 'Safe + stronger privacy, safe optional services off, faster shutdown, and more UI cleanup.'}"
                                    FontSize="12" Margin="0,6,0,12" TextWrapping="Wrap"
                                    Foreground="{StaticResource Brush.TextSecondary}" MinHeight="48"/>
                         <Button Style="{StaticResource SubtleButton}" Content="{l:Tr 'Select Balanced preset'}"
@@ -155,7 +155,7 @@
                         BorderThickness="1" BorderBrush="{StaticResource Brush.Orange}">
                     <StackPanel>
                         <TextBlock Text="{l:Tr 'Aggressive'}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
-                        <TextBlock Text="{l:Tr 'Balanced + Copilot/AI and Recall off, DiagTrack disabled, telemetry blocked at the firewall.'}"
+                        <TextBlock Text="{l:Tr 'Balanced + Copilot/AI and Recall off, all telemetry tasks off, plus performance and cleanup tweaks. Still fully reversible.'}"
                                    FontSize="12" Margin="0,6,0,12" TextWrapping="Wrap"
                                    Foreground="{StaticResource Brush.TextSecondary}" MinHeight="48"/>
                         <Button Style="{StaticResource SubtleButton}" Content="{l:Tr 'Select Aggressive preset'}"
@@ -164,6 +164,18 @@
                     </StackPanel>
                 </Border>
             </UniformGrid>
+
+            <!-- Live preview of what the chosen profile will change on this PC, so the scope is clear before applying. -->
+            <Border Margin="0,16,0,0" Padding="16,13" CornerRadius="8"
+                    Background="{StaticResource Brush.Card}" BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}"
+                    Visibility="{Binding Main.HasActivePreset, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="{Binding Main.PresetPreview}" FontSize="12.5" TextWrapping="Wrap"
+                               Foreground="{StaticResource Brush.TextPrimary}"/>
+                    <TextBlock Margin="0,7,0,0" FontSize="11.5" TextWrapping="Wrap" Foreground="{StaticResource Brush.TextTertiary}"
+                               Text="{l:Tr 'It never touches Remove Apps, Edge or the tools (Clean up, Memory and the rest). Everything is reversible from Restore.'}"/>
+                </StackPanel>
+            </Border>
 
             <TextBlock Margin="0,18,0,0" FontSize="12" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap"
                        Text="{l:Tr 'Presets never remove apps. Selecting one only marks the toggles — nothing changes until you click Apply Changes. A registry snapshot is saved automatically before every apply; use the Restore page to roll back.'}"/>

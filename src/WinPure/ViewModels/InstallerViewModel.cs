@@ -154,7 +154,7 @@ public sealed class InstallerViewModel : PageViewModel
     private async Task InstallAsync(InstallableAppViewModel app)
     {
         if (!Main.ConfirmDespiteGuards(Loc.F("install {0}", app.Name), SystemGuards.ForRepair)) return;
-        var answer = MessageBox.Show(
+        var answer = WinPure.Views.WinPureDialog.Show(
             Loc.F("Install {0} with winget?\n\nIt is downloaded from its publisher, and installing accepts that app's license terms. WinPure's Restore cannot undo this: to remove the app later, uninstall it from Settings > Apps.", app.Name),
             Loc.T("WinPure — Install app"), MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) return;

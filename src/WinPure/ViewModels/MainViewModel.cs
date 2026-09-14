@@ -46,6 +46,31 @@ public sealed class NavItem : ObservableObject
     public bool HasPending => PendingCount > 0;
 }
 
+/// <summary>
+/// A collapsible section of the sidebar (Settings, Tools, Apps, Backups). It is a grouped VIEW over the same
+/// NavItem instances that live in the flat NavItems list, so every existing code path that iterates NavItems
+/// keeps working; the sidebar simply renders these groups instead of one long list that ran off the bottom.
+/// </summary>
+public sealed class NavGroup : ObservableObject
+{
+    private readonly string _header = "";
+    /// <summary>Translated when set: the English passed in is the key.</summary>
+    public required string Header { get => _header; init => _header = Loc.T(value); }
+    public ObservableCollection<NavItem> Items { get; } = new();
+
+    private bool _isExpanded = true;
+    public bool IsExpanded { get => _isExpanded; set => Set(ref _isExpanded, value); }
+    public RelayCommand ToggleCommand { get; }
+    public NavGroup() => ToggleCommand = new RelayCommand(_ => IsExpanded = !IsExpanded);
+
+    // The sum of the section's pending badges, shown on the header so a pending change is not hidden by a
+    // collapsed section.
+    private int _pendingCount;
+    public int PendingCount { get => _pendingCount; private set { if (Set(ref _pendingCount, value)) OnPropertyChanged(nameof(HasPending)); } }
+    public bool HasPending => _pendingCount > 0;
+    public void RefreshPending() => PendingCount = Items.Sum(i => i.PendingCount);
+}
+
 public sealed class MainViewModel : ObservableObject
 {
     private readonly BackupManager _backupManager = new();
@@ -53,6 +78,10 @@ public sealed class MainViewModel : ObservableObject
     private ScanContext _scanContext = new();
 
     public ObservableCollection<NavItem> NavItems { get; } = new();
+    /// <summary>The sidebar's collapsible sections, a grouped view over NavItems. Built once after NavItems is filled.</summary>
+    public ObservableCollection<NavGroup> NavGroups { get; } = new();
+    /// <summary>Home, pinned above the sections so it is always one click away.</summary>
+    public NavItem? HomeItem { get; private set; }
     public List<TweakViewModel> AllTweaks { get; } = new();
 
     private readonly DashboardViewModel _dashboard;
@@ -249,6 +278,7 @@ public sealed class MainViewModel : ObservableObject
         foreach (var item in NavItems) item.Owner = this;
         _currentNav = NavItems[0];
         _currentNav.SetCurrentSilently(true);
+        BuildNavGroups();
 
         // The dashboard shows live RAM and disk figures; refresh them every 2 s, but only while it is the
         // page on screen (the setter stops the timer on navigation away). The app opens on the dashboard.
@@ -262,6 +292,39 @@ public sealed class MainViewModel : ObservableObject
         SelectPresetCommand = new RelayCommand(p => SelectPreset((PresetLevel)p!), _ => !IsBusy);
         ExportConfigCommand = new RelayCommand(_ => ExportConfigToFile(), _ => !IsBusy);
         ImportConfigCommand = new RelayCommand(_ => ImportConfigFromFile(), _ => !IsBusy);
+        UndoLastCommand = new RelayCommand(_ => _ = UndoLastAsync(), _ => !IsBusy && _lastBackupSession is not null);
+        DismissUndoCommand = new RelayCommand(_ => HideUndo());
+
+        _undoTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(45) };
+        _undoTimer.Tick += (_, _) => HideUndo();
+    }
+
+    // Buckets the flat NavItems into four collapsible sidebar sections. Home is pinned above them. Classifying by
+    // page identity/type keeps this in one place; adding a page means adding it to the right bucket here.
+    private void BuildNavGroups()
+    {
+        var settings = new NavGroup { Header = "Settings" };
+        var tools = new NavGroup { Header = "Tools" };
+        var apps = new NavGroup { Header = "Apps" };
+        var backups = new NavGroup { Header = "Backups" };
+
+        foreach (var item in NavItems)
+        {
+            var target = item.Page switch
+            {
+                _ when item.Page == _dashboard => null,                                   // Home: pinned, no section
+                CategoryPageViewModel { Category: TweakCategory.RemoveApps } => apps,      // Remove Apps sits with the app pages
+                CategoryPageViewModel => settings,                                         // the eight tweak categories
+                _ when item.Page == _installer || item.Page == _uninstaller => apps,
+                _ when item.Page == _restore => backups,
+                _ => tools,                                                                // every one-shot tool
+            };
+            if (target is null) HomeItem = item;
+            else target.Items.Add(item);
+        }
+
+        foreach (var g in new[] { settings, tools, apps, backups })
+            NavGroups.Add(g);
     }
 
     private void AddCategory(string label, string glyph, TweakCategory category, string title, string subtitle,
@@ -304,9 +367,16 @@ public sealed class MainViewModel : ObservableObject
                 }
             }
             if (value == _currentNav) return;
+            // The Undo banner belongs to the screen where you just applied; leaving that screen retires it, so it
+            // can never sit stale over another page (e.g. after you apply again on Startup or DNS).
+            HideUndo();
             var old = _currentNav;
             _currentNav = value;
             old?.SetCurrentSilently(false);
+            // If we navigate into a page inside a collapsed section (e.g. a Dashboard card jumps to Restore),
+            // open that section so the highlighted entry is actually visible.
+            foreach (var g in NavGroups)
+                if (g.Items.Contains(value)) { g.IsExpanded = true; break; }
             value.SetCurrentSilently(true);
             if (value.Page == _restore) LoadBackups();
             if (value.Page == _installer && !_installer.HasChecked) _ = _installer.RefreshAsync();
@@ -498,13 +568,64 @@ public sealed class MainViewModel : ObservableObject
             : Loc.F("{0} pending changes — a backup is created before applying.", PendingCount);
 
     private PresetLevel? _activePreset;
-    public PresetLevel? ActivePreset { get => _activePreset; set => Set(ref _activePreset, value); }
+    public PresetLevel? ActivePreset
+    {
+        get => _activePreset;
+        set { if (Set(ref _activePreset, value)) OnPropertyChanged(nameof(HasActivePreset)); }
+    }
+    public bool HasActivePreset => _activePreset is not null;
+
+    // A plain-language preview of what the chosen profile will change on THIS PC, so the user sees the
+    // scope before applying instead of guessing. Rebuilt by SelectPreset; empty until a profile is picked.
+    private string _presetPreview = "";
+    public string PresetPreview { get => _presetPreview; set => Set(ref _presetPreview, value); }
+
+    /// <summary>The short sidebar label for a category, reused so the preview matches what the user sees in the nav.</summary>
+    private string CategoryLabel(TweakCategory c) =>
+        NavItems.FirstOrDefault(n => n.Page is CategoryPageViewModel p && p.Category == c)?.Label ?? c.ToString();
 
     public RelayCommand ApplyCommand { get; }
     public RelayCommand RescanCommand { get; }
     public RelayCommand SelectPresetCommand { get; }
     public RelayCommand ExportConfigCommand { get; }
     public RelayCommand ImportConfigCommand { get; }
+    public RelayCommand UndoLastCommand { get; }
+    public RelayCommand DismissUndoCommand { get; }
+
+    // ---------------------------------------------------------------- undo banner
+    // After a successful apply, a banner near the top offers a one-click Undo of exactly that batch — so the
+    // user does not have to hunt for it in Restore. It knows the session it just made; Undo restores that one.
+
+    private BackupSession? _lastBackupSession;
+    private int _lastAppliedCount;
+
+    private bool _showUndoBanner;
+    public bool ShowUndoBanner { get => _showUndoBanner; private set => Set(ref _showUndoBanner, value); }
+
+    public string UndoBannerText => _lastAppliedCount == 1
+        ? Loc.T("Applied 1 change.")
+        : Loc.F("Applied {0} changes.", _lastAppliedCount);
+
+    // The banner is a convenience, not a permanent fixture: it fades on its own after a while, and also when the
+    // user dismisses it, applies again, or clicks Undo. Restore still holds every backup for later.
+    private readonly DispatcherTimer _undoTimer;
+
+    private void ShowUndo(BackupSession session, int appliedCount)
+    {
+        _lastBackupSession = session;
+        _lastAppliedCount = appliedCount;
+        OnPropertyChanged(nameof(UndoBannerText));
+        ShowUndoBanner = true;
+        _undoTimer.Stop();
+        _undoTimer.Start();
+    }
+
+    private void HideUndo()
+    {
+        _undoTimer.Stop();
+        ShowUndoBanner = false;
+        _lastBackupSession = null;   // nothing left to undo once the banner is gone; disables UndoLastCommand
+    }
 
     private void UpdatePendingCount()
     {
@@ -516,6 +637,8 @@ public sealed class MainViewModel : ObservableObject
         foreach (var item in NavItems)
             if (item.Page is CategoryPageViewModel page)
                 item.PendingCount = page.Tweaks.Count(t => t.IsDirty);
+        foreach (var g in NavGroups)
+            g.RefreshPending();   // so a pending change is visible on a collapsed section's header too
     }
 
     /// <summary>Startup toggles apply immediately, so the dashboard's backup count moves too.</summary>
@@ -545,6 +668,7 @@ public sealed class MainViewModel : ObservableObject
                 tweak.RefreshStatus(_engine, ctx);
             _startup.Load(ctx);
             UpdatePendingCount();
+            UpdatePresetPreview();
             UpdateDashboard();
             int undetected = AllTweaks.Count(t => t.Status == TweakStatus.Unknown);
             string systemWarnings = guards.Count == 1 ? Loc.T("1 system warning") : Loc.F("{0} system warnings", guards.Count);
@@ -609,6 +733,37 @@ public sealed class MainViewModel : ObservableObject
             : keptManual == 1
             ? Loc.F("{0} preset selected, keeping 1 manual selection — review and click Apply Changes.", preset)
             : Loc.F("{0} preset selected, keeping {1} manual selections — review and click Apply Changes.", preset, keptManual);
+
+        UpdatePresetPreview();
+    }
+
+    // Counts only the pending, reversible tweaks the profile actually turns on here — a tweak already in the
+    // wanted state changes nothing, so it is not promised. Grouped by category so the scope reads at a glance.
+    // Self-contained (reads ActivePreset) so a rescan after applying can refresh the numbers, not leave them stale.
+    private void UpdatePresetPreview()
+    {
+        if (_activePreset is not { } level) { PresetPreview = ""; return; }
+        string presetName = level switch
+        {
+            PresetLevel.Safe => Loc.T("Safe"),
+            PresetLevel.Balanced => Loc.T("Balanced"),
+            PresetLevel.Aggressive => Loc.T("Aggressive"),
+            _ => level.ToString(),
+        };
+        var pending = AllTweaks.Where(t => t.IsDirty && t.IsSelected).ToList();
+        if (pending.Count == 0)
+        {
+            PresetPreview = Loc.F("The {0} profile — everything it covers is already applied on this PC.", presetName);
+            return;
+        }
+        // Each piece is a number plus an already-localized category label, so no English reaches the screen here.
+        string breakdown = string.Join("  ·  ", pending
+            .GroupBy(t => t.Tweak.Category)
+            .OrderByDescending(g => g.Count())
+            .Select(g => $"{g.Count()} {CategoryLabel(g.Key)}"));
+        PresetPreview = pending.Count == 1
+            ? Loc.F("The {0} profile will change 1 setting on this PC:  {1}", presetName, breakdown)
+            : Loc.F("The {0} profile will change {1} settings on this PC:  {2}", presetName, pending.Count, breakdown);
     }
 
     // ---------------------------------------------------------------- configuration files
@@ -636,7 +791,7 @@ public sealed class MainViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show(Loc.F("The configuration could not be saved:\n\n{0}", ex.Message), Loc.T("WinPure — Export configuration"),
+            WinPure.Views.WinPureDialog.Show(Loc.F("The configuration could not be saved:\n\n{0}", ex.Message), Loc.T("WinPure — Export configuration"),
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
@@ -660,7 +815,7 @@ public sealed class MainViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show(ex.Message, Loc.T("WinPure — Import configuration"), MessageBoxButton.OK, MessageBoxImage.Warning);
+            WinPure.Views.WinPureDialog.Show(ex.Message, Loc.T("WinPure — Import configuration"), MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -713,7 +868,7 @@ public sealed class MainViewModel : ObservableObject
         var relevant = (select ?? SystemGuards.ForApply)(_guards);
         if (relevant.Count == 0) return true;
 
-        var answer = MessageBox.Show(
+        var answer = WinPure.Views.WinPureDialog.Show(
             Loc.F("Before you {0}, WinPure found:\n\n{1}\n\nContinue anyway?", what, SystemGuards.Describe(relevant)),
             Loc.T("WinPure — Check before continuing"), MessageBoxButton.YesNo, MessageBoxImage.Warning,
             MessageBoxResult.No);
@@ -744,7 +899,7 @@ public sealed class MainViewModel : ObservableObject
         if (irreversible.Count > 0)
         {
             var names = string.Join("\n  • ", irreversible.Select(c => Loc.T(c.Tweak.Name)));
-            var answer = MessageBox.Show(
+            var answer = WinPure.Views.WinPureDialog.Show(
                 Loc.F("These changes uninstall apps, and WinPure cannot undo them. To get an app back you would reinstall it yourself, from the Microsoft Store (OneDrive from microsoft.com):\n\n  • {0}\n\nRemove them?", names),
                 Loc.T("WinPure — Confirm app removal"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
             if (answer != MessageBoxResult.Yes) return;
@@ -753,14 +908,17 @@ public sealed class MainViewModel : ObservableObject
         bool futureUsers = ApplyToFutureUsers && FutureUsers.WritesFor(changes).Count > 0;
         if (futureUsers)
         {
-            var answer = MessageBox.Show(
+            var answer = WinPure.Views.WinPureDialog.Show(
                 Loc.T("These per-user settings will also be written into the Default profile, so accounts created later start with them. This changes C:\\Users\\Default and is undone from Restore. Continue?"),
                 Loc.T("WinPure — Apply to future users"), MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes);
             if (answer != MessageBoxResult.Yes) return;
         }
 
+        HideUndo();
         IsBusy = true;
         var progress = new Progress<string>(msg => StatusText = msg);
+        BackupSession? justMade = null;
+        int applied = 0;
         try
         {
             var results = await Task.Run(() => _engine.ApplyChanges(changes, progress, futureUsers));
@@ -769,6 +927,7 @@ public sealed class MainViewModel : ObservableObject
             if (results.Any(r => r.Success && r.Tweak.NotifiesMouseChange))
                 NativeMethods.ApplyMouseSettings();
             int failed = results.Count(r => !r.Success);
+            applied = results.Count(r => r.Success);
             bool needsExplorer = results.Any(r => r.Success && r.Tweak.RequiresExplorerRestart);
             bool needsReboot = results.Any(r => r.Success && r.Tweak.RequiresRestart);
 
@@ -778,9 +937,13 @@ public sealed class MainViewModel : ObservableObject
                 ? Loc.T("Finished with 1 error — see the log in %AppData%\\WinPure\\Logs.")
                 : Loc.F("Finished with {0} errors — see the log in %AppData%\\WinPure\\Logs.", failed);
 
+            // The apply just made one backup session (newest on disk). Remember it; the Undo banner is shown after
+            // the rescan below, once the busy veil is down. A removal-only batch captures nothing → no false promise.
+            justMade = _backupManager.ListSessions().FirstOrDefault();
+
             if (needsExplorer)
             {
-                var answer = MessageBox.Show(
+                var answer = WinPure.Views.WinPureDialog.Show(
                     Loc.T("Some changes need File Explorer to restart to take effect.\nRestart Explorer now?"),
                     "WinPure", MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (answer == MessageBoxResult.Yes)
@@ -788,7 +951,7 @@ public sealed class MainViewModel : ObservableObject
             }
             else if (needsReboot)
             {
-                MessageBox.Show(Loc.T("Some changes will take full effect after a reboot."), "WinPure",
+                WinPure.Views.WinPureDialog.Show(Loc.T("Some changes will take full effect after a reboot."), "WinPure",
                     MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
@@ -797,6 +960,10 @@ public sealed class MainViewModel : ObservableObject
             IsBusy = false;
         }
         await ScanAsync();
+
+        // Shown after the rescan so it appears over the settled page, not over the busy veil.
+        if (applied > 0 && justMade is { Entries.Count: > 0 })
+            ShowUndo(justMade, applied);
     }
 
     /// <summary>
@@ -808,6 +975,7 @@ public sealed class MainViewModel : ObservableObject
         if (startupPage.PendingCount == 0) return;
         if (!ConfirmDespiteGuards(Loc.T("change startup apps"), SystemGuards.ForStartup)) return;
 
+        HideUndo();   // the startup batch is its own thing; retire any banner from a previous tweak apply
         IsBusy = true;
         StatusText = Loc.T("Applying startup changes…");
         try
@@ -818,7 +986,7 @@ public sealed class MainViewModel : ObservableObject
                 ? (applied == 1 ? Loc.T("Done — 1 startup change applied.") : Loc.F("Done — {0} startup changes applied.", applied))
                 : Loc.F("{0} applied, {1} could not be changed — see the log in %AppData%\\WinPure\\Logs.", applied, failed);
             if (failed > 0)
-                MessageBox.Show(Loc.F("{0} startup change(s) could not be applied. See the log in %AppData%\\WinPure\\Logs.", failed),
+                WinPure.Views.WinPureDialog.Show(Loc.F("{0} startup change(s) could not be applied. See the log in %AppData%\\WinPure\\Logs.", failed),
                     "WinPure", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
@@ -843,17 +1011,43 @@ public sealed class MainViewModel : ObservableObject
         // Restoring as the wrong user writes the per-user half of the backup into the wrong profile.
         if (!ConfirmDespiteGuards(Loc.T("restore this backup"), SystemGuards.ForRestore)) return;
 
-        var answer = MessageBox.Show(
+        var answer = WinPure.Views.WinPureDialog.Show(
             Loc.F("Restore the snapshot from {0}?\nAll {1} captured values will be written back.", vm.Title, vm.Session.Entries.Count),
-            Loc.T("WinPure — Restore backup"), MessageBoxButton.YesNo, MessageBoxImage.Question);
+            Loc.T("WinPure — Restore backup"), MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) return;
 
+        await DoRestore(vm.Session);
+    }
+
+    // The one-click Undo of the batch just applied. It knows the exact session, so it skips the "pick which
+    // backup" step — but keeps the same guard (restoring as the wrong user misplaces per-user values) and a
+    // confirmation. Underneath it is the very same restore Restore uses, so it is reversible in turn from there.
+    private async Task UndoLastAsync()
+    {
+        var session = _lastBackupSession;
+        if (session is null) return;
+        if (!ConfirmDespiteGuards(Loc.T("undo the changes you just applied"), SystemGuards.ForRestore)) return;
+
+        var answer = WinPure.Views.WinPureDialog.Show(
+            _lastAppliedCount == 1
+                ? Loc.T("Undo the change you just applied? Its backed-up value is written back.")
+                : Loc.F("Undo the {0} changes you just applied? Their backed-up values are written back.", _lastAppliedCount),
+            Loc.T("WinPure — Undo"), MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (answer != MessageBoxResult.Yes) return;
+
+        HideUndo();
+        await DoRestore(session);
+    }
+
+    // Shared by Restore and the Undo banner: writes a whole session back, repaints for theme/mouse values, and
+    // rescans. A snapshot may include theme or mouse values — make open apps repaint and re-read the pointer.
+    private async Task DoRestore(BackupSession session)
+    {
         IsBusy = true;
         StatusText = Loc.T("Restoring backup…");
         try
         {
-            int failures = await Task.Run(() => _backupManager.RestoreSession(vm.Session));
-            // a snapshot may include theme or mouse values — make open apps repaint and re-read the pointer
+            int failures = await Task.Run(() => _backupManager.RestoreSession(session));
             NativeMethods.BroadcastThemeChange();
             NativeMethods.ApplyMouseSettings();
             StatusText = failures == 0 ? Loc.T("Backup restored.")
@@ -873,9 +1067,9 @@ public sealed class MainViewModel : ObservableObject
         // list is that account's backups, not the signed-in user's — and deleting cannot be undone.
         if (!ConfirmDespiteGuards(Loc.T("delete this backup"), SystemGuards.ForRestore)) return;
 
-        var answer = MessageBox.Show(
+        var answer = WinPure.Views.WinPureDialog.Show(
             Loc.F("Delete the backup from {0}? This cannot be undone.", vm.Title),
-            Loc.T("WinPure — Delete backup"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            Loc.T("WinPure — Delete backup"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) return;
         _backupManager.DeleteSession(vm.Session);
         LoadBackups();

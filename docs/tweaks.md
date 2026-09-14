@@ -47,7 +47,7 @@ Built-in features switched off without uninstalling anything. Removing apps has 
 | Disable Copilot / Windows AI | Aggressive | `TurnOffWindowsCopilot = 1` (HKLM + HKCU) + taskbar button off |
 | Disable Windows AI & Recall | Aggressive | `WindowsAI!DisableAIDataAnalysis = 1` (HKLM + HKCU), `AllowRecallEnablement = 0`, `AllowRecallExport = 0`, Notepad AI off, AI Settings page hidden |
 | Disable Click to Do | Balanced | `WindowsAI!DisableClickToDo = 1` (HKLM + HKCU) - the AI overlay on selected text/images |
-| Disable Paint AI Features | Manual | `CurrentVersion\Policies\Paint!DisableCocreator / DisableImageCreator / DisableGenerativeFill = 1` |
+| Disable Paint AI Features | Aggressive | `CurrentVersion\Policies\Paint!DisableCocreator / DisableImageCreator / DisableGenerativeFill = 1` |
 | Disable Game Bar Capture | Manual | `GameDVR!AppCaptureEnabled = 0` + `GameBar!ShowStartupPanel = 0` — nothing uninstalled; an alternative to removing Xbox |
 | Disable Game Bar Integration | Manual | `GameBar!UseNexusForGameBarEnabled = 0` + do-nothing handler under `HKCU\SOFTWARE\Classes\ms-gamebar` — silences the ms-gamebar popup after removing Xbox |
 
@@ -66,7 +66,7 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Disable Geolocation Service | Balanced | `lfsvc` | Manual |
 | Disable Fax Service | Balanced | `Fax` | Manual |
 | Disable Bluetooth Support | Manual | `bthserv` | Manual |
-| Set Windows AI Fabric to Manual | Manual | `WSAIFabricSvc` (start mode set to Manual, not Disabled) | Automatic |
+| Set Windows AI Fabric to Manual | Aggressive | `WSAIFabricSvc` (start mode set to Manual, not Disabled) | Automatic |
 
 ## 🚀 Performance
 
@@ -74,18 +74,18 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 |---|---|---|
 | Faster App Timeouts | Safe | `WaitToKillAppTimeout 5000→2000`, `HungAppTimeout 5000→1000` |
 | Faster System Shutdown | Balanced | `WaitToKillServiceTimeout 5000→2000` |
-| Disable Window Animations | Manual | `MinAnimate = 0`, taskbar animations off |
+| Disable Window Animations | Aggressive | `MinAnimate = 0`, taskbar animations off |
 | Prioritize Foreground Apps | Balanced | `Win32PrioritySeparation = 38` |
 | Disable Hibernation | Manual | `powercfg /hibernate off` (frees hiberfil.sys); undo restores the setting this PC had |
 | High Performance Power Plan | Manual | `powercfg /setactive` High Performance (not for laptops); undo returns to the plan that was active |
-| Disable Reserved Storage | Manual | `Set-WindowsReservedStorageState -State Disabled` (frees the update reserve) |
-| Disable Fullscreen Optimizations | Manual | `GameDVR_DXGIHonorFSEWindowsCompatible = 1` |
+| Disable Reserved Storage | Aggressive | `Set-WindowsReservedStorageState -State Disabled` (frees the update reserve) |
+| Disable Fullscreen Optimizations | Aggressive | `GameDVR_DXGIHonorFSEWindowsCompatible = 1` |
 | Disable Mouse Acceleration | Manual | `MouseSpeed/Threshold1/Threshold2 = 0` |
-| Enable Long Paths | Manual | `FileSystem!LongPathsEnabled = 1` |
+| Enable Long Paths | Aggressive | `FileSystem!LongPathsEnabled = 1` |
 | Disable Remote Desktop | Manual | `fDenyTSConnections = 1` — on Pro this disables a feature that works |
 | Disable Fast Startup | Balanced | `Session Manager\Power!HiberbootEnabled = 0` |
 | Don't Get Updates As Soon As They're Available | Balanced | `WindowsUpdate\UX\Settings!IsContinuousInnovationOptedIn = 0` — security updates unaffected |
-| Enable Daily Registry Backup | Manual | `Configuration Manager!EnablePeriodicBackup = 1` |
+| Enable Daily Registry Backup | Balanced | `Configuration Manager!EnablePeriodicBackup = 1` |
 | Sync the Clock With pool.ntp.org | Manual | `W32Time\Parameters!NtpServer = pool.ntp.org,0x9` (same flags as stock: only the server changes) |
 | Keep driver updates out of Windows Update | Balanced | `WindowsUpdate!ExcludeWUDriversInQualityUpdate = 1` (policy) — WU stops pushing driver updates |
 | Don't force a reboot after updates while signed in | Balanced | `WindowsUpdate\AU!NoAutoRebootWithLoggedOnUsers = 1` (policy) — updates still install |
@@ -97,8 +97,8 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Enable Dark Mode | Safe | `AppsUseLightTheme = 0`, `SystemUsesLightTheme = 0` |
 | Disable Snap Assist Flyout | Manual | `EnableSnapAssistFlyout = 0` |
 | Hide Suggestions in Start | Safe | Subscribed content + `Start_IrisRecommendations = 0` |
-| Hide Most Used Apps in Start | Manual | `ShowOrHideMostUsedApps = 2` |
-| Hide Recently Added Apps in Start | Manual | `HideRecentlyAddedApps = 1` |
+| Hide Most Used Apps in Start | Balanced | `ShowOrHideMostUsedApps = 2` |
+| Hide Recently Added Apps in Start | Balanced | `HideRecentlyAddedApps = 1` |
 | Hide 'New App Installed' Badge | Safe | `NoNewAppAlert = 1` |
 | Show File Extensions | Safe | `HideFileExt = 0` |
 | Show Hidden Files | Manual | `Hidden = 1` |
@@ -114,9 +114,9 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | End Task on Taskbar Right-Click | Safe | `TaskbarDeveloperSettings!TaskbarEndTask = 1` |
 | Disable Aero Shake | Safe | `DisallowShaking = 1` |
 | Speed up menu animations | Balanced | `Control Panel\Desktop!MenuShowDelay = 0` — instant submenus (stock 400 ms) |
-| Stop the Sticky Keys shortcut prompt | Manual | Accessibility `Flags`: StickyKeys 506, Keyboard Response 122, ToggleKeys 58 — turns off the 5×-Shift popup, not the feature |
+| Stop the Sticky Keys shortcut prompt | Balanced | Accessibility `Flags`: StickyKeys 506, Keyboard Response 122, ToggleKeys 58 — turns off the 5×-Shift popup, not the feature |
 | Hide the taskbar search box | Balanced | `Search!SearchboxTaskbarMode = 0` — search still works from Start |
-| Turn off transparency effects | Manual | `Themes\Personalize!EnableTransparency = 0` (repaints without a sign-out) |
+| Turn off transparency effects | Aggressive | `Themes\Personalize!EnableTransparency = 0` (repaints without a sign-out) |
 | Open File Explorer to This PC | Balanced | `Explorer\Advanced!LaunchTo = 1` (default 2 = Home) |
 | Keep Edge tabs out of Alt+Tab | Balanced | `Explorer\Advanced!MultiTaskingAltTabFilter = 3` |
 | Never combine taskbar buttons | Balanced | `Explorer\Advanced!TaskbarGlomLevel = 2`, `MMTaskbarGlomLevel = 2` |
@@ -137,7 +137,7 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Remove 'Share' | Manual | Deletes the `ModernSharing` handler under `AllFileSystemObjects` (recreated on revert) |
 | Remove 'Give access to' | Safe | Deletes the 6 `Sharing` handlers: files, folders, background, drives & both library folders |
 | Remove 'Cast to device' | Manual | Blocked shell extension `{7AD84985-87B4-4a16-BE58-8B72A5B390F7}` (Play To Menu) |
-| Remove 'Include in library' | Manual | Deletes the `Library Location` handler under `Folder\ShellEx\ContextMenuHandlers` (recreated on revert) |
+| Remove 'Include in library' | Aggressive | Deletes the `Library Location` handler under `Folder\ShellEx\ContextMenuHandlers` (recreated on revert) |
 | Add 'Open PowerShell here' to folders | Manual | Per-user `Directory\Background\shell` verb running `powershell.exe` in the folder (undo deletes it) |
 | Add 'Take ownership' to the right-click menu | Manual | Per-user elevated `runas` verbs under `*\shell` and `Directory\shell` running `icacls /setowner *S-1-5-32-544` + `/grant` (undo deletes them) |
 | Add 'Run with priority' to programs | Manual | Per-user cascading `exefile\shell` verb running `start` with a priority flag (undo deletes the subtree) |
@@ -150,7 +150,7 @@ Switched with DISM (`Enable-` / `Disable-WindowsOptionalFeature -NoRestart`, nev
 | Tweak | Preset | Feature |
 |---|---|---|
 | Remove PowerShell 2.0 | Balanced | `MicrosoftWindowsPowerShellV2Root`, which takes `MicrosoftWindowsPowerShellV2` with it (already gone on current 25H2) |
-| Turn Off SMB 1.0 | Manual | `SMB1Protocol` |
+| Turn Off SMB 1.0 | Aggressive | `SMB1Protocol` |
 | Remove the XPS Document Writer | Manual | `Printing-XPSServices-Features` |
 | Remove Windows Media Player Legacy | Manual | `WindowsMediaPlayer` (Media Features stay on) |
 | Remove the Work Folders Client | Manual | `WorkFolders-Client` |

@@ -587,7 +587,7 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
-            Id = "apps-paint-ai", Category = TweakCategory.Apps, Preset = PresetLevel.Manual,
+            Id = "apps-paint-ai", Category = TweakCategory.Apps, Preset = PresetLevel.Aggressive,
             Name = "Disable Paint AI Features",
             Description = "Turn off Cocreator, Image Creator and generative fill in Paint.",
             Help = "Removes the AI buttons from Paint's toolbar. The three policies come from this machine's own WindowsCopilot.admx, which puts them under CurrentVersion\\Policies\\Paint (machine scope).",
@@ -841,7 +841,7 @@ public static class TweakCatalog
         // Automatic on this 26H2 26200 machine; revert restores Automatic.
         yield return new Tweak
         {
-            Id = "svc-ai-fabric", Category = TweakCategory.Services, Preset = PresetLevel.Manual,
+            Id = "svc-ai-fabric", Category = TweakCategory.Services, Preset = PresetLevel.Aggressive,
             Name = "Set Windows AI Fabric to Manual",
             Description = "Stop the Windows AI Fabric service (WSAIFabricSvc) from starting automatically. It can still start on demand.",
             Help = "Sets the service start mode to Manual (3) instead of Automatic. Fits the catalog's other AI opt-outs (Copilot, Windows AI). Not fully disabled, so it stays available if something asks for it; undo restores Automatic.",
@@ -885,7 +885,7 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
-            Id = "perf-animations", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
+            Id = "perf-animations", Category = TweakCategory.Performance, Preset = PresetLevel.Aggressive,
             Name = "Disable Window Animations",
             Description = "Turn off minimize/maximize animations. For low-end hardware.",
             Icon = "", RequiresExplorerRestart = true,
@@ -942,7 +942,7 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
-            Id = "perf-reserved-storage", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
+            Id = "perf-reserved-storage", Category = TweakCategory.Performance, Preset = PresetLevel.Aggressive,
             Name = "Disable Reserved Storage",
             Description = "Stop Windows from setting aside several GB so that updates always have room to install.",
             Help = "Without the reserve, a nearly full disk can make an update fail until you free up space yourself. Windows refuses the change while an update is using the reserve; try again once it has finished. Undo turns the reserve back on only if this PC had it.",
@@ -960,7 +960,7 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
-            Id = "perf-fullscreen-opt", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
+            Id = "perf-fullscreen-opt", Category = TweakCategory.Performance, Preset = PresetLevel.Aggressive,
             Name = "Disable Fullscreen Optimizations",
             Description = "Use true exclusive fullscreen in games for lower input latency.",
             Help = "From Chris Titus WinUtil. Note: disables color management in exclusive fullscreen.",
@@ -989,7 +989,7 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
-            Id = "perf-long-paths", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
+            Id = "perf-long-paths", Category = TweakCategory.Performance, Preset = PresetLevel.Aggressive,
             Name = "Enable Long Paths",
             Description = "Allow file paths longer than 260 characters.",
             Icon = "",
@@ -1046,7 +1046,7 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
-            Id = "perf-registry-backup", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
+            Id = "perf-registry-backup", Category = TweakCategory.Performance, Preset = PresetLevel.Balanced,
             Name = "Enable Daily Registry Backup",
             Description = "Have Windows copy the registry to RegBack during idle maintenance, as it once did by default.",
             Help = "A safety net if the registry is ever damaged. It uses some disk space — one copy of each registry hive. The RegIdleBackup task that does the copying is already enabled on current Windows; this turns on the setting it checks.",
@@ -1145,7 +1145,7 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
-            Id = "ui-most-used", Category = TweakCategory.UI, Preset = PresetLevel.Manual,
+            Id = "ui-most-used", Category = TweakCategory.UI, Preset = PresetLevel.Balanced,
             Name = "Hide Most Used Apps in Start",
             Description = "Remove the 'Most used' apps list from the Start Menu.",
             Icon = "",
@@ -1157,7 +1157,7 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
-            Id = "ui-recently-added", Category = TweakCategory.UI, Preset = PresetLevel.Manual,
+            Id = "ui-recently-added", Category = TweakCategory.UI, Preset = PresetLevel.Balanced,
             Name = "Hide Recently Added Apps in Start",
             Description = "Remove the 'Recently added' apps list from the Start Menu.",
             Icon = "",
@@ -1373,7 +1373,7 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
-            Id = "ui-sticky-keys-prompt", Category = TweakCategory.UI, Preset = PresetLevel.Manual,
+            Id = "ui-sticky-keys-prompt", Category = TweakCategory.UI, Preset = PresetLevel.Balanced,
             Name = "Stop the Sticky Keys shortcut prompt",
             Description = "Turn off the pop-up that appears when you press Shift five times, and the Filter/Toggle Keys chimes.",
             Help = "Clears the activation-shortcut bit in the Sticky, Filter and Toggle Keys Flags (Accessibility). It only turns off the shortcut prompt — the accessibility features themselves still work if you enable them in Settings. Undo restores the flags you had.",
@@ -1401,7 +1401,7 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
-            Id = "ui-transparency", Category = TweakCategory.UI, Preset = PresetLevel.Manual,
+            Id = "ui-transparency", Category = TweakCategory.UI, Preset = PresetLevel.Aggressive,
             Name = "Turn off transparency effects",
             Description = "Make the Start menu, taskbar and other surfaces solid instead of translucent — a small GPU saving.",
             Help = "Sets Themes\\Personalize!EnableTransparency to 0 and broadcasts the theme-change so it repaints without a sign-out.",
@@ -1533,7 +1533,7 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
-            Id = "features-smb1", Category = TweakCategory.Features, Preset = PresetLevel.Manual,
+            Id = "features-smb1", Category = TweakCategory.Features, Preset = PresetLevel.Aggressive,
             Name = "Turn Off SMB 1.0",
             Description = "Turn off the obsolete file-sharing protocol the WannaCry ransomware spread through.",
             Help = "Already off on a clean Windows 11; this catches PCs upgraded from older versions. Very old NAS drives, printers and scanners that only speak SMB 1.0 stop working without it.",
@@ -1759,7 +1759,7 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
-            Id = "ctx-include-in-library", Category = TweakCategory.ContextMenu, Preset = PresetLevel.Manual,
+            Id = "ctx-include-in-library", Category = TweakCategory.ContextMenu, Preset = PresetLevel.Aggressive,
             Name = "Remove 'Include in library'",
             Description = "Remove the legacy 'Include in library' entry from the folder right-click menu.",
             Help = "Deletes the Library Location handler key (same pattern as 'Remove Share'); the backup re-creates it on undo. HKCR resolves to HKLM\\Software\\Classes on this machine.",

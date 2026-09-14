@@ -65,7 +65,7 @@ public sealed class HostsViewModel : PageViewModel
     private void Save()
     {
         if (!Main.ConfirmDespiteGuards(Loc.T("edit the hosts file"), SystemGuards.ForRepair)) return;
-        var answer = MessageBox.Show(
+        var answer = WinPure.Views.WinPureDialog.Show(
             Loc.T("Write these changes to the hosts file? This affects how your PC resolves domain names. WinPure saves the current file first so you can undo this."),
             Loc.T("WinPure — Hosts file"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) return;
@@ -75,7 +75,7 @@ public sealed class HostsViewModel : PageViewModel
     private void Reset()
     {
         if (!Main.ConfirmDespiteGuards(Loc.T("reset the hosts file to the Windows default"), SystemGuards.ForRepair)) return;
-        var answer = MessageBox.Show(
+        var answer = WinPure.Views.WinPureDialog.Show(
             Loc.T("Replace the hosts file with the stock Windows default (comments only, no custom entries)? The current file is backed up first."),
             Loc.T("WinPure — Hosts file"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) return;
@@ -85,7 +85,7 @@ public sealed class HostsViewModel : PageViewModel
     private void Undo()
     {
         if (!Main.ConfirmDespiteGuards(Loc.T("undo the last hosts change"), SystemGuards.ForRepair)) return;
-        var answer = MessageBox.Show(
+        var answer = WinPure.Views.WinPureDialog.Show(
             Loc.T("Restore the hosts file WinPure backed up before the last save? Any unsaved edits in the editor are discarded."),
             Loc.T("WinPure — Hosts file"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) return;

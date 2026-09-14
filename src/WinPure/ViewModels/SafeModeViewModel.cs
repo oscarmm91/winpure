@@ -46,7 +46,7 @@ public sealed class SafeModeViewModel : PageViewModel
     private void Enter(SafeBoot mode)
     {
         if (!Main.ConfirmDespiteGuards(Loc.T("set the next restart to Safe Mode"), SystemGuards.ForRepair)) return;
-        var answer = MessageBox.Show(
+        var answer = WinPure.Views.WinPureDialog.Show(
             Loc.T("Windows will start in Safe Mode on the NEXT restart, and stay that way until you change it back. To return to a normal Windows: open this page again (it works in Safe Mode) and click 'Restore normal boot', then restart. Continue?"),
             Loc.T("WinPure — Safe Mode"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) return;
@@ -89,7 +89,7 @@ public sealed class SafeModeViewModel : PageViewModel
 
     private void OfferRestart()
     {
-        var answer = MessageBox.Show(
+        var answer = WinPure.Views.WinPureDialog.Show(
             Loc.T("Restart now to apply the boot change?"),
             Loc.T("WinPure — Safe Mode"), MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) return;

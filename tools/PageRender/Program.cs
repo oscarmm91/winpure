@@ -106,6 +106,10 @@ internal static class Program
             // Hardware reads read-only hardware facts from the registry when opened.
             vm.CurrentNav = vm.NavItems.First(n => n.Page is HardwareViewModel);
             Render(root, Path.Combine(outDir, "15-hardware.png"));
+
+            // PATH editor lists the user PATH (read-only analysis) when opened.
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is PathViewModel);
+            Render(root, Path.Combine(outDir, "16-path.png"));
             return 0;
         }
         catch (Exception ex)

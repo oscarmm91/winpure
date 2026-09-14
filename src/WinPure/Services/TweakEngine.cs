@@ -112,6 +112,16 @@ public sealed class TweakEngine
         return result;
     }
 
+    /// <summary>Rewrites a PATH (user or machine) to the kept entries, capturing the old PATH into a backup first.</summary>
+    public int ApplyPath(PathScope scope, IReadOnlyList<string> keptEntries)
+    {
+        var session = _backupManager.CreateSession();
+        int removed = PathService.Apply(scope, keptEntries, session, () => FlushSnapshot(session));
+        try { _backupManager.SaveSession(session); }
+        catch (Exception ex) { LogService.Log($"The PATH backup could not be finalised: {ex.Message}"); }
+        return removed;
+    }
+
     private void ApplyTweak(Tweak tweak, BackupSession session)
     {
         foreach (var action in tweak.Actions)

@@ -122,6 +122,7 @@ failures += FreeingMemoryReportsBeforeAndAfterWithoutTouchingRealMemory() ? 0 : 
 failures += PowerActionsGoToTheBackendWithoutTouchingTheRealMachine() ? 0 : 1;
 failures += DiagnosticsExportsASystemBundleWithoutTouchingTheSystem() ? 0 : 1;
 failures += HardwareInfoIsReadOnlyAndLabelled() ? 0 : 1;
+failures += PathEditorFlagsEntriesBacksUpBeforeWritingAndRestores() ? 0 : 1;
 failures += DnsCapturesCurrentServersAndRestorePutsThemBack() ? 0 : 1;
 failures += AServiceCanBeSetToManualNotJustDisabled() ? 0 : 1;
 failures += CreatingAContextMenuKeyIsUndoneByDeletingIt() ? 0 : 1;
@@ -1581,6 +1582,73 @@ bool HardwareInfoIsReadOnlyAndLabelled()
     return Report("hardware info is read-only, labelled and never throws",
         problems.Count == 0,
         problems.Count == 0 ? "sections returned with Processor.Model and Memory.Total, stable across calls, no blank rows" : string.Join(" | ", problems));
+}
+
+// The PATH editor rewrites a PATH reversibly. It runs against a throwaway registry key, never the real PATH:
+// entries are flagged cautiously (a disconnected drive is Unverifiable, never "dead"), the whole PATH is
+// captured into the backup BEFORE the write, and RestoreEntry puts the original back.
+bool PathEditorFlagsEntriesBacksUpBeforeWritingAndRestores()
+{
+    const string testKey = @"HKCU\Software\WinPureTests\PathUser";
+    string savedUser = WinPure.Services.PathService.UserKey;
+    var problems = new List<string>();
+    try
+    {
+        WinPure.Services.PathService.UserKey = testKey;
+        using (var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\WinPureTests\PathUser"))
+            k!.SetValue("Path", @"C:\Windows;C:\Windows;C:\WinPureNoSuchDir_ZZZ;;Q:\NotConnected",
+                Microsoft.Win32.RegistryValueKind.ExpandString);
+
+        var scope = WinPure.Services.PathScope.User;
+        var analyzed = WinPure.Services.PathService.Analyze(scope);
+        // Expected: None, Duplicate, Missing (C: is fixed+ready), Empty, Unverifiable (Q: not connected).
+        var issues = analyzed.Select(e => e.Issue).ToList();
+        if (issues.Count != 5) problems.Add($"expected 5 entries, got {issues.Count}");
+        else
+        {
+            if (issues[0] != WinPure.Services.PathIssue.None) problems.Add($"[0] should be None, was {issues[0]}");
+            if (issues[1] != WinPure.Services.PathIssue.Duplicate) problems.Add($"[1] should be Duplicate, was {issues[1]}");
+            if (issues[2] != WinPure.Services.PathIssue.Missing) problems.Add($"[2] should be Missing, was {issues[2]}");
+            if (issues[3] != WinPure.Services.PathIssue.Empty) problems.Add($"[3] should be Empty, was {issues[3]}");
+            if (issues[4] != WinPure.Services.PathIssue.Unverifiable) problems.Add($"[4] should be Unverifiable (disconnected drive), was {issues[4]}");
+        }
+
+        string original = WinPure.Services.PathService.ReadRaw(scope);
+        var session = new WinPure.Models.BackupSession { Id = "path-test" };
+        string? snapshotAtFlush = null;
+        var kept = analyzed
+            .Where(e => e.Issue is WinPure.Services.PathIssue.None or WinPure.Services.PathIssue.Unverifiable)
+            .Select(e => e.Value).ToList();
+        int removed = WinPure.Services.PathService.Apply(scope, kept, session, () => snapshotAtFlush = WinPure.Services.PathService.ReadRaw(scope));
+
+        // The backup must be flushed with the ORIGINAL PATH, before the new one is written.
+        if (snapshotAtFlush != original) problems.Add("the snapshot was taken AFTER the write (invariant broken)");
+        if (session.Entries.Count != 1 || session.Entries[0].Value != original)
+            problems.Add("the backup did not capture the original PATH");
+        if (removed < 1) problems.Add("nothing was reported removed");
+
+        string after = WinPure.Services.PathService.ReadRaw(scope);
+        if (after.Contains("NoSuchDir") || after.Contains(";;")) problems.Add($"dead/empty entries survived: '{after}'");
+        if (!after.Contains(@"Q:\NotConnected")) problems.Add("a disconnected-drive entry was wrongly removed");
+
+        // Restore puts the whole original PATH back.
+        WinPure.Services.PathService.RestoreEntry(session.Entries[0]);
+        if (WinPure.Services.PathService.ReadRaw(scope) != original) problems.Add("Restore did not put the original PATH back");
+
+        // A forged PATH value with a control character is refused.
+        if (WinPure.Services.PathService.IsValidPathValue("a;\u0001evil;b")) problems.Add("a control character passed the PATH guard");
+        if (!WinPure.Services.PathService.IsValidPathValue(original)) problems.Add("a real PATH was wrongly rejected");
+    }
+    catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
+    finally
+    {
+        WinPure.Services.PathService.UserKey = savedUser;
+        try { Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(@"Software\WinPureTests\PathUser", throwOnMissingSubKey: false); } catch { }
+    }
+
+    return Report("the PATH editor flags entries, backs up before writing, and Restore puts it back",
+        problems.Count == 0,
+        problems.Count == 0 ? "cautious flags (disconnected drive left alone), snapshot-before-write, and a clean restore" : string.Join(" | ", problems));
 }
 
 // Power actions route to the swappable backend with the right arguments, and only Shutdown/Restart carry a

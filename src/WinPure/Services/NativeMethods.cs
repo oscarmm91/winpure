@@ -84,6 +84,23 @@ public static class NativeMethods
     }
 
     /// <summary>
+    /// Tells running apps the environment (PATH) changed, so a newly started program picks up the new PATH.
+    /// Already-running processes keep their old PATH until they restart — Windows offers no way around that.
+    /// </summary>
+    public static void BroadcastEnvironmentChange()
+    {
+        try
+        {
+            SendMessageTimeout(HwndBroadcast, WmSettingChange, IntPtr.Zero, "Environment", SmtoAbortIfHung, 100, IntPtr.Zero);
+            SendNotifyMessage(HwndBroadcast, WmSettingChange, IntPtr.Zero, "Environment");
+        }
+        catch
+        {
+            // best-effort notification; the registry write is what persists
+        }
+    }
+
+    /// <summary>
     /// Pushes the current Control Panel\Mouse acceleration values to the live session (SPI_SETMOUSE) so a mouse
     /// tweak takes effect without signing out. The tweak already wrote the registry (which persists across logins);
     /// this only syncs the running pointer to it. Best-effort — never breaks an apply.

@@ -66,6 +66,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly DispatcherTimer _liveTimer;
     private readonly DnsViewModel _dns;
     private readonly HostsViewModel _hosts;
+    private readonly PathViewModel _path;
     private readonly InstallerViewModel _installer;
 
     /// <summary>The Remove Apps banner, also shown above search results that include an app removal.</summary>
@@ -195,6 +196,14 @@ public sealed class MainViewModel : ObservableObject
             Main = this,
         };
         NavItems.Add(new NavItem { Label = "Hosts", Glyph = ((char)0xE8A5).ToString(), Page = _hosts });
+        _path = new PathViewModel(_engine)
+        {
+            Title = "PATH editor",
+            Subtitle = "Review the folders on your PATH and remove the dead, duplicate or empty ones. WinPure backs up the "
+                     + "whole PATH first, so Restore can put it back. Entries on drives that are not connected are left alone.",
+            Main = this,
+        };
+        NavItems.Add(new NavItem { Label = "PATH", Glyph = ((char)0xE8FD).ToString(), Page = _path });
         NavItems.Add(new NavItem { Label = "Restore", Glyph = "", Page = _restore });
 
         // The two pages whose changes Restore cannot undo sit together at the bottom, apart from everything else.
@@ -281,6 +290,7 @@ public sealed class MainViewModel : ObservableObject
             if (value.Page == _memory) _memory.Load();   // re-read RAM each time the page opens
             if (value.Page == _diagnostics && !_diagnostics.HasLoaded) _diagnostics.Load();
             if (value.Page == _hardware && !_hardware.HasLoaded) _hardware.Load();
+            if (value.Page == _path && !_path.HasLoaded) _path.Load();
             SyncLiveTimer();
             OnPropertyChanged();
             OnPropertyChanged(nameof(CurrentPage));

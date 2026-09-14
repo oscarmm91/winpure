@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.1.0 — more of the toolbox
+
+More of the utility toolbox, each page reversible where it can be and clearly "no undo" where it cannot:
+
+- **Move folder** — move a big folder to another drive and leave a junction behind, so programs still find it. The data is copied and verified BEFORE the original is removed, so an interrupted move never loses anything. It refuses system folders, whole user profiles, same-drive moves, and moves without enough free space, and never follows junctions inside the folder.
+- **Uninstall Apps** — remove any installed program by running its own uninstaller. Judged by whether the program is actually gone afterwards, never by an exit code. Not undone by Restore.
+- **Hardware** — a read-only look at the processor, memory, graphics, drives and motherboard, read from the registry — no driver and no extra dependency.
+- **PATH editor** — review the user or machine PATH and remove the dead, duplicate and empty entries, reversibly (the whole PATH is backed up first). A folder on a drive that is not connected is never treated as dead.
+- **Safe Mode** — restart into Windows Safe Mode (with or without networking) and back. Restoring normal boot is always one click and works from inside Safe Mode too.
+- **Context menu** — added "Take ownership" (files and folders) and a "Run with priority" submenu for programs.
+- **Disable mouse acceleration** now takes effect immediately, without signing out.
+- **Install** — added the DirectX End-User Runtime.
+
+Reversible tweaks: **139** (up from 137). Everything reversible still rolls back from the Restore page.
+
 ## 2.0.0 — WinPure, all-in-one
 
 WinPure grows from a debloater into an all-in-one Windows 11 toolbox. On top of **137 reversible tweaks** (up from ~111, every key verified on a real machine and every policy cross-checked against its `.admx`):

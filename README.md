@@ -121,9 +121,15 @@ Candy Crush, TikTok/Facebook/X/Instagram, Netflix/Disney+/Prime/Spotify, Skype, 
 </details>
 
 <details>
-<summary>📥 <b>Install Apps</b> — 23 apps with winget</summary>
+<summary>📥 <b>Install Apps</b> — 24 apps with winget, or search for any</summary>
 <br/>
-Browsers, 7-Zip, Everything, PowerToys, ShareX, Notepad++, password managers, VLC, OBS, Git, VS Code, Python, Node.js, Discord, Zoom, LibreOffice, Acrobat Reader, Steam and Epic — installed from their publishers with winget. Like an app removal, an install is something WinPure cannot undo, so it lives on its own page, in no preset, and asks before every install.
+Browsers, 7-Zip, Everything, PowerToys, ShareX, Notepad++, password managers, VLC, OBS, Git, VS Code, Python, Node.js, Discord, Zoom, LibreOffice, Acrobat Reader, Steam, Epic and the DirectX runtime — installed from their publishers with winget — plus a search box to install any other winget package. Like an app removal, an install is something WinPure cannot undo, so it lives on its own page, in no preset, and asks before every install.
+</details>
+
+<details>
+<summary>🗑️ <b>Uninstall Apps</b> — remove any installed program</summary>
+<br/>
+Every installed program in one filterable list, each removed by running its own uninstaller. Success is judged by whether the program is actually gone afterwards, never by an exit code. Like Install and Remove Apps, this is not undone by Restore, so it sits apart and confirms first.
 </details>
 
 <details>
@@ -140,6 +146,25 @@ Apps launched from the registry (per-user, machine-wide and 32-bit), shortcuts i
 Create a system restore point, repair system files (SFC + DISM), clean up the component store (DISM StartComponentCleanup), reset Windows Update components, reset the network stack, clean temporary files, re-register Store apps, update all apps (winget), install the Visual C++ redistributables.
 <br/><br/>
 <img src="docs/screenshots/repair.png" width="800"/>
+</details>
+
+<details>
+<summary>🧰 <b>Utility toolbox</b> — the all-in-one pages</summary>
+<br/>
+On top of the tweaks, WinPure bundles the tools you would otherwise reach for separately:
+<ul>
+<li><b>Home</b> — live memory and disk use, and count cards that open the filtered lists behind them.</li>
+<li><b>Clean up</b> — delete regenerable junk (temp, update and Delivery Optimization caches, browser and GPU shader caches, game-launcher caches, crash dumps, the Recycle Bin, a previous <code>Windows.old</code>) with a size preview. Permanent by design, separated from everything reversible.</li>
+<li><b>Free up memory</b> — an honest RAM trim that says plainly the gain is usually brief.</li>
+<li><b>DNS</b> — switch every adapter to Cloudflare, Quad9, AdGuard, Google, OpenDNS or back to automatic; your current servers are captured first so Restore puts them back.</li>
+<li><b>Hosts</b> — edit the hosts file with a multi-level backup and a one-click reset to the Windows default.</li>
+<li><b>PATH editor</b> — trim dead, duplicate and empty entries from the PATH, reversibly; a disconnected drive is never called dead.</li>
+<li><b>Move folder</b> — move a big folder to another drive and leave a junction behind; the data is copied and verified before the original is removed.</li>
+<li><b>Power</b> — schedule a shutdown or restart, or sleep, hibernate, lock and sign out now.</li>
+<li><b>Safe Mode</b> — restart into Safe Mode and back; restoring normal boot is always one click.</li>
+<li><b>Hardware</b> — a read-only look at the CPU, memory, graphics, drives and motherboard.</li>
+<li><b>Diagnostics</b> — a read-only system summary and a one-click support bundle you can save and share.</li>
+</ul>
 </details>
 
 <details>

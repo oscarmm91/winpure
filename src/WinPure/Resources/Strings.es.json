@@ -756,5 +756,11 @@
   "{0} free of {1}": "{0} libres de {1}",
   "All ({0})": "Todas ({0})",
   "On ({0})": "Activadas ({0})",
-  "Off ({0})": "Desactivadas ({0})"
+  "Off ({0})": "Desactivadas ({0})",
+  "Show the full path in the File Explorer title bar": "Mostrar la ruta completa en la barra de título del Explorador",
+  "Show the complete folder path (C:\\Users\\…) in Explorer's title bar and tab, not just the folder name.": "Muestra la ruta completa de la carpeta (C:\\Users\\…) en la barra de título y la pestaña del Explorador, no solo el nombre de la carpeta.",
+  "Sets CabinetState!FullPath to 1 (default 0). Undo restores 0. Takes effect on the next Explorer window.": "Pone CabinetState!FullPath en 1 (predeterminado 0). Deshacer restaura 0. Aplica en la siguiente ventana del Explorador.",
+  "Add 'Open PowerShell here' to folders": "Agregar 'Abrir PowerShell aquí' a las carpetas",
+  "Add an 'Open PowerShell here' entry to the right-click menu of a folder's empty space.": "Agrega una entrada 'Abrir PowerShell aquí' al menú contextual del espacio vacío de una carpeta.",
+  "Creates a per-user verb under Directory\\Background\\shell that runs powershell.exe in the folder. Undo deletes it.": "Crea un verbo por usuario bajo Directory\\Background\\shell que ejecuta powershell.exe en la carpeta. Deshacer lo borra."
 }

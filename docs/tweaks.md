@@ -123,6 +123,7 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Remove "- Shortcut" from new shortcut names | Balanced | `Explorer\NamingTemplates!ShortcutNameTemplate = "%s.lnk"` |
 | Hide Gallery from the navigation pane | Balanced | `HKCU\Software\Classes\CLSID\{e88865ea-...}!System.IsPinnedToNameSpaceTree = 0` (undo deletes it) |
 | Hide Home from the navigation pane | Manual | `HKCU\Software\Classes\CLSID\{f874310e-...}!System.IsPinnedToNameSpaceTree = 0` (undo deletes it) |
+| Show the full path in the File Explorer title bar | Manual | `CabinetState!FullPath = 1` (default 0) |
 
 ## 🖱️ Context Menu
 
@@ -137,6 +138,7 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Remove 'Give access to' | Safe | Deletes the 6 `Sharing` handlers: files, folders, background, drives & both library folders |
 | Remove 'Cast to device' | Manual | Blocked shell extension `{7AD84985-87B4-4a16-BE58-8B72A5B390F7}` (Play To Menu) |
 | Remove 'Include in library' | Manual | Deletes the `Library Location` handler under `Folder\ShellEx\ContextMenuHandlers` (recreated on revert) |
+| Add 'Open PowerShell here' to folders | Manual | Per-user `Directory\Background\shell` verb running `powershell.exe` in the folder (undo deletes it) |
 | Allow the Context Menu on More Than 15 Files | Balanced | `CurrentVersion\Explorer!MultipleInvokePromptMinimum = 300` |
 
 ## 🧩 Windows Features

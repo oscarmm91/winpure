@@ -87,7 +87,7 @@ Faster app timeouts & shutdown, foreground-app priority, window animations, hibe
 </details>
 
 <details>
-<summary>🎨 <b>UI & Personalization</b> — 29 tweaks</summary>
+<summary>🎨 <b>UI & Personalization</b> — 30 tweaks</summary>
 <br/>
 Dark mode, Snap Assist flyout, Start Menu suggestions/most-used/recently-added, "new app" badge, file extensions, hidden files, Widgets/Task View/Chat taskbar buttons, taskbar alignment, End Task on right-click, Aero Shake, search highlights, NumLock at sign-in, Spotlight wallpaper, "What's new" screens after updates, the F1 help key.
 <br/><br/>
@@ -95,7 +95,7 @@ Dark mode, Snap Assist flyout, Start Menu suggestions/most-used/recently-added, 
 </details>
 
 <details>
-<summary>🖱️ <b>Context Menu</b> — 10 tweaks</summary>
+<summary>🖱️ <b>Context Menu</b> — 11 tweaks</summary>
 <br/>
 Restore the classic Windows 10 right-click menu, remove "Edit with Clipchamp / Notepad / Photos", "Ask Copilot", "Share" and "Give access to", and lift the 15-file limit on right-click options.
 <br/><br/>

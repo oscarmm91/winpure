@@ -1492,6 +1492,19 @@ public static class TweakCatalog
                 Dword(@"HKCU\Software\Classes\CLSID\{f874310e-b6b7-47dc-bc84-b9e6b38f5903}", "System.IsPinnedToNameSpaceTree", 0, null),
             },
         };
+
+        yield return new Tweak
+        {
+            Id = "ui-fullpath-titlebar", Category = TweakCategory.UI, Preset = PresetLevel.Manual,
+            Name = "Show the full path in the File Explorer title bar",
+            Description = "Show the complete folder path (C:\\Users\\…) in Explorer's title bar and tab, not just the folder name.",
+            Help = "Sets CabinetState!FullPath to 1 (default 0). Undo restores 0. Takes effect on the next Explorer window.",
+            Icon = Glyph(0xE8A5), RequiresExplorerRestart = true,
+            Actions = new TweakAction[]
+            {
+                Dword(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\CabinetState", "FullPath", 1, 0),
+            },
+        };
     }
 
     // ------------------------------------------------------------------ Windows Features
@@ -1757,6 +1770,37 @@ public static class TweakCatalog
                     KeyPath = @"HKCR\Folder\ShellEx\ContextMenuHandlers\Library Location",
                     DeleteOnApply = true,
                     KeyDefaultValue = "{3dad6c5d-2167-4cae-9914-f99e41c12cfa}",
+                },
+            },
+        };
+
+        // Adds an entry to the right-click menu (most context-menu tweaks remove). Creates a per-user key
+        // under HKCU\Software\Classes so it needs no elevation and undo simply deletes it. The command uses
+        // -WorkingDirectory "%V", exactly like Windows' own built-in verb, so the folder path is a plain
+        // process argument and never reaches PowerShell's script parser — a folder name containing ' or ;
+        // cannot inject a command. (The mined "Copy/Move to folder" entries were dropped: Windows already
+        // registers those exact CLSIDs under the same key, and their Shift-only gate lives inside the CLSID,
+        // so a duplicate entry cannot un-gate it and would only show the item twice.)
+        yield return new Tweak
+        {
+            Id = "ctx-open-powershell-here", Category = TweakCategory.ContextMenu, Preset = PresetLevel.Manual,
+            Name = "Add 'Open PowerShell here' to folders",
+            Description = "Add an 'Open PowerShell here' entry to the right-click menu of a folder's empty space.",
+            Help = "Creates a per-user verb under Directory\\Background\\shell that runs powershell.exe in the folder. Undo deletes it.",
+            Icon = Glyph(0xE756), RequiresExplorerRestart = true,
+            Actions = new TweakAction[]
+            {
+                new RegistryKeyAction
+                {
+                    KeyPath = @"HKCU\Software\Classes\Directory\Background\shell\WinPureOpenPowerShell",
+                    DeleteOnApply = false,
+                    KeyDefaultValue = "Open PowerShell here",
+                },
+                new RegistryKeyAction
+                {
+                    KeyPath = @"HKCU\Software\Classes\Directory\Background\shell\WinPureOpenPowerShell\command",
+                    DeleteOnApply = false,
+                    KeyDefaultValue = "powershell.exe -NoExit -WorkingDirectory \"%V\"",
                 },
             },
         };

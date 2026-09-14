@@ -121,6 +121,7 @@ failures += HostsEditorBacksUpBeforeSavingAndCanUndoOrReset() ? 0 : 1;
 failures += FreeingMemoryReportsBeforeAndAfterWithoutTouchingRealMemory() ? 0 : 1;
 failures += DnsCapturesCurrentServersAndRestorePutsThemBack() ? 0 : 1;
 failures += AServiceCanBeSetToManualNotJustDisabled() ? 0 : 1;
+failures += CreatingAContextMenuKeyIsUndoneByDeletingIt() ? 0 : 1;
 ReportCatalogDeadWeightOnThisMachine();
 ReportPolicyWritesNotBackedByAnAdmx();
 
@@ -1620,6 +1621,47 @@ bool CleanupFolderKindDeletesTheWholeFolder()
     return Report("cleanup deletes a whole folder (Windows.old) and no-ops when it is absent",
         problems.Count == 0,
         problems.Count == 0 ? "measured 300, deleted the whole folder, freed 300; an absent folder is a no-op" : string.Join(" | ", problems));
+}
+
+// The additive context-menu tweak (Open PowerShell here) CREATES a registry key that did not exist.
+// Through the REAL engine path (ApplyChanges to apply, then ApplyChanges to revert, which restores from the
+// backup via BackupManager.RestoreEntry) applying must create the key with its default value and undo must
+// DELETE it — leaving no junk in the user's registry. Runs under HKCU\Software\WinPureTests (allowed by the
+// test-key prefix in BackupEntryPolicy).
+bool CreatingAContextMenuKeyIsUndoneByDeletingIt()
+{
+    const string sub = @"Software\WinPureTests\CtxCreate";
+    const string keyPath = @"HKCU\" + sub;
+    var problems = new List<string>();
+    bool Exists() { using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(sub); return k is not null; }
+    try
+    {
+        Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(sub, throwOnMissingSubKey: false);   // start absent
+        var tweak = new Tweak
+        {
+            Id = "test-ctx-create", Category = TweakCategory.ContextMenu, Name = "n", Description = "", Icon = "",
+            Actions = new TweakAction[] { new RegistryKeyAction { KeyPath = keyPath, DeleteOnApply = false, KeyDefaultValue = "{TESTCLSID}" } },
+        };
+        var engine = new TweakEngine(new BackupManager());
+
+        engine.ApplyChanges(new[] { (tweak, true) });
+        bool createdAfterApply = Exists();
+        string? defAfter;
+        using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(sub)) defAfter = k?.GetValue("") as string;
+
+        engine.ApplyChanges(new[] { (tweak, false) });   // revert restores from the backup captured above
+        bool existsAfterRevert = Exists();
+
+        if (!createdAfterApply) problems.Add("apply did not create the key");
+        if (defAfter != "{TESTCLSID}") problems.Add($"default value after apply = {defAfter ?? "(none)"}, expected {{TESTCLSID}}");
+        if (existsAfterRevert) problems.Add("undo did not delete the created key (registry junk left behind)");
+    }
+    catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
+    finally { try { Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(sub, throwOnMissingSubKey: false); } catch { } }
+
+    return Report("creating a context-menu key is undone by deleting it",
+        problems.Count == 0,
+        problems.Count == 0 ? "engine apply creates the key with its default; engine revert restores from the backup and deletes it" : string.Join(" | ", problems));
 }
 
 // A service tweak can target Manual (3), not only Disabled (4): "applied" then means the start mode

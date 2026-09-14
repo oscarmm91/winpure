@@ -61,6 +61,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly CleanupViewModel _cleanup;
     private readonly MemoryViewModel _memory;
     private readonly PowerViewModel _power;
+    private readonly DiagnosticsViewModel _diagnostics;
     private readonly DispatcherTimer _liveTimer;
     private readonly DnsViewModel _dns;
     private readonly HostsViewModel _hosts;
@@ -163,6 +164,13 @@ public sealed class MainViewModel : ObservableObject
             Main = this,
         };
         NavItems.Add(new NavItem { Label = "Power", Glyph = ((char)0xE7E8).ToString(), Page = _power });
+        _diagnostics = new DiagnosticsViewModel
+        {
+            Title = "Diagnostics",
+            Subtitle = "A read-only summary of this PC, and a support bundle you can save and share when something needs troubleshooting.",
+            Main = this,
+        };
+        NavItems.Add(new NavItem { Label = "Diagnostics", Glyph = ((char)0xE9D9).ToString(), Page = _diagnostics });
         _dns = new DnsViewModel(_engine)
         {
             Title = "DNS servers",
@@ -262,6 +270,7 @@ public sealed class MainViewModel : ObservableObject
             if (value.Page == _dns && !_dns.HasLoaded) _ = _dns.LoadAsync();
             if (value.Page == _hosts && !_hosts.HasLoaded) _hosts.Load();
             if (value.Page == _memory) _memory.Load();   // re-read RAM each time the page opens
+            if (value.Page == _diagnostics && !_diagnostics.HasLoaded) _diagnostics.Load();
             SyncLiveTimer();
             OnPropertyChanged();
             OnPropertyChanged(nameof(CurrentPage));

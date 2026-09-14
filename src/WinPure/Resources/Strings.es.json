@@ -811,5 +811,22 @@
   "shut down the PC": "apagar la PC",
   "Windows would not do that — the action may be turned off on this PC.": "Windows no hizo eso — la acción puede estar desactivada en esta PC.",
   "Game launcher caches": "Cachés de los lanzadores de juegos",
-  "The web/UI cache of game launchers (Steam, Epic, Battle.net). Regenerated on demand — not your games, saves or settings.": "La caché web/de interfaz de los lanzadores de juegos (Steam, Epic, Battle.net). Se regenera al momento — no son tus juegos, partidas ni ajustes."
+  "The web/UI cache of game launchers (Steam, Epic, Battle.net). Regenerated on demand — not your games, saves or settings.": "La caché web/de interfaz de los lanzadores de juegos (Steam, Epic, Battle.net). Se regenera al momento — no son tus juegos, partidas ni ajustes.",
+  "Diagnostics": "Diagnóstico",
+  "A read-only summary of this PC, and a support bundle you can save and share when something needs troubleshooting.": "Un resumen de solo lectura de esta PC, y un paquete de soporte que puedes guardar y compartir cuando algo necesite diagnóstico.",
+  "Windows": "Windows",
+  "Version": "Versión",
+  "Processor": "Procesador",
+  "Uptime": "Tiempo encendido",
+  "Device": "Dispositivo",
+  "WinPure": "WinPure",
+  "Support bundle": "Paquete de soporte",
+  "Export diagnostics": "Exportar diagnóstico",
+  "Copy system info": "Copiar info del sistema",
+  "Copied the system info to the clipboard.": "Se copió la info del sistema al portapapeles.",
+  "Could not copy to the clipboard.": "No se pudo copiar al portapapeles.",
+  "Saved the diagnostics bundle to {0}": "Se guardó el paquete de diagnóstico en {0}",
+  "Could not save the bundle: {0}": "No se pudo guardar el paquete: {0}",
+  "Save a zip with the WinPure logs and the system summary above, for troubleshooting. It holds no passwords, though the logs may include Windows file paths that contain your user name.": "Guarda un zip con los registros de WinPure y el resumen del sistema de arriba, para diagnóstico. No contiene contraseñas, aunque los registros pueden incluir rutas de Windows que contienen tu nombre de usuario.",
+  "Install date": "Instalado el"
 }

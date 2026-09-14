@@ -98,6 +98,10 @@ internal static class Program
             // Power page is inert until a button is clicked (nothing runs on open).
             vm.CurrentNav = vm.NavItems.First(n => n.Page is PowerViewModel);
             Render(root, Path.Combine(outDir, "13-power.png"));
+
+            // Diagnostics reads read-only system facts when opened.
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is DiagnosticsViewModel);
+            Render(root, Path.Combine(outDir, "14-diagnostics.png"));
             return 0;
         }
         catch (Exception ex)

@@ -120,6 +120,7 @@ failures += CleanupFolderKindDeletesTheWholeFolder() ? 0 : 1;
 failures += HostsEditorBacksUpBeforeSavingAndCanUndoOrReset() ? 0 : 1;
 failures += FreeingMemoryReportsBeforeAndAfterWithoutTouchingRealMemory() ? 0 : 1;
 failures += PowerActionsGoToTheBackendWithoutTouchingTheRealMachine() ? 0 : 1;
+failures += DiagnosticsExportsASystemBundleWithoutTouchingTheSystem() ? 0 : 1;
 failures += DnsCapturesCurrentServersAndRestorePutsThemBack() ? 0 : 1;
 failures += AServiceCanBeSetToManualNotJustDisabled() ? 0 : 1;
 failures += CreatingAContextMenuKeyIsUndoneByDeletingIt() ? 0 : 1;
@@ -1506,6 +1507,41 @@ bool DnsCapturesCurrentServersAndRestorePutsThemBack()
         problems.Count == 0
             ? "both adapters switched to the preset, their prior servers captured in one backup, and Restore set them back; the policy allows only IP lists or DHCP"
             : string.Join(" | ", problems));
+}
+
+// The Diagnostics page reads read-only system facts and exports a zip of the WinPure logs plus a system
+// summary to a chosen path. It never changes the system; the export runs against a throwaway logs folder.
+bool DiagnosticsExportsASystemBundleWithoutTouchingTheSystem()
+{
+    string dir = Path.Combine(Path.GetTempPath(), "winpure-diag-" + Guid.NewGuid().ToString("N")[..8]);
+    string logsDir = Path.Combine(dir, "logs");
+    Directory.CreateDirectory(logsDir);
+    string zipPath = Path.Combine(dir, "bundle.zip");
+    var problems = new List<string>();
+    try
+    {
+        var info = DiagnosticsService.Info();
+        if (info.Count == 0) problems.Add("Info returned no rows");
+        if (!info.Any(r => r.Label == "Windows")) problems.Add("Info is missing the Windows row");
+
+        File.WriteAllText(Path.Combine(logsDir, "session_test.log"), "hello log");
+        DiagnosticsService.LogsDirForTests = logsDir;
+        var (ok, err) = DiagnosticsService.Export(zipPath);
+        if (!ok) problems.Add($"export failed: {err}");
+        if (!File.Exists(zipPath)) problems.Add("no zip was written");
+        else
+        {
+            using var zip = System.IO.Compression.ZipFile.OpenRead(zipPath);
+            if (zip.GetEntry("winpure-system.txt") is null) problems.Add("the bundle has no system summary");
+            if (zip.GetEntry("logs/session_test.log") is null) problems.Add("the bundle did not include the logs");
+        }
+    }
+    catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
+    finally { DiagnosticsService.LogsDirForTests = null; try { Directory.Delete(dir, recursive: true); } catch { } }
+
+    return Report("diagnostics exports a system bundle without touching the system",
+        problems.Count == 0,
+        problems.Count == 0 ? "Info returns read-only rows; Export writes a zip with the system summary and the logs" : string.Join(" | ", problems));
 }
 
 // Power actions route to the swappable backend with the right arguments, and only Shutdown/Restart carry a

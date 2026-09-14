@@ -1,6 +1,22 @@
 # Changelog
 
-## Unreleased
+## 2.0.0 — WinPure, all-in-one
+
+WinPure grows from a debloater into an all-in-one Windows 11 toolbox. On top of **137 reversible tweaks** (up from ~111, every key verified on a real machine and every policy cross-checked against its `.admx`):
+
+- **Clean up** — delete regenerable junk (temp, Windows Update and Delivery Optimization caches, browser and GPU shader caches, game-launcher caches, crash dumps, the Recycle Bin, and a previous `Windows.old`) with a size preview. Deletion is permanent by design and clearly separated from everything reversible.
+- **DNS** — switch every network adapter to Cloudflare, Quad9, AdGuard, Google, OpenDNS or back to automatic; your current servers are captured first, so Restore puts them back.
+- **Hosts** — edit the Windows hosts file with a multi-level timestamped backup ("undo last save") and a one-click reset to the Windows default.
+- **Free up memory** — an honest RAM trim that says plainly the gain is usually brief.
+- **Power** — schedule a shutdown or restart (Windows' own timer, so it persists if you close WinPure), or sleep, hibernate, lock and sign out now. The delay is bounded so a mistyped value can never fire an immediate shutdown.
+- **Diagnostics** — a read-only summary of the PC and a one-click support bundle (the WinPure logs plus the summary) you can save and share.
+- **Home** now shows live memory and disk use, and its count cards open filtered lists.
+- **Repair** — added component-store cleanup (`DISM /StartComponentCleanup`), re-register Store apps, update all apps (winget), and install the Visual C++ redistributables.
+- **Install** — a winget search box to install any app, not just the curated list.
+- **Startup** — applies in one batch (one backup instead of one per toggle), with an On/Off filter.
+- **Apply to new user accounts** — a checkbox that also writes reversible per-user tweaks into the default profile.
+
+Everything reversible stays reversible through the Restore page; the delete, install, remove-apps and power sections are separated out and confirm before acting. Backups now live in an administrators-only folder whose trust is proven by the file's owner, not by the shape of its permissions.
 
 ### New: Startup Apps
 

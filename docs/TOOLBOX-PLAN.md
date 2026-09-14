@@ -1,4 +1,4 @@
-<!-- Digest de minería (workflow wf_8053a493-941, 8 repos, 9 Sonnets) del 2026-09-13. ESTADO: las Fases A-E ya se construyeron y publicaron en v2.0.0 (ver CHANGELOG); lo que queda pendiente de decisión de Oscar es el bundling (~10%) y los ítems con puerta que se listan más abajo. -->
+<!-- Digest de minería (workflow wf_8053a493-941, 8 repos, 9 Sonnets) del 2026-09-13. ESTADO (14-sep-2026): Fases A-E en v2.0.0; el resto (PATH, desinstalador, Tomar posesión, Ejecutar con prioridad, Modo Seguro, Hardware, Mover carpeta/junction, mouse en vivo, DirectX) en v2.1.0. Los 3 gates se resolvieron por la vía que no cruza la línea: DX9/Everything por winget (sin bundling), hardware por registro (sin driver/NuGet), y bin de cuarentena NO (Limpieza sigue irreversible). Decidido NO hacer: MSI mode (snake-oil/no determinista) y curva de mouse REG_BINARY (redundante con accel=0). Ver el CLAUDE.md padre (sección CUARTO LOTE) para el detalle. -->
 
 # Plan de integración — WinPure "todo en uno"
 

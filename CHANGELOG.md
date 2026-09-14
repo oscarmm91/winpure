@@ -3,6 +3,7 @@
 ## 2.1.1
 
 - The app version now shows in the sidebar footer, under "About", so you can tell at a glance which version you are running.
+- **Repair tools now show live output** — a long tool like *Update all apps (winget)* or SFC/DISM prints what it is doing as it runs, instead of only a spinner, so you can see it is actually working.
 
 ## 2.1.0 — more of the toolbox
 

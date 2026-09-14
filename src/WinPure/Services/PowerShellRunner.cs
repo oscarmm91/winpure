@@ -27,7 +27,7 @@ public static class PowerShellRunner
     /// processes PowerShell starts down with it) leaves the machine worse off than letting it finish.
     /// </param>
     public static PsResult Run(string script, int timeoutMs = 120_000, CancellationToken cancel = default,
-        bool dieWithApp = false)
+        bool dieWithApp = false, Action<string>? onOutputLine = null)
     {
         try
         {
@@ -56,13 +56,19 @@ public static class PowerShellRunner
             using var outDone = new ManualResetEventSlim(false);
             using var errDone = new ManualResetEventSlim(false);
 
+            // onOutputLine, when given, receives each line as it arrives (on a background thread — the caller
+            // marshals to the UI) so a long tool can show what it is doing live instead of a silent spinner.
             p.OutputDataReceived += (_, e) =>
             {
-                if (e.Data is null) outDone.Set(); else stdout.AppendLine(e.Data);
+                if (e.Data is null) { outDone.Set(); return; }
+                stdout.AppendLine(e.Data);
+                if (onOutputLine is not null) { try { onOutputLine(e.Data); } catch { } }
             };
             p.ErrorDataReceived += (_, e) =>
             {
-                if (e.Data is null) errDone.Set(); else stderr.AppendLine(e.Data);
+                if (e.Data is null) { errDone.Set(); return; }
+                stderr.AppendLine(e.Data);
+                if (onOutputLine is not null) { try { onOutputLine(e.Data); } catch { } }
             };
             p.BeginOutputReadLine();
             p.BeginErrorReadLine();

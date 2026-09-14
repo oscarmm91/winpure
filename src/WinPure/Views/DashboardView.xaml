@@ -143,7 +143,7 @@
                         BorderThickness="1" BorderBrush="{StaticResource Brush.Accent}">
                     <StackPanel>
                         <TextBlock Text="{l:Tr 'Balanced'}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
-                        <TextBlock Text="{l:Tr 'Safe + optional services off, Click to Do off, Delivery Optimization off, faster shutdown.'}"
+                        <TextBlock Text="{l:Tr 'Safe + stronger privacy, safe optional services off, faster shutdown, and more UI cleanup.'}"
                                    FontSize="12" Margin="0,6,0,12" TextWrapping="Wrap"
                                    Foreground="{StaticResource Brush.TextSecondary}" MinHeight="48"/>
                         <Button Style="{StaticResource SubtleButton}" Content="{l:Tr 'Select Balanced preset'}"
@@ -155,7 +155,7 @@
                         BorderThickness="1" BorderBrush="{StaticResource Brush.Orange}">
                     <StackPanel>
                         <TextBlock Text="{l:Tr 'Aggressive'}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
-                        <TextBlock Text="{l:Tr 'Balanced + Copilot/AI and Recall off, DiagTrack disabled, telemetry blocked at the firewall.'}"
+                        <TextBlock Text="{l:Tr 'Balanced + Copilot/AI and Recall off, all telemetry tasks off, and safe speed tweaks. Still fully reversible.'}"
                                    FontSize="12" Margin="0,6,0,12" TextWrapping="Wrap"
                                    Foreground="{StaticResource Brush.TextSecondary}" MinHeight="48"/>
                         <Button Style="{StaticResource SubtleButton}" Content="{l:Tr 'Select Aggressive preset'}"

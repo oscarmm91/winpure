@@ -45,8 +45,8 @@
 | Preset | What it includes | Risk |
 |---|---|---|
 | 🟢 **Safe** | Basic telemetry off, no Bing/ads in Start, advertising ID off, cleaner context menu, dark mode, taskbar cleanup | None |
-| 🔵 **Balanced** | Safe + optional services off, Click to Do off, Delivery Optimization off, faster shutdown | Low |
-| 🟠 **Aggressive** | Balanced + Copilot/AI & Recall off, DiagTrack disabled, telemetry firewall block, telemetry tasks off | Power users |
+| 🔵 **Balanced** | Safe + stronger privacy, safe optional services off (Error Reporting, Fax, Geolocation…), faster shutdown, driver updates out of Windows Update, more Start/Explorer cleanup | Low |
+| 🟠 **Aggressive** | Balanced + Copilot/AI & Recall off, all telemetry tasks & firewall block, and safe performance/cleanup tweaks (animations, transparency, reserved storage). Never blind-disables Bluetooth, printing, Remote Desktop, indexing or SysMain | Power users |
 
 No preset removes an app, so everything a preset does can be switched back off. Uninstalling apps has its own page, **Remove Apps**, where you tick each one yourself.
 

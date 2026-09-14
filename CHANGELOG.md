@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.2.0 — better profiles, clearer control
+
+The three quick profiles were redesigned, and several things you asked for to make WinPure easier to see and control:
+
+- **Profiles that actually mean something.** Before, *Aggressive* touched only 9 settings (all privacy/AI) and most of the catalog was locked to *Manual*, invisible to every profile. Now the three profiles are rebalanced so each is meaningful: **Aggressive** reaches ~80 reversible settings across privacy, services, performance, interface and the context menu — while still never blind-disabling Bluetooth, printing, Remote Desktop, search indexing or SysMain (those stay Manual so a profile can't take away hardware you use). Everything a profile does is reversible.
+- **See what a profile will do before applying.** Pick a profile and the Dashboard shows a plain-language preview — how many settings it will change on *this* PC, by category — and a reminder that it never touches Remove Apps, Edge or the tools, and that it all rolls back from Restore.
+- **A one-click Undo, right where you are.** After you apply, a banner appears near the top with **Undo** that reverts exactly the batch you just applied — no need to go find it in Restore (which still keeps every backup).
+- **See what each backup changed.** Every entry on the Restore page now has a "What changed" list of everything that backup touched, not just the first few.
+- **Dialogs that match the app.** The plain white Windows message boxes were replaced with dark, WinPure-styled dialogs.
+- **A sidebar that fits.** The left menu is now organized into collapsible sections (Settings, Tools, Apps, Backups) and scrolls, so the pages that used to be cut off below the fold are easy to find.
+- Fixed a text overlap in the Apply bar when the hint was long.
+
 ## 2.1.1
 
 - The app version now shows in the sidebar footer, under "About", so you can tell at a glance which version you are running.

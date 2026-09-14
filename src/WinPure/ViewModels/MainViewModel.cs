@@ -373,6 +373,10 @@ public sealed class MainViewModel : ObservableObject
             var old = _currentNav;
             _currentNav = value;
             old?.SetCurrentSilently(false);
+            // If we navigate into a page inside a collapsed section (e.g. a Dashboard card jumps to Restore),
+            // open that section so the highlighted entry is actually visible.
+            foreach (var g in NavGroups)
+                if (g.Items.Contains(value)) { g.IsExpanded = true; break; }
             value.SetCurrentSilently(true);
             if (value.Page == _restore) LoadBackups();
             if (value.Page == _installer && !_installer.HasChecked) _ = _installer.RefreshAsync();
@@ -1009,7 +1013,7 @@ public sealed class MainViewModel : ObservableObject
 
         var answer = WinPure.Views.WinPureDialog.Show(
             Loc.F("Restore the snapshot from {0}?\nAll {1} captured values will be written back.", vm.Title, vm.Session.Entries.Count),
-            Loc.T("WinPure — Restore backup"), MessageBoxButton.YesNo, MessageBoxImage.Question);
+            Loc.T("WinPure — Restore backup"), MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) return;
 
         await DoRestore(vm.Session);
@@ -1065,7 +1069,7 @@ public sealed class MainViewModel : ObservableObject
 
         var answer = WinPure.Views.WinPureDialog.Show(
             Loc.F("Delete the backup from {0}? This cannot be undone.", vm.Title),
-            Loc.T("WinPure — Delete backup"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            Loc.T("WinPure — Delete backup"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) return;
         _backupManager.DeleteSession(vm.Session);
         LoadBackups();

@@ -762,5 +762,17 @@
   "Sets CabinetState!FullPath to 1 (default 0). Undo restores 0. Takes effect on the next Explorer window.": "Pone CabinetState!FullPath en 1 (predeterminado 0). Deshacer restaura 0. Aplica en la siguiente ventana del Explorador.",
   "Add 'Open PowerShell here' to folders": "Agregar 'Abrir PowerShell aquí' a las carpetas",
   "Add an 'Open PowerShell here' entry to the right-click menu of a folder's empty space.": "Agrega una entrada 'Abrir PowerShell aquí' al menú contextual del espacio vacío de una carpeta.",
-  "Creates a per-user verb under Directory\\Background\\shell that runs powershell.exe in the folder. Undo deletes it.": "Crea un verbo por usuario bajo Directory\\Background\\shell que ejecuta powershell.exe en la carpeta. Deshacer lo borra."
+  "Creates a per-user verb under Directory\\Background\\shell that runs powershell.exe in the folder. Undo deletes it.": "Crea un verbo por usuario bajo Directory\\Background\\shell que ejecuta powershell.exe en la carpeta. Deshacer lo borra.",
+  "Re-register Store Apps (fix Start menu)": "Volver a registrar apps de la Store (arregla el menú Inicio)",
+  "Re-register your installed Store apps — a common fix for a broken Start menu, Store or Settings. Nothing is uninstalled.": "Vuelve a registrar tus apps de la Store — arreglo común de un menú Inicio, Store o Configuración roto. No desinstala nada.",
+  "This re-registers every Store app installed for your account (Add-AppxPackage -Register). It is a common fix for a broken Start menu, Store or Settings and does not delete anything. It can take a few minutes. Continue?": "Esto vuelve a registrar todas las apps de la Store instaladas para tu cuenta (Add-AppxPackage -Register). Es un arreglo común de un menú Inicio, Store o Configuración roto y no borra nada. Puede tardar unos minutos. ¿Continuar?",
+  "Store apps were re-registered.": "Se volvieron a registrar las apps de la Store.",
+  "Update All Apps (winget)": "Actualizar todas las apps (winget)",
+  "Upgrade every app winget can update to its latest version.": "Actualiza a su última versión todas las apps que winget puede actualizar.",
+  "Apps were updated to their latest versions.": "Las apps se actualizaron a su última versión.",
+  "Install Visual C++ Redistributables": "Instalar los Redistribuibles de Visual C++",
+  "Install the Microsoft Visual C++ 2015-2022 runtimes (x64 and x86) — a common fix for 'missing VCRUNTIME/MSVCP DLL' errors.": "Instala los runtimes de Microsoft Visual C++ 2015-2022 (x64 y x86) — arreglo común de errores de 'falta VCRUNTIME/MSVCP DLL'.",
+  "Visual C++ Redistributables installed.": "Se instalaron los Redistribuibles de Visual C++.",
+  "This runs 'winget upgrade --all' to download and install the latest version of every app winget can update. It can take a while and cannot be cancelled midway. Continue?": "Esto ejecuta 'winget upgrade --all' para descargar e instalar la última versión de cada app que winget puede actualizar. Puede tardar y no se puede cancelar a la mitad. ¿Continuar?",
+  "This installs the Microsoft Visual C++ Redistributables (2015-2022, x64 and x86) via winget — a common fix for 'missing VCRUNTIME140.dll / MSVCP140.dll' errors. It cannot be cancelled midway. Continue?": "Esto instala los Redistribuibles de Microsoft Visual C++ (2015-2022, x64 y x86) con winget — arreglo común de errores de 'falta VCRUNTIME140.dll / MSVCP140.dll'. No se puede cancelar a la mitad. ¿Continuar?"
 }

@@ -131,5 +131,62 @@ public static class RepairCatalog
                 exit 0
                 """,
         },
+        new RepairTool
+        {
+            Id = "repair-reregister-apps",
+            Name = "Re-register Store Apps (fix Start menu)",
+            Description = "Re-register your installed Store apps — a common fix for a broken Start menu, Store or Settings. Nothing is uninstalled.",
+            DoneText = "Store apps were re-registered.",
+            Icon = "",
+            // Cancellable: killing this between iterations is safe — already-registered packages stay done and
+            // the rest are simply skipped, exactly as if it had not run. (Individual Add-AppxPackage failures
+            // are expected — framework packages, etc. — so the tool reports success once the pass completes.)
+            ConfirmText = "This re-registers every Store app installed for your account (Add-AppxPackage -Register). It is a common fix for a broken Start menu, Store or Settings and does not delete anything. It can take a few minutes. Continue?",
+            TimeoutMs = 1_200_000,
+            Script = """
+                $ErrorActionPreference = 'SilentlyContinue'
+                Get-AppxPackage | ForEach-Object { Add-AppxPackage -DisableDevelopmentMode -Register "$($_.InstallLocation)\AppXManifest.xml" }
+                exit 0
+                """,
+        },
+        new RepairTool
+        {
+            Id = "repair-winget-upgrade-all",
+            Name = "Update All Apps (winget)",
+            Description = "Upgrade every app winget can update to its latest version.",
+            DoneText = "Apps were updated to their latest versions.",
+            Icon = "",
+            // Not cancellable, like SFC/DISM: an installer winget launches, cut off halfway, leaves a broken
+            // app behind (the same reason the Install page never dies with the app). The exit code is winget's
+            // own, so no internet / a failed upgrade reports failure instead of a false "updated".
+            ConfirmText = "This runs 'winget upgrade --all' to download and install the latest version of every app winget can update. It can take a while and cannot be cancelled midway. Continue?",
+            TimeoutMs = 1_800_000,
+            Cancellable = false,
+            Script = """
+                winget upgrade --all --silent --include-unknown --accept-source-agreements --accept-package-agreements
+                exit $LASTEXITCODE
+                """,
+        },
+        new RepairTool
+        {
+            Id = "repair-install-vcredist",
+            Name = "Install Visual C++ Redistributables",
+            Description = "Install the Microsoft Visual C++ 2015-2022 runtimes (x64 and x86) — a common fix for 'missing VCRUNTIME/MSVCP DLL' errors.",
+            DoneText = "Visual C++ Redistributables installed.",
+            Icon = "",
+            // Not cancellable, for the same reason as the winget upgrade tool. Success is judged by the EFFECT
+            // (both redistributables present via winget list), not by the install exit code — winget returns
+            // non-zero when a package is already installed, which is not a failure here.
+            ConfirmText = "This installs the Microsoft Visual C++ Redistributables (2015-2022, x64 and x86) via winget — a common fix for 'missing VCRUNTIME140.dll / MSVCP140.dll' errors. It cannot be cancelled midway. Continue?",
+            TimeoutMs = 900_000,
+            Cancellable = false,
+            Script = """
+                winget install --id Microsoft.VCRedist.2015+.x64 -e --silent --accept-source-agreements --accept-package-agreements
+                winget install --id Microsoft.VCRedist.2015+.x86 -e --silent --accept-source-agreements --accept-package-agreements
+                $x64 = winget list --id Microsoft.VCRedist.2015+.x64 -e --accept-source-agreements 2>$null | Select-String 'Microsoft.VCRedist.2015'
+                $x86 = winget list --id Microsoft.VCRedist.2015+.x86 -e --accept-source-agreements 2>$null | Select-String 'Microsoft.VCRedist.2015'
+                if ($x64 -and $x86) { exit 0 } else { exit 1 }
+                """,
+        },
     };
 }

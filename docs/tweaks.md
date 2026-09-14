@@ -205,3 +205,6 @@ WinPure cannot bring back an app removed here, so none of it is in a preset and 
 | Reset Windows Update | Stops `wuauserv/BITS/cryptsvc`, clears download cache + qmgr, restarts services |
 | Reset Network | `netsh winsock reset`, `netsh int ip reset`, `ipconfig /flushdns` |
 | Clean Temporary Files | Empties `%TEMP%` and `C:\Windows\Temp`, reports MB freed |
+| Re-register Store Apps (fix Start menu) | `Add-AppxPackage -Register` for every installed Store app |
+| Update All Apps (winget) | `winget upgrade --all` (never `--ignore-security-hash`) |
+| Install Visual C++ Redistributables | `winget install Microsoft.VCRedist.2015+.x64` and `.x86` |

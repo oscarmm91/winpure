@@ -135,9 +135,9 @@ Apps launched from the registry (per-user, machine-wide and 32-bit), shortcuts i
 </details>
 
 <details>
-<summary>🔧 <b>Repair & Maintenance</b> — 6 tools</summary>
+<summary>🔧 <b>Repair & Maintenance</b> — 9 tools</summary>
 <br/>
-Create a system restore point, repair system files (SFC + DISM), clean up the component store (DISM StartComponentCleanup), reset Windows Update components, reset the network stack, clean temporary files.
+Create a system restore point, repair system files (SFC + DISM), clean up the component store (DISM StartComponentCleanup), reset Windows Update components, reset the network stack, clean temporary files, re-register Store apps, update all apps (winget), install the Visual C++ redistributables.
 <br/><br/>
 <img src="docs/screenshots/repair.png" width="800"/>
 </details>

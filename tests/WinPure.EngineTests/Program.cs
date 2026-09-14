@@ -336,9 +336,10 @@ bool CancellingReallyKillsTheProcess()
 bool OnlySafeRepairsOfferCancel()
 {
     var tools = RepairCatalog.Build();
-    // Both component-store DISM operations are unsafe to kill: SFC+DISM /RestoreHealth and
-    // /StartComponentCleanup can each leave WinSxS inconsistent if interrupted.
-    var mustNotCancel = new[] { "repair-system-files", "repair-component-cleanup" };
+    // Unsafe to kill: the two component-store DISM operations (SFC+DISM /RestoreHealth and
+    // /StartComponentCleanup can leave WinSxS inconsistent), plus the two winget tools (an installer cut off
+    // halfway leaves a broken app behind — the same reason the Install page never dies with the app).
+    var mustNotCancel = new[] { "repair-system-files", "repair-component-cleanup", "repair-winget-upgrade-all", "repair-install-vcredist" };
     var protectedTools = tools.Where(t => mustNotCancel.Contains(t.Id)).ToList();
     var others = tools.Where(t => !mustNotCancel.Contains(t.Id)).ToList();
 

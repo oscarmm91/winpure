@@ -89,6 +89,8 @@
                             </ControlTemplate>
                         </Button.Template>
                     </Button>
+                    <TextBlock Text="{Binding AppVersion}" HorizontalAlignment="Center" Margin="0,4,0,0"
+                               FontSize="10.5" Foreground="{StaticResource Brush.TextTertiary}"/>
                 </StackPanel>
 
                 <!-- nav -->

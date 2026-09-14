@@ -337,6 +337,9 @@ public sealed class MainViewModel : ObservableObject
 
     public string OsInfo { get; } = GetOsInfo();
 
+    /// <summary>The app version (e.g. "v2.1.0"), shown in the sidebar footer so it is always visible.</summary>
+    public string AppVersion { get; } = $"v{typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "?"}";
+
     public PageViewModel CurrentPage => _searchPage ?? CurrentNav.Page;
 
     // ---------------------------------------------------------------- search

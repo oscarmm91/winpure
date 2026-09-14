@@ -17,6 +17,10 @@ public sealed class RepairToolViewModel : ObservableObject
     private string _statusText = "";
     public string StatusText { get => _statusText; set => Set(ref _statusText, value); }
 
+    /// <summary>The latest line the running tool printed, shown live so the user can see it is working.</summary>
+    private string _liveOutput = "";
+    public string LiveOutput { get => _liveOutput; set => Set(ref _liveOutput, value); }
+
     private bool _isRunning;
     public bool IsRunning
     {
@@ -45,6 +49,7 @@ public sealed class RepairToolViewModel : ObservableObject
     {
         _cts = new CancellationTokenSource();
         IsRunning = true;
+        LiveOutput = "";
         _clock.Restart();
         StatusText = Loc.F("Running… {0}", "0:00");
         _timer.Start();
@@ -108,7 +113,17 @@ public sealed class RepairViewModel : PageViewModel
             // A tool that is safe to cancel may also die with the app. One that is not — SFC/DISM —
             // keeps running if WinPure is closed: killing DISM midway is the harm Cancellable exists
             // to prevent, and closing the window must not do it through the back door.
-            var result = await Task.Run(() => PowerShellRunner.Run(tool.Script, tool.TimeoutMs, token, dieWithApp: tool.Cancellable));
+            // Stream each output line to the tool's live view. The lines arrive on a background thread, so hop to
+            // the UI thread to update the bound property.
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            void OnLine(string line)
+            {
+                var t = line.Trim();
+                if (t.Length == 0) return;
+                if (dispatcher is not null) dispatcher.BeginInvoke(() => vm.LiveOutput = t);
+                else vm.LiveOutput = t;
+            }
+            var result = await Task.Run(() => PowerShellRunner.Run(tool.Script, tool.TimeoutMs, token, dieWithApp: tool.Cancellable, onOutputLine: OnLine));
             string elapsed = RepairToolViewModel.Format(vm.Elapsed);
             string lastLine = result.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
                 .LastOrDefault()?.Trim() ?? "";

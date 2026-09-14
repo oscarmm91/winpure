@@ -42,6 +42,11 @@
                                                Foreground="{StaticResource Brush.TextSecondary}"/>
                                     <TextBlock Text="{Binding StatusText}" FontSize="11" Margin="0,3,0,0" TextWrapping="Wrap"
                                                Foreground="{StaticResource Brush.GreenText}"/>
+                                    <!-- Live output from the running tool, so it never looks frozen. -->
+                                    <TextBlock Text="{Binding LiveOutput}" FontSize="10.5" Margin="0,2,0,0"
+                                               FontFamily="Consolas, Cascadia Mono, monospace" TextTrimming="CharacterEllipsis"
+                                               Foreground="{StaticResource Brush.TextTertiary}"
+                                               Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}}"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">

@@ -126,6 +126,7 @@ failures += PathEditorFlagsEntriesBacksUpBeforeWritingAndRestores() ? 0 : 1;
 failures += UninstallerJudgesByEffectAndParsesCommands() ? 0 : 1;
 failures += SafeModeBuildsCorrectArgsAndAlwaysRestoresNormal() ? 0 : 1;
 failures += MoveFolderCopiesVerifiesBeforeDeletingAndRefusesSystemFolders() ? 0 : 1;
+failures += PowerShellStreamsOutputLinesLive() ? 0 : 1;
 failures += DnsCapturesCurrentServersAndRestorePutsThemBack() ? 0 : 1;
 failures += AServiceCanBeSetToManualNotJustDisabled() ? 0 : 1;
 failures += CreatingAContextMenuKeyIsUndoneByDeletingIt() ? 0 : 1;
@@ -1697,6 +1698,25 @@ bool UninstallerJudgesByEffectAndParsesCommands()
     return Report("the uninstaller judges success by the list, not by running",
         problems.Count == 0,
         problems.Count == 0 ? "IsGone reads the list after running; a survived uninstall is not called gone; commands split without a shell" : string.Join(" | ", problems));
+}
+
+// A long repair tool must not look frozen: PowerShellRunner streams each output line to a callback as it arrives,
+// so the UI can show what the tool is doing. Runs a short real PowerShell that prints three lines.
+bool PowerShellStreamsOutputLinesLive()
+{
+    var streamed = new System.Collections.Concurrent.ConcurrentQueue<string>();
+    var result = PowerShellRunner.Run(
+        "1..3 | ForEach-Object { Write-Output \"line $_\" }",
+        timeoutMs: 20_000, onOutputLine: l => streamed.Enqueue(l));
+
+    var lines = streamed.ToArray();
+    bool streamedLive = lines.Length >= 3 && lines.Any(l => l.Contains("line 2"));
+    bool inFinalOutput = result.Output.Contains("line 2");
+    return Report("a repair tool's output is streamed live, line by line",
+        result.Success && streamedLive && inFinalOutput,
+        result.Success && streamedLive && inFinalOutput
+            ? $"the callback received {lines.Length} lines as they were printed, and the full output still has them"
+            : $"success={result.Success}, streamed={lines.Length} lines, inFinalOutput={inFinalOutput}");
 }
 
 // Move-folder copies and VERIFIES before deleting the original (so an interrupted move never loses data), refuses

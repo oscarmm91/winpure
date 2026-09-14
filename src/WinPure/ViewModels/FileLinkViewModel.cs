@@ -81,6 +81,12 @@ public sealed class FileLinkViewModel : PageViewModel
             Main.StatusText = result.Ok ? Loc.T("Folder moved and linked.") : Loc.T("The folder was not moved — see the page.");
             if (result.Ok) UpdatePreview();
         }
+        catch (Exception ex)
+        {
+            Status = Loc.T("The move failed — see the log.");
+            Main.StatusText = Loc.T("The folder was not moved — see the page.");
+            LogService.Log($"Move folder failed: {ex.Message}");
+        }
         finally
         {
             Main.IsBusy = false;

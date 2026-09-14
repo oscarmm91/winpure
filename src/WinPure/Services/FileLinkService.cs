@@ -51,10 +51,23 @@ public static class FileLinkService
         if (root is null) return Loc.T("the path is not valid");
         if (string.Equals(full, root, StringComparison.OrdinalIgnoreCase)) return Loc.T("a whole drive cannot be moved");
 
-        // Roots WinPure will never move or replace: the drive root, the user-profile root, and WinPure's own folder.
+        // A % in a folder name would be expanded by cmd inside mklink (cmd expands %VAR% even in quotes), pointing
+        // the junction somewhere wrong. Refuse it rather than risk a broken link.
+        if (full.Contains('%')) return Loc.T("the folder path contains a % — rename it and try again");
+
+        // The root of a user PROFILE (C:\Users\name) must not be moved wholesale — but a folder INSIDE a profile
+        // (Downloads, a game folder…) is the common, allowed case.
+        var usersRoot = Path.Combine(root + "\\", "Users").TrimEnd('\\');
+        if (full.StartsWith(usersRoot + "\\", StringComparison.OrdinalIgnoreCase))
+        {
+            var rel = full.Substring(usersRoot.Length + 1);
+            if (!rel.Contains('\\')) return Loc.T("a whole user profile cannot be moved");
+        }
+
+        // Roots WinPure will never move or replace: the Users root and WinPure's own folder.
         string[] blockedExactly =
         {
-            Path.Combine(root + "\\", "Users"),
+            usersRoot,
             AppContext.BaseDirectory,
         };
         foreach (var p in blockedExactly)
@@ -65,13 +78,15 @@ public static class FileLinkService
         }
 
         // Whole system trees are off-limits both as the folder itself and anything under them — moving a piece of
-        // Windows, System32 or Program Files (or junctioning over it) can break Windows or installed software.
+        // Windows, System32, Program Files or ProgramData (which holds WinPure's own backups) can break Windows or
+        // installed software.
         string[] blockedTrees =
         {
             Environment.GetFolderPath(Environment.SpecialFolder.Windows),
             Environment.GetFolderPath(Environment.SpecialFolder.System),
             Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
             Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
         };
         foreach (var p in blockedTrees)
         {
@@ -96,6 +111,7 @@ public static class FileLinkService
         if (!Backend.DirectoryExists(source)) return new(false, Loc.T("the folder does not exist"));
         if (Backend.IsReparsePoint(source)) return new(false, Loc.T("that folder is already a link"));
         if (!Backend.DirectoryExists(destinationParent)) return new(false, Loc.T("the destination does not exist"));
+        if (destinationParent.Contains('%')) return new(false, Loc.T("the destination path contains a % — choose another"));
 
         string sourceFull = Path.GetFullPath(source).TrimEnd('\\');
         string name = Path.GetFileName(sourceFull);
@@ -114,13 +130,23 @@ public static class FileLinkService
         if (code >= 8) return new(false, Loc.F("the copy failed (robocopy {0}); nothing was deleted", code));
         if (!Backend.DirectoryExists(dest)) return new(false, Loc.T("the copy did not produce the destination; nothing was deleted"));
 
-        // Only now, with a verified copy in place, is the original removed and replaced by a junction.
-        Backend.DeleteDirectory(sourceFull);
-        Backend.CreateJunction(sourceFull, dest);
+        // Only now, with a verified copy in place, is the original removed and replaced by a junction. If deleting
+        // the source or creating the junction throws here the DATA IS STILL SAFE at the destination — say so and
+        // where, rather than letting the failure surface as an unobserved exception with the source already gone.
+        try
+        {
+            Backend.DeleteDirectory(sourceFull);
+            Backend.CreateJunction(sourceFull, dest);
+        }
+        catch (Exception ex)
+        {
+            LogService.Log($"Move: the copy to {dest} is complete, but finishing the move failed: {ex.Message}");
+            return new(false, Loc.F("Your data is safe at {0}, but the junction could not be created — move it back there, or make the junction yourself.", dest));
+        }
 
         var resolved = Backend.ReparseTarget(sourceFull);
         if (resolved is null || !string.Equals(resolved.TrimEnd('\\'), dest.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
-            return new(false, Loc.T("the folder was moved but the junction could not be verified — see the log"));
+            return new(false, Loc.F("Your data was moved to {0}, but the junction could not be verified — see the log.", dest));
         return new(true, Loc.F("Moved to {0} and linked.", dest));
     }
 }
@@ -155,8 +181,10 @@ internal sealed class FileLinkCli : IFileLinkBackend
 
     public int Robocopy(string source, string dest)
     {
-        // /E all subfolders, /COPYALL data+attrs+ACLs, /R:1 /W:1 minimal retries, /NP no per-file percent.
-        var (code, _) = Run("robocopy.exe", source, dest, "/E", "/COPYALL", "/R:1", "/W:1", "/NP", "/NFL", "/NDL");
+        // /E all subfolders, /COPYALL data+attrs+ACLs, /XJ exclude junctions so robocopy never follows a reparse
+        // point inside the tree (which could copy the wrong data or loop), /R:1 /W:1 minimal retries, /NP/NFL/NDL
+        // keep the output tiny.
+        var (code, _) = Run("robocopy.exe", source, dest, "/E", "/COPYALL", "/XJ", "/R:1", "/W:1", "/NP", "/NFL", "/NDL");
         return code;
     }
 

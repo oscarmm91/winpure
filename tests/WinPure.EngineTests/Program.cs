@@ -1714,6 +1714,12 @@ bool MoveFolderCopiesVerifiesBeforeDeletingAndRefusesSystemFolders()
         var root = System.IO.Path.GetPathRoot(win);
         if (WinPure.Services.FileLinkService.RejectSource(root!) is null) problems.Add("a drive root was not refused");
         if (WinPure.Services.FileLinkService.RejectSource(@"D:\Games\Big") is not null) problems.Add("a normal folder was wrongly refused");
+        // A whole user profile is refused, but a folder INSIDE it (the common case) is allowed.
+        if (WinPure.Services.FileLinkService.RejectSource(System.IO.Path.Combine(root!, "Users", "SomeUser")) is null) problems.Add("a whole user profile was not refused");
+        if (WinPure.Services.FileLinkService.RejectSource(System.IO.Path.Combine(root!, "Users", "SomeUser", "Downloads")) is not null) problems.Add("a folder inside a profile was wrongly refused");
+        // A % in the path (cmd would expand it inside mklink) and ProgramData (holds WinPure's backups) are refused.
+        if (WinPure.Services.FileLinkService.RejectSource(@"D:\Games\100%off") is null) problems.Add("a % in the path was not refused");
+        if (WinPure.Services.FileLinkService.RejectSource(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData)) is null) problems.Add("ProgramData was not refused");
 
         // Happy path across drives: copy, verify, delete, junction.
         var fake = new FakeFileLinkBackend();

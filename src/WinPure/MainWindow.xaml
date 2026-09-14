@@ -93,15 +93,68 @@
                                FontSize="10.5" Foreground="{StaticResource Brush.TextTertiary}"/>
                 </StackPanel>
 
-                <!-- nav -->
-                <ItemsControl ItemsSource="{Binding NavItems}" Margin="0,4,0,0">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <RadioButton Style="{StaticResource NavButton}" GroupName="Nav"
-                                         IsChecked="{Binding IsCurrent, Mode=TwoWay}"/>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <!-- nav: Home pinned, then collapsible sections, all inside a scroller so nothing is cut off -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,4,0,0">
+                    <StackPanel>
+                        <!-- Home -->
+                        <RadioButton Style="{StaticResource NavButton}" GroupName="Nav" DataContext="{Binding HomeItem}"
+                                     IsChecked="{Binding IsCurrent, Mode=TwoWay}"/>
+
+                        <!-- sections -->
+                        <ItemsControl ItemsSource="{Binding NavGroups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,6,0,0">
+                                        <!-- section header: click to expand/collapse -->
+                                        <Button Command="{Binding ToggleCommand}" Cursor="Hand" HorizontalAlignment="Stretch">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border x:Name="Bg" Background="Transparent" Padding="20,7,14,5">
+                                                        <Grid>
+                                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding Header}" FontSize="10.5" FontWeight="SemiBold"
+                                                                           Foreground="{StaticResource Brush.TextTertiary}"/>
+                                                                <!-- pending badge, so a collapsed section still shows it has changes -->
+                                                                <Border Background="{StaticResource Brush.Accent}" CornerRadius="8" Margin="8,0,0,0"
+                                                                        Padding="6,0" MinWidth="16" Height="16"
+                                                                        Visibility="{Binding HasPending, Converter={StaticResource BoolToVisibility}}">
+                                                                    <TextBlock Text="{Binding PendingCount}" FontSize="10" Foreground="White"
+                                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                </Border>
+                                                            </StackPanel>
+                                                            <TextBlock x:Name="Chev" Text="&#xE70D;" FontFamily="{StaticResource Font.Icon}" FontSize="9"
+                                                                       Foreground="{StaticResource Brush.TextTertiary}"
+                                                                       HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                                        </Grid>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <DataTrigger Binding="{Binding IsExpanded}" Value="False">
+                                                            <Setter TargetName="Chev" Property="Text" Value="&#xE70E;"/>
+                                                        </DataTrigger>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="Bg" Property="Background" Value="{StaticResource Brush.SidebarHover}"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                        </Button>
+
+                                        <!-- section items -->
+                                        <ItemsControl ItemsSource="{Binding Items}"
+                                                      Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <RadioButton Style="{StaticResource NavButton}" GroupName="Nav"
+                                                                 IsChecked="{Binding IsCurrent, Mode=TwoWay}"/>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
             </DockPanel>
         </Border>
 
@@ -158,13 +211,20 @@
             <Border Grid.Row="3" BorderBrush="{StaticResource Brush.Divider}" BorderThickness="0,1,0,0"
                     Padding="36,16" Background="{StaticResource Brush.Background}">
                 <Grid>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE930;" FontFamily="{StaticResource Font.Icon}" FontSize="15"
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <!-- Left hint fills the star column and ellipsizes instead of sliding under the right group.
+                         Two columns keep the two groups apart; before, they shared one cell and overlapped. -->
+                    <DockPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock DockPanel.Dock="Left" Text="&#xE930;" FontFamily="{StaticResource Font.Icon}" FontSize="15"
                                    Foreground="{StaticResource Brush.TextSecondary}" VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding ApplyHint}" Margin="10,0,0,0" FontSize="12.5"
-                                   Foreground="{StaticResource Brush.TextSecondary}" VerticalAlignment="Center"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                   Foreground="{StaticResource Brush.TextSecondary}" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding ApplyHint}"/>
+                    </DockPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                         <CheckBox IsChecked="{Binding ApplyToFutureUsers}" VerticalAlignment="Center" Margin="0,0,18,0"
                                   Visibility="{Binding FutureUsersApplies, Converter={StaticResource BoolToVisibility}}"
                                   Foreground="{StaticResource Brush.TextSecondary}"

@@ -2702,7 +2702,7 @@ bool EveryStaticResourceAndBindingPathExists()
     // review renamed SearchText to a typo in MainWindow.xaml and this test stayed green.
     var directContexts = new (string File, Type[] Types)[]
     {
-        ("MainWindow.xaml", new[] { typeof(WinPure.ViewModels.MainViewModel), typeof(WinPure.ViewModels.NavItem) }),
+        ("MainWindow.xaml", new[] { typeof(WinPure.ViewModels.MainViewModel), typeof(WinPure.ViewModels.NavItem), typeof(WinPure.ViewModels.NavGroup) }),
         ("Styles.xaml", new[] { typeof(WinPure.ViewModels.NavItem) }),
         // The tweak pages: page bindings and each card's. A review found ShowsPresets, Warning and CanToggle unchecked.
         ("CategoryView.xaml", new[] { typeof(WinPure.ViewModels.CategoryPageViewModel), typeof(WinPure.ViewModels.TweakViewModel) }),
@@ -2839,13 +2839,17 @@ bool EveryVisibleTextHasASpanishTranslation()
         Add(preset.Description, $"{preset.Id} description");
     }
     // Sidebar labels and page titles translate themselves when set, so read them back — in English, here.
-    foreach (var nav in new WinPure.ViewModels.MainViewModel().NavItems)
+    var navVm = new WinPure.ViewModels.MainViewModel();
+    foreach (var nav in navVm.NavItems)
     {
         Add(nav.Label, "sidebar");
         Add(nav.Page.Title, "page title");
         Add(nav.Page.Subtitle, "page subtitle");
         if (nav.Page is WinPure.ViewModels.CategoryPageViewModel page) Add(page.Warning, "page warning");
     }
+    // The collapsible section headers (Settings, Tools, Apps, Backups) also translate on set — check them too.
+    foreach (var group in navVm.NavGroups)
+        Add(group.Header, "sidebar section");
 
     var spanish = new Dictionary<string, string>(StringComparer.Ordinal);
     using (var stream = typeof(Loc).Assembly.GetManifestResourceStream("WinPure.Strings.es.json"))

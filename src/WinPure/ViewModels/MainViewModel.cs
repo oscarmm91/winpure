@@ -46,6 +46,31 @@ public sealed class NavItem : ObservableObject
     public bool HasPending => PendingCount > 0;
 }
 
+/// <summary>
+/// A collapsible section of the sidebar (Settings, Tools, Apps, Backups). It is a grouped VIEW over the same
+/// NavItem instances that live in the flat NavItems list, so every existing code path that iterates NavItems
+/// keeps working; the sidebar simply renders these groups instead of one long list that ran off the bottom.
+/// </summary>
+public sealed class NavGroup : ObservableObject
+{
+    private readonly string _header = "";
+    /// <summary>Translated when set: the English passed in is the key.</summary>
+    public required string Header { get => _header; init => _header = Loc.T(value); }
+    public ObservableCollection<NavItem> Items { get; } = new();
+
+    private bool _isExpanded = true;
+    public bool IsExpanded { get => _isExpanded; set => Set(ref _isExpanded, value); }
+    public RelayCommand ToggleCommand { get; }
+    public NavGroup() => ToggleCommand = new RelayCommand(_ => IsExpanded = !IsExpanded);
+
+    // The sum of the section's pending badges, shown on the header so a pending change is not hidden by a
+    // collapsed section.
+    private int _pendingCount;
+    public int PendingCount { get => _pendingCount; private set { if (Set(ref _pendingCount, value)) OnPropertyChanged(nameof(HasPending)); } }
+    public bool HasPending => _pendingCount > 0;
+    public void RefreshPending() => PendingCount = Items.Sum(i => i.PendingCount);
+}
+
 public sealed class MainViewModel : ObservableObject
 {
     private readonly BackupManager _backupManager = new();
@@ -53,6 +78,10 @@ public sealed class MainViewModel : ObservableObject
     private ScanContext _scanContext = new();
 
     public ObservableCollection<NavItem> NavItems { get; } = new();
+    /// <summary>The sidebar's collapsible sections, a grouped view over NavItems. Built once after NavItems is filled.</summary>
+    public ObservableCollection<NavGroup> NavGroups { get; } = new();
+    /// <summary>Home, pinned above the sections so it is always one click away.</summary>
+    public NavItem? HomeItem { get; private set; }
     public List<TweakViewModel> AllTweaks { get; } = new();
 
     private readonly DashboardViewModel _dashboard;
@@ -249,6 +278,7 @@ public sealed class MainViewModel : ObservableObject
         foreach (var item in NavItems) item.Owner = this;
         _currentNav = NavItems[0];
         _currentNav.SetCurrentSilently(true);
+        BuildNavGroups();
 
         // The dashboard shows live RAM and disk figures; refresh them every 2 s, but only while it is the
         // page on screen (the setter stops the timer on navigation away). The app opens on the dashboard.
@@ -267,6 +297,34 @@ public sealed class MainViewModel : ObservableObject
 
         _undoTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(45) };
         _undoTimer.Tick += (_, _) => HideUndo();
+    }
+
+    // Buckets the flat NavItems into four collapsible sidebar sections. Home is pinned above them. Classifying by
+    // page identity/type keeps this in one place; adding a page means adding it to the right bucket here.
+    private void BuildNavGroups()
+    {
+        var settings = new NavGroup { Header = "Settings" };
+        var tools = new NavGroup { Header = "Tools" };
+        var apps = new NavGroup { Header = "Apps" };
+        var backups = new NavGroup { Header = "Backups" };
+
+        foreach (var item in NavItems)
+        {
+            var target = item.Page switch
+            {
+                _ when item.Page == _dashboard => null,                                   // Home: pinned, no section
+                CategoryPageViewModel { Category: TweakCategory.RemoveApps } => apps,      // Remove Apps sits with the app pages
+                CategoryPageViewModel => settings,                                         // the eight tweak categories
+                _ when item.Page == _installer || item.Page == _uninstaller => apps,
+                _ when item.Page == _restore => backups,
+                _ => tools,                                                                // every one-shot tool
+            };
+            if (target is null) HomeItem = item;
+            else target.Items.Add(item);
+        }
+
+        foreach (var g in new[] { settings, tools, apps, backups })
+            NavGroups.Add(g);
     }
 
     private void AddCategory(string label, string glyph, TweakCategory category, string title, string subtitle,
@@ -575,6 +633,8 @@ public sealed class MainViewModel : ObservableObject
         foreach (var item in NavItems)
             if (item.Page is CategoryPageViewModel page)
                 item.PendingCount = page.Tweaks.Count(t => t.IsDirty);
+        foreach (var g in NavGroups)
+            g.RefreshPending();   // so a pending change is visible on a collapsed section's header too
     }
 
     /// <summary>Startup toggles apply immediately, so the dashboard's backup count moves too.</summary>

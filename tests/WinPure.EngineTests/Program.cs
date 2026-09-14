@@ -2969,7 +2969,7 @@ bool TheThreeProfilesSelectTheIntendedTweaks()
         "ui-taskbar-never-combine", "ui-no-shortcut-suffix", "ui-hide-gallery", "ui-most-used", "ui-recently-added",
         "ui-sticky-keys-prompt",
         "ctx-multi-invoke",
-        "features-powershell-v2", "features-smb1",
+        "features-powershell-v2",
     };
     var expectedAggressive = new HashSet<string>
     {
@@ -2980,6 +2980,9 @@ bool TheThreeProfilesSelectTheIntendedTweaks()
         "perf-animations", "perf-fullscreen-opt", "perf-long-paths", "perf-reserved-storage",
         "ui-transparency",
         "ctx-cast-to-device", "ctx-include-in-library",
+        // SMB1 removal needs a reboot and can break legacy SMB1-only NAS/printers, so it belongs to the
+        // opt-in tier, not the default one (grader minor #3).
+        "features-smb1",
     };
 
     var problems = new List<string>();

@@ -517,7 +517,7 @@
   "Cannot be undone: to get it back, reinstall it yourself.": "No se puede deshacer: para recuperarla, reinstálala tú.",
   "Clean, optimize and take control of Windows 11 — every change is backed up and reversible, except the apps you choose to remove.": "Limpia, optimiza y toma el control de Windows 11 — cada cambio se respalda y se puede deshacer, salvo las apps que decidas quitar.",
   "Safe + stronger privacy, safe optional services off, faster shutdown, and more UI cleanup.": "Seguro + más privacidad, servicios opcionales seguros desactivados, apagado más rápido y más limpieza de la interfaz.",
-  "Balanced + Copilot/AI and Recall off, all telemetry tasks off, and safe speed tweaks. Still fully reversible.": "Equilibrado + Copilot/IA y Recall desactivados, todas las tareas de telemetría apagadas y ajustes de velocidad seguros. Todo sigue siendo reversible.",
+  "Balanced + Copilot/AI and Recall off, all telemetry tasks off, plus performance and cleanup tweaks. Still fully reversible.": "Equilibrado + Copilot/IA y Recall desactivados, todas las tareas de telemetría apagadas, más ajustes de rendimiento y limpieza. Todo sigue siendo reversible.",
   "The {0} profile — everything it covers is already applied on this PC.": "El perfil {0} — todo lo que cubre ya está aplicado en esta PC.",
   "The {0} profile will change 1 setting on this PC:  {1}": "El perfil {0} cambiará 1 ajuste en esta PC:  {1}",
   "The {0} profile will change {1} settings on this PC:  {2}": "El perfil {0} cambiará {1} ajustes en esta PC:  {2}",

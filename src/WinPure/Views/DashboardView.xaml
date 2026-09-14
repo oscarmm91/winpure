@@ -155,7 +155,7 @@
                         BorderThickness="1" BorderBrush="{StaticResource Brush.Orange}">
                     <StackPanel>
                         <TextBlock Text="{l:Tr 'Aggressive'}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
-                        <TextBlock Text="{l:Tr 'Balanced + Copilot/AI and Recall off, all telemetry tasks off, and safe speed tweaks. Still fully reversible.'}"
+                        <TextBlock Text="{l:Tr 'Balanced + Copilot/AI and Recall off, all telemetry tasks off, plus performance and cleanup tweaks. Still fully reversible.'}"
                                    FontSize="12" Margin="0,6,0,12" TextWrapping="Wrap"
                                    Foreground="{StaticResource Brush.TextSecondary}" MinHeight="48"/>
                         <Button Style="{StaticResource SubtleButton}" Content="{l:Tr 'Select Aggressive preset'}"

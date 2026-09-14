@@ -1533,7 +1533,7 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
-            Id = "features-smb1", Category = TweakCategory.Features, Preset = PresetLevel.Balanced,
+            Id = "features-smb1", Category = TweakCategory.Features, Preset = PresetLevel.Aggressive,
             Name = "Turn Off SMB 1.0",
             Description = "Turn off the obsolete file-sharing protocol the WannaCry ransomware spread through.",
             Help = "Already off on a clean Windows 11; this catches PCs upgraded from older versions. Very old NAS drives, printers and scanners that only speak SMB 1.0 stop working without it.",

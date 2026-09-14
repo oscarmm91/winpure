@@ -121,6 +121,7 @@ failures += HostsEditorBacksUpBeforeSavingAndCanUndoOrReset() ? 0 : 1;
 failures += FreeingMemoryReportsBeforeAndAfterWithoutTouchingRealMemory() ? 0 : 1;
 failures += PowerActionsGoToTheBackendWithoutTouchingTheRealMachine() ? 0 : 1;
 failures += DiagnosticsExportsASystemBundleWithoutTouchingTheSystem() ? 0 : 1;
+failures += HardwareInfoIsReadOnlyAndLabelled() ? 0 : 1;
 failures += DnsCapturesCurrentServersAndRestorePutsThemBack() ? 0 : 1;
 failures += AServiceCanBeSetToManualNotJustDisabled() ? 0 : 1;
 failures += CreatingAContextMenuKeyIsUndoneByDeletingIt() ? 0 : 1;
@@ -1542,6 +1543,44 @@ bool DiagnosticsExportsASystemBundleWithoutTouchingTheSystem()
     return Report("diagnostics exports a system bundle without touching the system",
         problems.Count == 0,
         problems.Count == 0 ? "Info returns read-only rows; Export writes a zip with the system summary and the logs" : string.Join(" | ", problems));
+}
+
+// The Hardware page reads read-only facts from the registry, Environment and DriveInfo — no WMI, no NuGet
+// dependency, no driver. It must return labelled sections without throwing. Processor and Memory exist on any
+// machine (including the CI VM); GPU/motherboard may be absent there, so they are not asserted.
+bool HardwareInfoIsReadOnlyAndLabelled()
+{
+    var problems = new List<string>();
+    try
+    {
+        var sections = HardwareService.Info();
+        if (sections.Count == 0) problems.Add("Info returned no sections");
+
+        var cpu = sections.FirstOrDefault(s => s.Title == "Processor");
+        if (cpu is null) problems.Add("no Processor section");
+        else if (!cpu.Rows.Any(r => r.Label == "Model" && !string.IsNullOrWhiteSpace(r.Value)))
+            problems.Add("Processor section has no non-empty Model row");
+
+        var mem = sections.FirstOrDefault(s => s.Title == "Memory");
+        if (mem is null) problems.Add("no Memory section");
+        else if (!mem.Rows.Any(r => r.Label == "Total" && r.Value.Contains("GB")))
+            problems.Add("Memory section has no Total row in GB");
+
+        // Read-only: calling twice returns the same shape and changes nothing.
+        var again = HardwareService.Info();
+        if (again.Count != sections.Count) problems.Add("Info is not stable across calls");
+
+        // No blank facts leak through — every row carries a label and a value.
+        foreach (var s in sections)
+            foreach (var r in s.Rows)
+                if (string.IsNullOrWhiteSpace(r.Label) || string.IsNullOrWhiteSpace(r.Value))
+                    problems.Add($"blank row in {s.Title}");
+    }
+    catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
+
+    return Report("hardware info is read-only, labelled and never throws",
+        problems.Count == 0,
+        problems.Count == 0 ? "sections returned with Processor.Model and Memory.Total, stable across calls, no blank rows" : string.Join(" | ", problems));
 }
 
 // Power actions route to the swappable backend with the right arguments, and only Shutdown/Restart carry a

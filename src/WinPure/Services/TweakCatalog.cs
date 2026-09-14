@@ -976,7 +976,8 @@ public static class TweakCatalog
             Id = "perf-mouse-accel", Category = TweakCategory.Performance, Preset = PresetLevel.Manual,
             Name = "Disable Mouse Acceleration",
             Description = "Make cursor movement 1:1 with physical mouse movement.",
-            Help = "Sets MouseSpeed and both thresholds to 0 — preferred for gaming and precise work.",
+            Help = "Sets MouseSpeed and both thresholds to 0 — preferred for gaming and precise work. WinPure pushes the change to the live session with SPI_SETMOUSE, so it takes effect without signing out.",
+            NotifiesMouseChange = true,
             Icon = "",
             Actions = new TweakAction[]
             {
@@ -1802,6 +1803,84 @@ public static class TweakCatalog
                     DeleteOnApply = false,
                     KeyDefaultValue = "powershell.exe -NoExit -WorkingDirectory \"%V\"",
                 },
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "ctx-take-ownership", Category = TweakCategory.ContextMenu, Preset = PresetLevel.Manual,
+            Name = "Add 'Take ownership' to the right-click menu",
+            Description = "Add a 'Take ownership' entry to the right-click menu of files and folders, so you can grab full control of something Windows won't let you touch.",
+            // The verb is named "runas" ON PURPOSE: a shell verb inherits the caller's token, and Explorer runs under the
+            // user's FILTERED (non-elevated) token, so a normal verb's icacls /setowner would fail with Access Denied on the
+            // very files this exists to unlock. The canonical "runas" verb makes Explorer elevate the command through UAC;
+            // MUIVerb gives the menu text, HasLUAShield the shield. The path arrives as "%1" always inside double quotes, and
+            // Windows forbids the " character in file names, so the quotes cannot be broken and cmd's metacharacters (& | ^)
+            // stay literal: no command injection (the Fase A hole was a PowerShell single-quote, and ' IS legal in names).
+            // Ownership is taken by SID (*S-1-5-32-544 = BUILTIN\Administrators, language-invariant), NOT takeown, to avoid
+            // takeown /d's localized prompt. On folders it is recursive (/t) — that follows into any junctions inside the tree.
+            // Single & (not &&) so /grant still runs if /setowner fails on a few children of a large tree.
+            Help = "Creates per-user 'runas' verbs under *\\shell and Directory\\shell so the command runs elevated through UAC — an unelevated verb would fail with Access Denied. They run icacls /setowner then /grant by the Administrators SID, so it works on any Windows language. On folders it is recursive. Undo deletes them.",
+            Icon = Glyph(0xE72E),
+            Actions = new TweakAction[]
+            {
+                new RegistryKeyAction { KeyPath = @"HKCU\Software\Classes\*\shell\runas", DeleteOnApply = false, KeyDefaultValue = "" },
+                new RegistryValueAction { KeyPath = @"HKCU\Software\Classes\*\shell\runas", ValueName = "MUIVerb", Kind = RegistryValueKind.String, ApplyValue = "Take ownership", DefaultValue = null },
+                new RegistryValueAction { KeyPath = @"HKCU\Software\Classes\*\shell\runas", ValueName = "HasLUAShield", Kind = RegistryValueKind.String, ApplyValue = "", DefaultValue = null },
+                new RegistryKeyAction
+                {
+                    KeyPath = @"HKCU\Software\Classes\*\shell\runas\command",
+                    DeleteOnApply = false,
+                    KeyDefaultValue = "cmd.exe /c icacls \"%1\" /setowner *S-1-5-32-544 & icacls \"%1\" /grant *S-1-5-32-544:F",
+                },
+                new RegistryKeyAction { KeyPath = @"HKCU\Software\Classes\Directory\shell\runas", DeleteOnApply = false, KeyDefaultValue = "" },
+                new RegistryValueAction { KeyPath = @"HKCU\Software\Classes\Directory\shell\runas", ValueName = "MUIVerb", Kind = RegistryValueKind.String, ApplyValue = "Take ownership", DefaultValue = null },
+                new RegistryValueAction { KeyPath = @"HKCU\Software\Classes\Directory\shell\runas", ValueName = "HasLUAShield", Kind = RegistryValueKind.String, ApplyValue = "", DefaultValue = null },
+                new RegistryKeyAction
+                {
+                    KeyPath = @"HKCU\Software\Classes\Directory\shell\runas\command",
+                    DeleteOnApply = false,
+                    KeyDefaultValue = "cmd.exe /c icacls \"%1\" /setowner *S-1-5-32-544 /t & icacls \"%1\" /grant *S-1-5-32-544:F /t",
+                },
+            },
+        };
+
+        yield return new Tweak
+        {
+            Id = "ctx-run-with-priority", Category = TweakCategory.ContextMenu, Preset = PresetLevel.Manual,
+            Name = "Add 'Run with priority' to programs",
+            Description = "Add a 'Run with priority' submenu to the right-click menu of programs, to launch one at High, Above normal, Normal, Below normal or Low CPU priority.",
+            // Same injection-safe quoting as Take ownership: "%1" cannot be broken because paths can't contain a double quote.
+            // A cascade needs the parent verb to carry MUIVerb + an (empty) SubCommands value so the shell reads the child shell key.
+            Help = "Creates a per-user cascading verb under Software\\Classes\\exefile\\shell that runs 'start' with a priority flag. Undo deletes the whole subtree.",
+            Icon = Glyph(0xE756),
+            Actions = new TweakAction[]
+            {
+                new RegistryKeyAction
+                {
+                    KeyPath = @"HKCU\Software\Classes\exefile\shell\WinPureRunPriority",
+                    DeleteOnApply = false, KeyDefaultValue = "",
+                },
+                new RegistryValueAction
+                {
+                    KeyPath = @"HKCU\Software\Classes\exefile\shell\WinPureRunPriority",
+                    ValueName = "MUIVerb", Kind = RegistryValueKind.String, ApplyValue = "Run with priority", DefaultValue = null,
+                },
+                new RegistryValueAction
+                {
+                    KeyPath = @"HKCU\Software\Classes\exefile\shell\WinPureRunPriority",
+                    ValueName = "SubCommands", Kind = RegistryValueKind.String, ApplyValue = "", DefaultValue = null,
+                },
+                new RegistryKeyAction { KeyPath = @"HKCU\Software\Classes\exefile\shell\WinPureRunPriority\shell\01high", DeleteOnApply = false, KeyDefaultValue = "High" },
+                new RegistryKeyAction { KeyPath = @"HKCU\Software\Classes\exefile\shell\WinPureRunPriority\shell\01high\command", DeleteOnApply = false, KeyDefaultValue = "cmd.exe /c start \"\" /high \"%1\"" },
+                new RegistryKeyAction { KeyPath = @"HKCU\Software\Classes\exefile\shell\WinPureRunPriority\shell\02abovenormal", DeleteOnApply = false, KeyDefaultValue = "Above normal" },
+                new RegistryKeyAction { KeyPath = @"HKCU\Software\Classes\exefile\shell\WinPureRunPriority\shell\02abovenormal\command", DeleteOnApply = false, KeyDefaultValue = "cmd.exe /c start \"\" /abovenormal \"%1\"" },
+                new RegistryKeyAction { KeyPath = @"HKCU\Software\Classes\exefile\shell\WinPureRunPriority\shell\03normal", DeleteOnApply = false, KeyDefaultValue = "Normal" },
+                new RegistryKeyAction { KeyPath = @"HKCU\Software\Classes\exefile\shell\WinPureRunPriority\shell\03normal\command", DeleteOnApply = false, KeyDefaultValue = "cmd.exe /c start \"\" /normal \"%1\"" },
+                new RegistryKeyAction { KeyPath = @"HKCU\Software\Classes\exefile\shell\WinPureRunPriority\shell\04belownormal", DeleteOnApply = false, KeyDefaultValue = "Below normal" },
+                new RegistryKeyAction { KeyPath = @"HKCU\Software\Classes\exefile\shell\WinPureRunPriority\shell\04belownormal\command", DeleteOnApply = false, KeyDefaultValue = "cmd.exe /c start \"\" /belownormal \"%1\"" },
+                new RegistryKeyAction { KeyPath = @"HKCU\Software\Classes\exefile\shell\WinPureRunPriority\shell\05low", DeleteOnApply = false, KeyDefaultValue = "Low" },
+                new RegistryKeyAction { KeyPath = @"HKCU\Software\Classes\exefile\shell\WinPureRunPriority\shell\05low\command", DeleteOnApply = false, KeyDefaultValue = "cmd.exe /c start \"\" /low \"%1\"" },
             },
         };
     }

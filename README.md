@@ -95,7 +95,7 @@ Dark mode, Snap Assist flyout, Start Menu suggestions/most-used/recently-added, 
 </details>
 
 <details>
-<summary>🖱️ <b>Context Menu</b> — 11 tweaks</summary>
+<summary>🖱️ <b>Context Menu</b> — 13 tweaks</summary>
 <br/>
 Restore the classic Windows 10 right-click menu, remove "Edit with Clipchamp / Notepad / Photos", "Ask Copilot", "Share" and "Give access to", and lift the 15-file limit on right-click options.
 <br/><br/>

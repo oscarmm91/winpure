@@ -102,6 +102,10 @@ internal static class Program
             // Diagnostics reads read-only system facts when opened.
             vm.CurrentNav = vm.NavItems.First(n => n.Page is DiagnosticsViewModel);
             Render(root, Path.Combine(outDir, "14-diagnostics.png"));
+
+            // Hardware reads read-only hardware facts from the registry when opened.
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is HardwareViewModel);
+            Render(root, Path.Combine(outDir, "15-hardware.png"));
             return 0;
         }
         catch (Exception ex)

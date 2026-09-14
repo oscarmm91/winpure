@@ -139,6 +139,8 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Remove 'Cast to device' | Manual | Blocked shell extension `{7AD84985-87B4-4a16-BE58-8B72A5B390F7}` (Play To Menu) |
 | Remove 'Include in library' | Manual | Deletes the `Library Location` handler under `Folder\ShellEx\ContextMenuHandlers` (recreated on revert) |
 | Add 'Open PowerShell here' to folders | Manual | Per-user `Directory\Background\shell` verb running `powershell.exe` in the folder (undo deletes it) |
+| Add 'Take ownership' to the right-click menu | Manual | Per-user elevated `runas` verbs under `*\shell` and `Directory\shell` running `icacls /setowner *S-1-5-32-544` + `/grant` (undo deletes them) |
+| Add 'Run with priority' to programs | Manual | Per-user cascading `exefile\shell` verb running `start` with a priority flag (undo deletes the subtree) |
 | Allow the Context Menu on More Than 15 Files | Balanced | `CurrentVersion\Explorer!MultipleInvokePromptMinimum = 300` |
 
 ## 🧩 Windows Features

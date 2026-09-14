@@ -62,6 +62,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly MemoryViewModel _memory;
     private readonly PowerViewModel _power;
     private readonly DiagnosticsViewModel _diagnostics;
+    private readonly HardwareViewModel _hardware;
     private readonly DispatcherTimer _liveTimer;
     private readonly DnsViewModel _dns;
     private readonly HostsViewModel _hosts;
@@ -171,6 +172,14 @@ public sealed class MainViewModel : ObservableObject
             Main = this,
         };
         NavItems.Add(new NavItem { Label = "Diagnostics", Glyph = ((char)0xE9D9).ToString(), Page = _diagnostics });
+        _hardware = new HardwareViewModel
+        {
+            Title = "Hardware",
+            Subtitle = "A read-only look at what is inside this PC — processor, memory, graphics, drives and motherboard. "
+                     + "Read from the registry, so it needs no extra driver.",
+            Main = this,
+        };
+        NavItems.Add(new NavItem { Label = "Hardware", Glyph = ((char)0xE964).ToString(), Page = _hardware });
         _dns = new DnsViewModel(_engine)
         {
             Title = "DNS servers",
@@ -271,6 +280,7 @@ public sealed class MainViewModel : ObservableObject
             if (value.Page == _hosts && !_hosts.HasLoaded) _hosts.Load();
             if (value.Page == _memory) _memory.Load();   // re-read RAM each time the page opens
             if (value.Page == _diagnostics && !_diagnostics.HasLoaded) _diagnostics.Load();
+            if (value.Page == _hardware && !_hardware.HasLoaded) _hardware.Load();
             SyncLiveTimer();
             OnPropertyChanged();
             OnPropertyChanged(nameof(CurrentPage));
@@ -715,6 +725,8 @@ public sealed class MainViewModel : ObservableObject
             var results = await Task.Run(() => _engine.ApplyChanges(changes, progress, futureUsers));
             if (results.Any(r => r.Success && r.Tweak.NotifiesThemeChange))
                 NativeMethods.BroadcastThemeChange();
+            if (results.Any(r => r.Success && r.Tweak.NotifiesMouseChange))
+                NativeMethods.ApplyMouseSettings();
             int failed = results.Count(r => !r.Success);
             bool needsExplorer = results.Any(r => r.Success && r.Tweak.RequiresExplorerRestart);
             bool needsReboot = results.Any(r => r.Success && r.Tweak.RequiresRestart);
@@ -800,8 +812,9 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             int failures = await Task.Run(() => _backupManager.RestoreSession(vm.Session));
-            // a snapshot may include theme values — make open apps repaint
+            // a snapshot may include theme or mouse values — make open apps repaint and re-read the pointer
             NativeMethods.BroadcastThemeChange();
+            NativeMethods.ApplyMouseSettings();
             StatusText = failures == 0 ? Loc.T("Backup restored.")
                 : failures == 1 ? Loc.T("Backup restored with 1 error (see log).")
                 : Loc.F("Backup restored with {0} errors (see log).", failures);

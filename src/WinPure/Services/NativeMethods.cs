@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Microsoft.Win32;
 
 namespace WinPure.Services;
 
@@ -24,6 +25,12 @@ public static class NativeMethods
 
     [DllImport("shell32.dll", SetLastError = false)]
     private static extern int SHChangeNotify(int eventId, int flags, IntPtr item1, IntPtr item2);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SystemParametersInfoW(uint uiAction, uint uiParam, int[] pvParam, uint fWinIni);
+
+    private const uint SpiSetMouse = 0x0004;
+    private const uint SpifSendChange = 0x0002;
 
     [DllImport("wtsapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool WTSQuerySessionInformationW(IntPtr server, int sessionId, int infoClass,
@@ -73,6 +80,27 @@ public static class NativeMethods
         catch
         {
             // cosmetic refresh only — never let it break an apply
+        }
+    }
+
+    /// <summary>
+    /// Pushes the current Control Panel\Mouse acceleration values to the live session (SPI_SETMOUSE) so a mouse
+    /// tweak takes effect without signing out. The tweak already wrote the registry (which persists across logins);
+    /// this only syncs the running pointer to it. Best-effort — never breaks an apply.
+    /// </summary>
+    public static void ApplyMouseSettings()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(@"Control Panel\Mouse");
+            int Read(string name, int fallback) => int.TryParse(key?.GetValue(name) as string, out int v) ? v : fallback;
+            // Windows defaults with acceleration on: speed 1, thresholds 6 and 10.
+            int[] p = { Read("MouseSpeed", 1), Read("MouseThreshold1", 6), Read("MouseThreshold2", 10) };
+            SystemParametersInfoW(SpiSetMouse, 0, p, SpifSendChange);
+        }
+        catch
+        {
+            // live-apply is best-effort; the registry values are what persist and load at next sign-in
         }
     }
 }

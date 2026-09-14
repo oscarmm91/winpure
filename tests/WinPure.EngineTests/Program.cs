@@ -2979,7 +2979,9 @@ bool TheThreeProfilesSelectTheIntendedTweaks()
         "svc-ai-fabric",
         "perf-animations", "perf-fullscreen-opt", "perf-long-paths", "perf-reserved-storage",
         "ui-transparency",
-        "ctx-cast-to-device", "ctx-include-in-library",
+        // ctx-cast-to-device stays Manual: removing it takes away working DLNA "Cast to device", a real feature,
+        // not a privacy/bloat win — both reviewers flagged it as over the line for a profile.
+        "ctx-include-in-library",
         // SMB1 removal needs a reboot and can break legacy SMB1-only NAS/printers, so it belongs to the
         // opt-in tier, not the default one (grader minor #3).
         "features-smb1",

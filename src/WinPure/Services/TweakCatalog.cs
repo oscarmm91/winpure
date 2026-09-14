@@ -1746,7 +1746,7 @@ public static class TweakCatalog
 
         yield return new Tweak
         {
-            Id = "ctx-cast-to-device", Category = TweakCategory.ContextMenu, Preset = PresetLevel.Aggressive,
+            Id = "ctx-cast-to-device", Category = TweakCategory.ContextMenu, Preset = PresetLevel.Manual,
             Name = "Remove 'Cast to device'",
             Description = "Remove the 'Cast to device' (DLNA Play To) entry from the right-click menu.",
             Help = "Blocks the Play To Menu shell extension {7AD84985-87B4-4a16-BE58-8B72A5B390F7} via the same Shell Extensions\\Blocked mechanism as the other context-menu removals; undo deletes the block.",

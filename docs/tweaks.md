@@ -136,7 +136,7 @@ Disabling sets registry `Start = 4` and stops the service; the original start mo
 | Remove 'Ask Copilot' | Safe | Blocked shell extension `{CB3B0003-8088-4EDE-8769-8B354AB2FF8C}` |
 | Remove 'Share' | Manual | Deletes the `ModernSharing` handler under `AllFileSystemObjects` (recreated on revert) |
 | Remove 'Give access to' | Safe | Deletes the 6 `Sharing` handlers: files, folders, background, drives & both library folders |
-| Remove 'Cast to device' | Aggressive | Blocked shell extension `{7AD84985-87B4-4a16-BE58-8B72A5B390F7}` (Play To Menu) |
+| Remove 'Cast to device' | Manual | Blocked shell extension `{7AD84985-87B4-4a16-BE58-8B72A5B390F7}` (Play To Menu) |
 | Remove 'Include in library' | Aggressive | Deletes the `Library Location` handler under `Folder\ShellEx\ContextMenuHandlers` (recreated on revert) |
 | Add 'Open PowerShell here' to folders | Manual | Per-user `Directory\Background\shell` verb running `powershell.exe` in the folder (undo deletes it) |
 | Add 'Take ownership' to the right-click menu | Manual | Per-user elevated `runas` verbs under `*\shell` and `Directory\shell` running `icacls /setowner *S-1-5-32-544` + `/grant` (undo deletes them) |

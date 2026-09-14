@@ -7,7 +7,11 @@ public enum TweakCategory
     Services,
     Performance,
     UI,
-    ContextMenu
+    ContextMenu,
+    Features,
+    Edge,
+    /// <summary>Everything that cannot be undone. Never in a preset; its page shows no preset buttons.</summary>
+    RemoveApps
 }
 
 /// <summary>Lowest preset that includes the tweak. Manual = never auto-selected by a preset.</summary>

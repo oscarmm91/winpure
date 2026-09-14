@@ -5,7 +5,11 @@ namespace WinPure.Models;
 /// <summary>One reversible unit of system state captured before a change.</summary>
 public sealed class BackupEntry
 {
-    /// <summary>registry-value | registry-key | service | scheduled-task</summary>
+    /// <summary>
+    /// registry-value | registry-key | service | scheduled-task | startup-entry | system-state | optional-feature.
+    /// For system-state, ValueName is the SystemStateKind and Value the measured state; for
+    /// optional-feature, ValueName is the DISM feature name and Value "Enabled" or "Disabled".
+    /// </summary>
     public required string Type { get; set; }
     public required string TweakId { get; set; }
     public string TweakName { get; set; } = "";
@@ -19,6 +23,12 @@ public sealed class BackupEntry
     public string? Value { get; set; }
     /// <summary>Whether the value (or key) existed before the change.</summary>
     public bool Existed { get; set; }
+
+    /// <summary>
+    /// Came from a best-effort action (see TweakAction.Optional). Windows may refuse to write
+    /// it back — that is expected and must not be reported as a failed restore.
+    /// </summary>
+    public bool Optional { get; set; }
 
     // service
     public string? ServiceName { get; set; }

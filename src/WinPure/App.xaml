@@ -13,6 +13,8 @@
 
             <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
             <views:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility"/>
+            <views:EnumEqualsConverter x:Key="EnumEquals"/>
+            <views:AllTrueConverter x:Key="AllTrue"/>
 
             <DataTemplate DataType="{x:Type vm:DashboardViewModel}">
                 <views:DashboardView/>
@@ -25,6 +27,30 @@
             </DataTemplate>
             <DataTemplate DataType="{x:Type vm:RepairViewModel}">
                 <views:RepairView/>
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:StartupViewModel}">
+                <views:StartupView/>
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:InstallerViewModel}">
+                <views:InstallerView/>
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:CleanupViewModel}">
+                <views:CleanupView/>
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:DnsViewModel}">
+                <views:DnsView/>
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:HostsViewModel}">
+                <views:HostsView/>
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:MemoryViewModel}">
+                <views:MemoryView/>
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:PowerViewModel}">
+                <views:PowerView/>
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:DiagnosticsViewModel}">
+                <views:DiagnosticsView/>
             </DataTemplate>
         </ResourceDictionary>
     </Application.Resources>

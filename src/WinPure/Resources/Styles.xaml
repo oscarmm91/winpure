@@ -11,13 +11,24 @@
                 <ControlTemplate TargetType="RadioButton">
                     <Grid>
                         <Border x:Name="Bg" Background="Transparent" CornerRadius="6" Padding="12,9">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock x:Name="Icon" Text="{Binding Glyph}" FontFamily="{StaticResource Font.Icon}"
-                                           FontSize="16" VerticalAlignment="Center"
-                                           Foreground="{TemplateBinding Foreground}"/>
-                                <TextBlock Text="{Binding Label}" Margin="14,0,0,0" FontSize="13.5"
-                                           VerticalAlignment="Center" Foreground="{TemplateBinding Foreground}"/>
-                            </StackPanel>
+                            <DockPanel>
+                                <!-- how many of this page's tweaks are waiting for Apply Changes. Shown by a
+                                     DataTrigger, not a converter: this dictionary is merged into App.xaml and
+                                     cannot see App.xaml's own resources, such as BoolToVisibility. -->
+                                <Border x:Name="Badge" DockPanel.Dock="Right" CornerRadius="9" MinWidth="18" Height="18" Padding="5,0"
+                                        VerticalAlignment="Center" Background="{DynamicResource Brush.Accent}"
+                                        Visibility="Collapsed">
+                                    <TextBlock Text="{Binding PendingCount}" FontSize="11" FontWeight="SemiBold" Foreground="White"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="Icon" Text="{Binding Glyph}" FontFamily="{StaticResource Font.Icon}"
+                                               FontSize="16" VerticalAlignment="Center"
+                                               Foreground="{TemplateBinding Foreground}"/>
+                                    <TextBlock Text="{Binding Label}" Margin="14,0,0,0" FontSize="13.5"
+                                               VerticalAlignment="Center" Foreground="{TemplateBinding Foreground}"/>
+                                </StackPanel>
+                            </DockPanel>
                         </Border>
                         <Rectangle x:Name="Pill" Width="3" Height="18" RadiusX="1.5" RadiusY="1.5"
                                    HorizontalAlignment="Left" VerticalAlignment="Center"
@@ -33,6 +44,9 @@
                             <Setter TargetName="Pill" Property="Visibility" Value="Visible"/>
                             <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
                         </Trigger>
+                        <DataTrigger Binding="{Binding HasPending}" Value="True">
+                            <Setter TargetName="Badge" Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>

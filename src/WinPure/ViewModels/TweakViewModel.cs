@@ -9,13 +9,15 @@ public sealed class TweakViewModel : ObservableObject
 
     public TweakViewModel(Tweak tweak) => Tweak = tweak;
 
-    public string Name => Tweak.Name;
-    public string Description => Tweak.Description;
-    public string Help => string.IsNullOrEmpty(Tweak.Help) ? Tweak.Description : Tweak.Help;
+    // The catalog is written in English; the card shows the user's language.
+    public string Name => Loc.T(Tweak.Name);
+    public string Description => Loc.T(Tweak.Description);
+    public string Help => Loc.T(string.IsNullOrEmpty(Tweak.Help) ? Tweak.Description : Tweak.Help);
     public string Icon => Tweak.Icon;
     public TweakCategory Category => Tweak.Category;
     public PresetLevel Preset => Tweak.Preset;
     public bool FullyReversible => Tweak.FullyReversible;
+    public bool RequiresRestart => Tweak.RequiresRestart;
 
     private TweakStatus _status = TweakStatus.Unknown;
     public TweakStatus Status
@@ -27,16 +29,25 @@ public sealed class TweakViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(StatusText));
                 OnPropertyChanged(nameof(IsOptimized));
+                OnPropertyChanged(nameof(CanToggle));
             }
         }
     }
 
     public bool IsOptimized => Status == TweakStatus.Optimized;
+
+    /// <summary>
+    /// False for an app removal that is already done: switching it off would promise an undo that does not exist,
+    /// so its toggle stays on and disabled.
+    /// </summary>
+    public bool CanToggle => FullyReversible || !IsOptimized;
     public string StatusText => Status switch
     {
-        TweakStatus.Optimized => "Optimized",
-        TweakStatus.Pending => "Not applied",
-        _ => "Scanning…",
+        TweakStatus.Optimized => Loc.T("Optimized"),
+        TweakStatus.Pending => Loc.T("Not applied"),
+        // Before the scan it really is still scanning; afterwards, Unknown means the check
+        // failed — saying "Scanning…" forever hid that from the user.
+        _ => _scanned ? Loc.T("Couldn't detect") : Loc.T("Scanning…"),
     };
 
     private bool _isSelected;
@@ -54,15 +65,23 @@ public sealed class TweakViewModel : ObservableObject
         }
     }
 
-    /// <summary>True when the toggle differs from the real system state.</summary>
-    public bool IsDirty => Status != TweakStatus.Unknown && IsSelected != IsOptimized;
+    /// <summary>
+    /// True when the toggle differs from the real system state. An undetectable tweak counts
+    /// as dirty once the user switches it on: applying is idempotent and always snapshots,
+    /// so "we could not check" must not mean "you cannot apply this".
+    /// </summary>
+    public bool IsDirty => IsSelected != IsOptimized;
 
     public event Action? SelectionChanged;
 
+    private bool _scanned;
+
     public void RefreshStatus(TweakEngine engine, ScanContext ctx)
     {
+        _scanned = true;
         Status = engine.GetStatus(Tweak, ctx);
         _isSelected = IsOptimized;
+        OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(IsSelected));
         OnPropertyChanged(nameof(IsDirty));
     }

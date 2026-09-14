@@ -25,6 +25,39 @@ public static class NativeMethods
     [DllImport("shell32.dll", SetLastError = false)]
     private static extern int SHChangeNotify(int eventId, int flags, IntPtr item1, IntPtr item2);
 
+    [DllImport("wtsapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool WTSQuerySessionInformationW(IntPtr server, int sessionId, int infoClass,
+        out IntPtr buffer, out int bytesReturned);
+
+    [DllImport("wtsapi32.dll")]
+    private static extern void WTSFreeMemory(IntPtr memory);
+
+    private const int WtsUserName = 5;
+    private const int WtsDomainName = 7;
+
+    /// <summary>
+    /// DOMAIN\user signed in to a session — the person at the keyboard, as opposed to the
+    /// account this process was elevated as. Pure Win32: no PowerShell, no WMI, no NuGet.
+    /// Null when it cannot be read.
+    /// </summary>
+    public static string? GetSessionUser(int sessionId)
+    {
+        string? user = QuerySession(sessionId, WtsUserName);
+        if (string.IsNullOrEmpty(user)) return null;
+        // Without the domain the answer is incomplete, not "the same user": a bare name could
+        // resolve to a different account of the same name. Incomplete means unknown.
+        string? domain = QuerySession(sessionId, WtsDomainName);
+        return string.IsNullOrEmpty(domain) ? null : $"{domain}\\{user}";
+    }
+
+    private static string? QuerySession(int sessionId, int infoClass)
+    {
+        if (!WTSQuerySessionInformationW(IntPtr.Zero, sessionId, infoClass, out var buffer, out _))
+            return null;
+        try { return Marshal.PtrToStringUni(buffer); }
+        finally { WTSFreeMemory(buffer); }
+    }
+
     /// <summary>Repaints every running app (Explorer, taskbar…) after a light/dark theme change.</summary>
     public static void BroadcastThemeChange()
     {

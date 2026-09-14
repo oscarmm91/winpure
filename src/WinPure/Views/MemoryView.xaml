@@ -1,0 +1,53 @@
+<UserControl x:Class="WinPure.Views.MemoryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:WinPure.Views">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,18,0,12">
+            <TextBlock Text="{Binding Title}" FontSize="28" FontWeight="SemiBold"
+                       Foreground="{StaticResource Brush.TextPrimary}"/>
+            <TextBlock Text="{Binding Subtitle}" FontSize="13" Margin="0,6,0,0" TextWrapping="Wrap"
+                       Foreground="{StaticResource Brush.TextSecondary}" MaxWidth="720" HorizontalAlignment="Left"/>
+        </StackPanel>
+
+        <Border Grid.Row="1" Background="{StaticResource Brush.Card}" CornerRadius="8" Padding="18,16" Margin="0,0,6,12"
+                BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}">
+            <StackPanel>
+                <Grid>
+                    <TextBlock Text="{l:Tr 'Physical memory'}" FontSize="13" FontWeight="SemiBold"
+                               Foreground="{StaticResource Brush.TextPrimary}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding UsageText}" HorizontalAlignment="Right" FontSize="13"
+                               Foreground="{StaticResource Brush.TextSecondary}" VerticalAlignment="Center"/>
+                </Grid>
+                <ProgressBar Value="{Binding LoadPercent, Mode=OneWay}" Maximum="100" Height="10" Margin="0,12,0,0"
+                             Foreground="{StaticResource Brush.Accent}" Background="{StaticResource Brush.CardBorder}"
+                             BorderThickness="0"/>
+                <Button Style="{StaticResource PrimaryButton}" Command="{Binding CleanCommand}" Margin="0,16,0,0"
+                        HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE74C;" FontFamily="{StaticResource Font.Icon}" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Text="{l:Tr 'Free up memory'}" Margin="8,0,0,0"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="2" Background="{StaticResource Brush.Card}" CornerRadius="8" Padding="14,10" Margin="0,0,6,0"
+                BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE946;" FontFamily="{StaticResource Font.Icon}" FontSize="14"
+                           Foreground="{StaticResource Brush.TextSecondary}" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding Status}" Margin="10,0,0,0" FontSize="12.5" VerticalAlignment="Center"
+                           TextWrapping="Wrap" Foreground="{StaticResource Brush.TextSecondary}" MaxWidth="680"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

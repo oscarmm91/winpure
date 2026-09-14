@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>WinPure</AssemblyName>
     <RootNamespace>WinPure</RootNamespace>
-    <Version>1.1.1</Version>
+    <Version>2.0.0</Version>
     <Authors>Oscar Medina (@oscaremeh)</Authors>
     <Product>WinPure</Product>
     <Description>Windows 11 debloater and optimizer with always-available restore.</Description>
@@ -23,6 +23,18 @@
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Lets tests/WinPure.EngineTests build a ScanContext that simulates a failed scan. -->
+    <InternalsVisibleTo Include="WinPure.EngineTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The Spanish text (see Services/Loc.cs). Embedded in WinPure.dll itself, so the single-file exe carries it.
+         WithCulture="false" is required: MSBuild reads the ".es." in the name as a culture and would move the
+         file into an es\WinPure.resources.dll satellite instead, which SatelliteResourceLanguages=en then drops. -->
+    <EmbeddedResource Include="Resources\Strings.es.json" LogicalName="WinPure.Strings.es.json" WithCulture="false" />
+  </ItemGroup>
 
 </Project>
 

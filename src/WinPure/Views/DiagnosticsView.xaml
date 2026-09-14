@@ -1,0 +1,54 @@
+<UserControl x:Class="WinPure.Views.DiagnosticsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:WinPure.Views">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,18,6,12">
+            <TextBlock Text="{Binding Title}" FontSize="28" FontWeight="SemiBold"
+                       Foreground="{StaticResource Brush.TextPrimary}"/>
+            <TextBlock Text="{Binding Subtitle}" FontSize="13" Margin="0,6,0,0" TextWrapping="Wrap"
+                       Foreground="{StaticResource Brush.TextSecondary}" MaxWidth="720" HorizontalAlignment="Left"/>
+
+            <Border Background="{StaticResource Brush.Card}" CornerRadius="8" Padding="18,10" Margin="0,20,0,12"
+                    BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}">
+                <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="130"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Label}" FontSize="12.5"
+                                           Foreground="{StaticResource Brush.TextSecondary}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="12.5"
+                                           Foreground="{StaticResource Brush.TextPrimary}" TextWrapping="Wrap"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+
+            <Border Background="{StaticResource Brush.Card}" CornerRadius="8" Padding="18,16" Margin="0,0,0,12"
+                    BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}">
+                <StackPanel>
+                    <TextBlock Text="{l:Tr 'Support bundle'}" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{StaticResource Brush.TextPrimary}"/>
+                    <TextBlock Text="{l:Tr 'Save a zip with the WinPure logs and the system summary above, for troubleshooting. It holds no passwords, though the logs may include Windows file paths that contain your user name.'}"
+                               FontSize="12" Margin="0,4,0,12" TextWrapping="Wrap"
+                               Foreground="{StaticResource Brush.TextSecondary}" MaxWidth="640" HorizontalAlignment="Left"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Style="{StaticResource PrimaryButton}" Command="{Binding ExportCommand}"
+                                Content="{l:Tr 'Export diagnostics'}"/>
+                        <Button Style="{StaticResource SubtleButton}" Command="{Binding CopyCommand}" Margin="8,0,0,0"
+                                Content="{l:Tr 'Copy system info'}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="{Binding Status}" FontSize="12.5" Margin="2,0,0,0" TextWrapping="Wrap"
+                       Foreground="{StaticResource Brush.TextSecondary}"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

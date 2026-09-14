@@ -121,6 +121,11 @@ failures += HostsEditorBacksUpBeforeSavingAndCanUndoOrReset() ? 0 : 1;
 failures += FreeingMemoryReportsBeforeAndAfterWithoutTouchingRealMemory() ? 0 : 1;
 failures += PowerActionsGoToTheBackendWithoutTouchingTheRealMachine() ? 0 : 1;
 failures += DiagnosticsExportsASystemBundleWithoutTouchingTheSystem() ? 0 : 1;
+failures += HardwareInfoIsReadOnlyAndLabelled() ? 0 : 1;
+failures += PathEditorFlagsEntriesBacksUpBeforeWritingAndRestores() ? 0 : 1;
+failures += UninstallerJudgesByEffectAndParsesCommands() ? 0 : 1;
+failures += SafeModeBuildsCorrectArgsAndAlwaysRestoresNormal() ? 0 : 1;
+failures += MoveFolderCopiesVerifiesBeforeDeletingAndRefusesSystemFolders() ? 0 : 1;
 failures += DnsCapturesCurrentServersAndRestorePutsThemBack() ? 0 : 1;
 failures += AServiceCanBeSetToManualNotJustDisabled() ? 0 : 1;
 failures += CreatingAContextMenuKeyIsUndoneByDeletingIt() ? 0 : 1;
@@ -1542,6 +1547,267 @@ bool DiagnosticsExportsASystemBundleWithoutTouchingTheSystem()
     return Report("diagnostics exports a system bundle without touching the system",
         problems.Count == 0,
         problems.Count == 0 ? "Info returns read-only rows; Export writes a zip with the system summary and the logs" : string.Join(" | ", problems));
+}
+
+// The Hardware page reads read-only facts from the registry, Environment and DriveInfo — no WMI, no NuGet
+// dependency, no driver. It must return labelled sections without throwing. Processor and Memory exist on any
+// machine (including the CI VM); GPU/motherboard may be absent there, so they are not asserted.
+bool HardwareInfoIsReadOnlyAndLabelled()
+{
+    var problems = new List<string>();
+    try
+    {
+        var sections = HardwareService.Info();
+        if (sections.Count == 0) problems.Add("Info returned no sections");
+
+        var cpu = sections.FirstOrDefault(s => s.Title == "Processor");
+        if (cpu is null) problems.Add("no Processor section");
+        else if (!cpu.Rows.Any(r => r.Label == "Model" && !string.IsNullOrWhiteSpace(r.Value)))
+            problems.Add("Processor section has no non-empty Model row");
+
+        var mem = sections.FirstOrDefault(s => s.Title == "Memory");
+        if (mem is null) problems.Add("no Memory section");
+        else if (!mem.Rows.Any(r => r.Label == "Total" && r.Value.Contains("GB")))
+            problems.Add("Memory section has no Total row in GB");
+
+        // Read-only: calling twice returns the same shape and changes nothing.
+        var again = HardwareService.Info();
+        if (again.Count != sections.Count) problems.Add("Info is not stable across calls");
+
+        // No blank facts leak through — every row carries a label and a value.
+        foreach (var s in sections)
+            foreach (var r in s.Rows)
+                if (string.IsNullOrWhiteSpace(r.Label) || string.IsNullOrWhiteSpace(r.Value))
+                    problems.Add($"blank row in {s.Title}");
+    }
+    catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
+
+    return Report("hardware info is read-only, labelled and never throws",
+        problems.Count == 0,
+        problems.Count == 0 ? "sections returned with Processor.Model and Memory.Total, stable across calls, no blank rows" : string.Join(" | ", problems));
+}
+
+// The PATH editor rewrites a PATH reversibly. It runs against a throwaway registry key, never the real PATH:
+// entries are flagged cautiously (a disconnected drive is Unverifiable, never "dead"), the whole PATH is
+// captured into the backup BEFORE the write, and RestoreEntry puts the original back.
+bool PathEditorFlagsEntriesBacksUpBeforeWritingAndRestores()
+{
+    const string testKey = @"HKCU\Software\WinPureTests\PathUser";
+    string savedUser = WinPure.Services.PathService.UserKey;
+    var problems = new List<string>();
+    try
+    {
+        WinPure.Services.PathService.UserKey = testKey;
+        using (var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\WinPureTests\PathUser"))
+            k!.SetValue("Path", @"C:\Windows;C:\Windows;C:\WinPureNoSuchDir_ZZZ;;Q:\NotConnected",
+                Microsoft.Win32.RegistryValueKind.ExpandString);
+
+        var scope = WinPure.Services.PathScope.User;
+        var analyzed = WinPure.Services.PathService.Analyze(scope);
+        // Expected: None, Duplicate, Missing (C: is fixed+ready), Empty, Unverifiable (Q: not connected).
+        var issues = analyzed.Select(e => e.Issue).ToList();
+        if (issues.Count != 5) problems.Add($"expected 5 entries, got {issues.Count}");
+        else
+        {
+            if (issues[0] != WinPure.Services.PathIssue.None) problems.Add($"[0] should be None, was {issues[0]}");
+            if (issues[1] != WinPure.Services.PathIssue.Duplicate) problems.Add($"[1] should be Duplicate, was {issues[1]}");
+            if (issues[2] != WinPure.Services.PathIssue.Missing) problems.Add($"[2] should be Missing, was {issues[2]}");
+            if (issues[3] != WinPure.Services.PathIssue.Empty) problems.Add($"[3] should be Empty, was {issues[3]}");
+            if (issues[4] != WinPure.Services.PathIssue.Unverifiable) problems.Add($"[4] should be Unverifiable (disconnected drive), was {issues[4]}");
+        }
+
+        string original = WinPure.Services.PathService.ReadRaw(scope);
+        var session = new WinPure.Models.BackupSession { Id = "path-test" };
+        string? snapshotAtFlush = null;
+        var kept = analyzed
+            .Where(e => e.Issue is WinPure.Services.PathIssue.None or WinPure.Services.PathIssue.Unverifiable)
+            .Select(e => e.Value).ToList();
+        int removed = WinPure.Services.PathService.Apply(scope, kept, session, () => snapshotAtFlush = WinPure.Services.PathService.ReadRaw(scope));
+
+        // The backup must be flushed with the ORIGINAL PATH, before the new one is written.
+        if (snapshotAtFlush != original) problems.Add("the snapshot was taken AFTER the write (invariant broken)");
+        if (session.Entries.Count != 1 || session.Entries[0].Value != original)
+            problems.Add("the backup did not capture the original PATH");
+        if (removed < 1) problems.Add("nothing was reported removed");
+
+        string after = WinPure.Services.PathService.ReadRaw(scope);
+        if (after.Contains("NoSuchDir") || after.Contains(";;")) problems.Add($"dead/empty entries survived: '{after}'");
+        if (!after.Contains(@"Q:\NotConnected")) problems.Add("a disconnected-drive entry was wrongly removed");
+
+        // Restore puts the whole original PATH back.
+        WinPure.Services.PathService.RestoreEntry(session.Entries[0]);
+        if (WinPure.Services.PathService.ReadRaw(scope) != original) problems.Add("Restore did not put the original PATH back");
+
+        // A forged PATH value with a control character is refused.
+        if (WinPure.Services.PathService.IsValidPathValue("a;\u0001evil;b")) problems.Add("a control character passed the PATH guard");
+        if (!WinPure.Services.PathService.IsValidPathValue(original)) problems.Add("a real PATH was wrongly rejected");
+    }
+    catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
+    finally
+    {
+        WinPure.Services.PathService.UserKey = savedUser;
+        try { Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(@"Software\WinPureTests\PathUser", throwOnMissingSubKey: false); } catch { }
+    }
+
+    return Report("the PATH editor flags entries, backs up before writing, and Restore puts it back",
+        problems.Count == 0,
+        problems.Count == 0 ? "cautious flags (disconnected drive left alone), snapshot-before-write, and a clean restore" : string.Join(" | ", problems));
+}
+
+// The uninstaller judges success by the list read AFTER running, never by the fact that it ran — an uninstaller
+// can return success and leave the program behind. Runs against a fake backend so no real uninstaller executes.
+bool UninstallerJudgesByEffectAndParsesCommands()
+{
+    var fake = new FakeUninstallBackend();
+    fake.Items.Add(new InstalledProgram("k1", "App One", "1.0", "Pub", "\"C:\\u.exe\" /S", false));
+    fake.Items.Add(new InstalledProgram("k2", "App Two", "2.0", "Pub", "MsiExec.exe /X{ABC}", false));
+    var prev = WinPure.Services.UninstallService.Swap(fake);
+    var problems = new List<string>();
+    try
+    {
+        var list = WinPure.Services.UninstallService.Read();
+        if (list.Count != 2) problems.Add($"expected 2 programs, got {list.Count}");
+
+        // A real uninstall: the program is gone -> IsGone true.
+        fake.ActuallyRemove = true;
+        WinPure.Services.UninstallService.Run(list[0]);
+        if (!WinPure.Services.UninstallService.IsGone(list[0], WinPure.Services.UninstallService.Read()))
+            problems.Add("a removed program was not judged gone");
+
+        // A FAILED uninstall (ran, but the program is still there) must NOT be judged gone.
+        fake.ActuallyRemove = false;
+        int before = fake.RunCount;
+        WinPure.Services.UninstallService.Run(list[1]);
+        if (fake.RunCount != before + 1) problems.Add("Run was not invoked");
+        if (WinPure.Services.UninstallService.IsGone(list[1], WinPure.Services.UninstallService.Read()))
+            problems.Add("a program that survived its uninstaller was wrongly judged gone");
+
+        // The command is split into exe + args WITHOUT a shell, so nothing is re-parsed.
+        var (e1, a1) = WinPure.Services.UninstallRegistry.SplitCommand("\"C:\\Program Files\\App\\unins.exe\" /SILENT /X");
+        if (e1 != "C:\\Program Files\\App\\unins.exe" || a1 != "/SILENT /X") problems.Add($"quoted split wrong: '{e1}' | '{a1}'");
+        var (e2, a2) = WinPure.Services.UninstallRegistry.SplitCommand("MsiExec.exe /X{ABC}");
+        if (e2 != "MsiExec.exe" || a2 != "/X{ABC}") problems.Add($"bare split wrong: '{e2}' | '{a2}'");
+        // An UNQUOTED path with spaces must not be cut at the first space (the .exe-aware split keeps it whole).
+        var (e3, a3) = WinPure.Services.UninstallRegistry.SplitCommand("C:\\Program Files\\App\\uninstall.exe /S");
+        if (e3 != "C:\\Program Files\\App\\uninstall.exe" || a3 != "/S") problems.Add($"unquoted-with-spaces split wrong: '{e3}' | '{a3}'");
+    }
+    catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
+    finally { WinPure.Services.UninstallService.Swap(prev); }
+
+    return Report("the uninstaller judges success by the list, not by running",
+        problems.Count == 0,
+        problems.Count == 0 ? "IsGone reads the list after running; a survived uninstall is not called gone; commands split without a shell" : string.Join(" | ", problems));
+}
+
+// Move-folder copies and VERIFIES before deleting the original (so an interrupted move never loses data), refuses
+// system-critical folders and same-drive moves, and leaves a junction that resolves to the new location. Runs
+// against a fake filesystem so nothing real is moved or deleted.
+bool MoveFolderCopiesVerifiesBeforeDeletingAndRefusesSystemFolders()
+{
+    var problems = new List<string>();
+    try
+    {
+        // Guards (no backend needed).
+        string win = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        if (WinPure.Services.FileLinkService.RejectSource(win) is null) problems.Add("the Windows folder was not refused");
+        if (WinPure.Services.FileLinkService.RejectSource(System.IO.Path.Combine(win, "System32")) is null) problems.Add("a folder inside Windows was not refused");
+        var root = System.IO.Path.GetPathRoot(win);
+        if (WinPure.Services.FileLinkService.RejectSource(root!) is null) problems.Add("a drive root was not refused");
+        if (WinPure.Services.FileLinkService.RejectSource(@"D:\Games\Big") is not null) problems.Add("a normal folder was wrongly refused");
+        // A whole user profile is refused, but a folder INSIDE it (the common case) is allowed.
+        if (WinPure.Services.FileLinkService.RejectSource(System.IO.Path.Combine(root!, "Users", "SomeUser")) is null) problems.Add("a whole user profile was not refused");
+        if (WinPure.Services.FileLinkService.RejectSource(System.IO.Path.Combine(root!, "Users", "SomeUser", "Downloads")) is not null) problems.Add("a folder inside a profile was wrongly refused");
+        // A % in the path (cmd would expand it inside mklink) and ProgramData (holds WinPure's backups) are refused.
+        if (WinPure.Services.FileLinkService.RejectSource(@"D:\Games\100%off") is null) problems.Add("a % in the path was not refused");
+        if (WinPure.Services.FileLinkService.RejectSource(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData)) is null) problems.Add("ProgramData was not refused");
+
+        // Happy path across drives: copy, verify, delete, junction.
+        var fake = new FakeFileLinkBackend();
+        fake.Dirs.Add(@"D:\Games\Big"); fake.Dirs.Add(@"E:\Store");
+        fake.RobocopyCode = 1; // 0-7 = success
+        var prev = WinPure.Services.FileLinkService.Swap(fake);
+        try
+        {
+            var r = WinPure.Services.FileLinkService.MoveToAnotherDrive(@"D:\Games\Big", @"E:\Store");
+            if (!r.Ok) problems.Add("move across drives failed: " + r.Message);
+            if (!fake.DeletedSource) problems.Add("the source was not deleted after a verified copy");
+            if (fake.ReparseTarget(@"D:\Games\Big") != @"E:\Store\Big") problems.Add("the junction does not point to the new location");
+
+            // A FAILED copy (robocopy 8+) must NEVER delete the source — no data loss.
+            var f2 = new FakeFileLinkBackend { RobocopyCode = 8 };
+            f2.Dirs.Add(@"D:\Games\Big"); f2.Dirs.Add(@"E:\Store");
+            WinPure.Services.FileLinkService.Swap(f2);
+            var r2 = WinPure.Services.FileLinkService.MoveToAnotherDrive(@"D:\Games\Big", @"E:\Store");
+            if (r2.Ok) problems.Add("a failed copy was reported as success");
+            if (f2.DeletedSource) problems.Add("DATA LOSS: the source was deleted after a failed copy");
+
+            // Same-drive move refused before any copy starts.
+            var f3 = new FakeFileLinkBackend();
+            f3.Dirs.Add(@"C:\A\Big"); f3.Dirs.Add(@"C:\B");
+            WinPure.Services.FileLinkService.Swap(f3);
+            var r3 = WinPure.Services.FileLinkService.MoveToAnotherDrive(@"C:\A\Big", @"C:\B");
+            if (r3.Ok) problems.Add("a same-drive move was allowed");
+            if (f3.RobocopyCalls != 0) problems.Add("a same-drive move started copying");
+
+            // Not enough free space refused before copying.
+            var f4 = new FakeFileLinkBackend { Size = 1_000_000, Free = 10 };
+            f4.Dirs.Add(@"D:\Big"); f4.Dirs.Add(@"E:\Store");
+            WinPure.Services.FileLinkService.Swap(f4);
+            var r4 = WinPure.Services.FileLinkService.MoveToAnotherDrive(@"D:\Big", @"E:\Store");
+            if (r4.Ok || f4.RobocopyCalls != 0) problems.Add("a move without enough free space was allowed");
+        }
+        finally { WinPure.Services.FileLinkService.Swap(prev); }
+    }
+    catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
+
+    return Report("move folder copies and verifies before deleting, and refuses system folders",
+        problems.Count == 0,
+        problems.Count == 0 ? "copy-verify-delete-link across drives; a failed copy never deletes; system folders, same-drive and low-space moves refused" : string.Join(" | ", problems));
+}
+
+// Safe Mode builds bcdedit's arguments from constants (never user input), passes {current} verbatim, reads the
+// invariant "safeboot" element without parsing localized text, and — critically — can always restore normal boot
+// from any state. Runs against a fake backend so a test never touches the real BCD.
+bool SafeModeBuildsCorrectArgsAndAlwaysRestoresNormal()
+{
+    var problems = new List<string>();
+    try
+    {
+        var min = WinPure.Services.BcdCli.ArgsFor(WinPure.Services.SafeBoot.Minimal);
+        if (!(min.Length == 4 && min[0] == "/set" && min[1] == "{current}" && min[2] == "safeboot" && min[3] == "minimal"))
+            problems.Add("minimal args wrong: " + string.Join(" ", min));
+        var net = WinPure.Services.BcdCli.ArgsFor(WinPure.Services.SafeBoot.Network);
+        if (net.Length != 4 || net[3] != "network") problems.Add("network args wrong: " + string.Join(" ", net));
+        var off = WinPure.Services.BcdCli.ArgsFor(WinPure.Services.SafeBoot.Off);
+        if (!(off.Length == 3 && off[0] == "/deletevalue" && off[1] == "{current}" && off[2] == "safeboot"))
+            problems.Add("off args wrong: " + string.Join(" ", off));
+
+        // Parsing keys only on the invariant element name; a localized value token still reads as "on".
+        if (WinPure.Services.BcdCli.ParseState("identifier {current}\r\ndevice partition=C:\r\nsafeboot Minimal\r\n") != WinPure.Services.SafeBoot.Minimal)
+            problems.Add("parse Minimal failed");
+        if (WinPure.Services.BcdCli.ParseState("safeboot Network") != WinPure.Services.SafeBoot.Network)
+            problems.Add("parse Network failed");
+        if (WinPure.Services.BcdCli.ParseState("safeboot Red") != WinPure.Services.SafeBoot.Minimal)
+            problems.Add("a localized value should still read as on (default Minimal)");
+        if (WinPure.Services.BcdCli.ParseState("device partition=C:\r\ndescription Windows") != WinPure.Services.SafeBoot.Off)
+            problems.Add("no safeboot line should read Off");
+
+        // Never strands: from any state, restoring normal returns to Off.
+        var fake = new FakeSafeModeBackend { State = WinPure.Services.SafeBoot.Network };
+        var prev = WinPure.Services.SafeModeService.Swap(fake);
+        try
+        {
+            WinPure.Services.SafeModeService.Set(WinPure.Services.SafeBoot.Off);
+            if (WinPure.Services.SafeModeService.Read() != WinPure.Services.SafeBoot.Off)
+                problems.Add("restoring normal boot did not clear safeboot");
+        }
+        finally { WinPure.Services.SafeModeService.Swap(prev); }
+    }
+    catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
+
+    return Report("safe mode builds the right bcdedit args and can always restore normal boot",
+        problems.Count == 0,
+        problems.Count == 0 ? "constant args, {current} verbatim, invariant safeboot parse, and normal boot always restorable" : string.Join(" | ", problems));
 }
 
 // Power actions route to the swappable backend with the right arguments, and only Shutdown/Restart carry a
@@ -3300,6 +3566,47 @@ sealed class FakeMemoryBackend : IMemoryBackend
     public bool Purged;
     public MemoryInfo Query() => new(Total, Avail);
     public void Purge() { Purged = true; Avail += 2_000; }   // pretend the trim freed some
+}
+
+/// <summary>Filesystem operations held in fields, so a test never moves or deletes real data.</summary>
+sealed class FakeFileLinkBackend : IFileLinkBackend
+{
+    public HashSet<string> Dirs { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> Links { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public long Size = 100, Free = 1_000_000;
+    public int RobocopyCode = 1;
+    public int RobocopyCalls;
+    public bool DeletedSource;
+
+    private static string N(string p) => p.TrimEnd('\\');
+    public bool DirectoryExists(string p) => Dirs.Contains(N(p)) || Links.ContainsKey(N(p));
+    public bool Exists(string p) => DirectoryExists(p);
+    public bool IsReparsePoint(string p) => Links.ContainsKey(N(p));
+    public long FolderSize(string p) => Size;
+    public long FreeSpace(string p) => Free;
+    public int Robocopy(string s, string d) { RobocopyCalls++; if (RobocopyCode < 8) Dirs.Add(N(d)); return RobocopyCode; }
+    public void DeleteDirectory(string p) { DeletedSource = true; Dirs.Remove(N(p)); }
+    public void CreateJunction(string link, string target) => Links[N(link)] = N(target);
+    public string? ReparseTarget(string p) => Links.TryGetValue(N(p), out var t) ? t : null;
+}
+
+/// <summary>A safe-boot state held in a field, so a test never touches the real BCD.</summary>
+sealed class FakeSafeModeBackend : ISafeModeBackend
+{
+    public SafeBoot State = SafeBoot.Off;
+    public List<SafeBoot> Sets { get; } = new();
+    public SafeBoot Read() => State;
+    public void Set(SafeBoot mode) { Sets.Add(mode); State = mode; }
+}
+
+/// <summary>An installed-program list held in a field, so a test never runs a real uninstaller.</summary>
+sealed class FakeUninstallBackend : IUninstallBackend
+{
+    public List<InstalledProgram> Items { get; } = new();
+    public bool ActuallyRemove = true;
+    public int RunCount;
+    public IReadOnlyList<InstalledProgram> Read() => Items.ToList();
+    public void Run(InstalledProgram p) { RunCount++; if (ActuallyRemove) Items.RemoveAll(x => x.Key == p.Key); }
 }
 
 /// <summary>Windows features held in memory, so tests never run DISM.</summary>

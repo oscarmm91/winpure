@@ -131,6 +131,13 @@ internal static class BackupEntryPolicy
                 reason = "a dns backup whose value is not an IP list or DHCP";
                 return false;
 
+            case "path":
+                // A whole PATH value. Written to the registry (not a command), so no shell injection; the guard
+                // is against a forged value with control characters or absurd length.
+                if (PathService.IsValidPathValue(entry.Value)) return true;
+                reason = "a path backup whose value is not a plausible PATH string";
+                return false;
+
             case "system-state":
                 // Kind and state are validated in SystemState.Restore, the only way this type is restored.
                 return true;

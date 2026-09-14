@@ -43,6 +43,9 @@ public sealed class Tweak
     public bool RequiresExplorerRestart { get; init; }
     /// <summary>Broadcast WM_SETTINGCHANGE("ImmersiveColorSet") after applying so open apps repaint.</summary>
     public bool NotifiesThemeChange { get; init; }
+    /// <summary>Push the Control Panel\Mouse values to the live session (SPI_SETMOUSE) after applying, so a
+    /// pointer tweak takes effect without signing out.</summary>
+    public bool NotifiesMouseChange { get; init; }
     /// <summary>False for actions that cannot be undone in place (e.g. app removal → reinstall from Store).</summary>
     public bool FullyReversible { get; init; } = true;
     public required IReadOnlyList<TweakAction> Actions { get; init; }

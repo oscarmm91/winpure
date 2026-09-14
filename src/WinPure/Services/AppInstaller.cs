@@ -47,6 +47,7 @@ public static class AppInstallerCatalog
 
         new("Valve.Steam", "Steam", "Valve's game store and launcher.", "Gaming", Glyph(0xE7FC)),
         new("EpicGames.EpicGamesLauncher", "Epic Games Launcher", "Epic's game store and launcher.", "Gaming", Glyph(0xE7FC)),
+        new("Microsoft.DirectX", "DirectX End-User Runtime", "The legacy DirectX 9 runtime some older games and apps still need.", "Gaming", Glyph(0xE7FC)),
     };
 }
 

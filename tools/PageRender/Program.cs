@@ -102,6 +102,27 @@ internal static class Program
             // Diagnostics reads read-only system facts when opened.
             vm.CurrentNav = vm.NavItems.First(n => n.Page is DiagnosticsViewModel);
             Render(root, Path.Combine(outDir, "14-diagnostics.png"));
+
+            // Hardware reads read-only hardware facts from the registry when opened.
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is HardwareViewModel);
+            Render(root, Path.Combine(outDir, "15-hardware.png"));
+
+            // PATH editor lists the user PATH (read-only analysis) when opened.
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is PathViewModel);
+            Render(root, Path.Combine(outDir, "16-path.png"));
+
+            // Uninstaller reads installed programs (read-only) when opened.
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is UninstallerViewModel);
+            System.Threading.Thread.Sleep(400); // give the async read a moment
+            Render(root, Path.Combine(outDir, "17-uninstall.png"));
+
+            // Safe Mode reads the current safeboot state when opened (best-effort; unelevated it reads Off).
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is SafeModeViewModel);
+            Render(root, Path.Combine(outDir, "18-safemode.png"));
+
+            // Move folder is inert until the user picks folders (nothing runs on open).
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is FileLinkViewModel);
+            Render(root, Path.Combine(outDir, "19-movefolder.png"));
             return 0;
         }
         catch (Exception ex)

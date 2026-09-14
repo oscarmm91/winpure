@@ -272,6 +272,12 @@ public sealed class BackupManager
                 DnsService.RestoreEntry(entry);
                 break;
             }
+            case "path":
+            {
+                // Put a whole PATH back to what it was (validated in PathService.RestoreEntry).
+                PathService.RestoreEntry(entry);
+                break;
+            }
         }
     }
 
@@ -303,6 +309,7 @@ public sealed class BackupManager
             "optional-feature" => $"Windows feature {e.ValueName}",
             "future-user-value" => $"profile template {e.KeyPath}!{e.ValueName}",
             "dns" => $"DNS on {e.ValueName}",
+            "path" => $"PATH ({e.ValueName})",
             _ => e.Type
         };
 }

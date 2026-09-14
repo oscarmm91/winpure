@@ -61,11 +61,16 @@ public sealed class MainViewModel : ObservableObject
     private readonly CleanupViewModel _cleanup;
     private readonly MemoryViewModel _memory;
     private readonly PowerViewModel _power;
+    private readonly SafeModeViewModel _safeMode;
     private readonly DiagnosticsViewModel _diagnostics;
+    private readonly HardwareViewModel _hardware;
     private readonly DispatcherTimer _liveTimer;
     private readonly DnsViewModel _dns;
     private readonly HostsViewModel _hosts;
+    private readonly PathViewModel _path;
+    private readonly FileLinkViewModel _fileLink;
     private readonly InstallerViewModel _installer;
+    private readonly UninstallerViewModel _uninstaller;
 
     /// <summary>The Remove Apps banner, also shown above search results that include an app removal.</summary>
     private const string RemoveAppsWarning = "WinPure cannot undo anything on this page: Restore does not bring an app back. To get one back, reinstall it yourself, from the Microsoft Store (OneDrive from microsoft.com).";
@@ -164,6 +169,14 @@ public sealed class MainViewModel : ObservableObject
             Main = this,
         };
         NavItems.Add(new NavItem { Label = "Power", Glyph = ((char)0xE7E8).ToString(), Page = _power });
+        _safeMode = new SafeModeViewModel
+        {
+            Title = "Safe Mode",
+            Subtitle = "Restart Windows into Safe Mode for troubleshooting, and back to normal. Restoring normal boot is "
+                     + "always one click — WinPure never leaves you stuck in Safe Mode.",
+            Main = this,
+        };
+        NavItems.Add(new NavItem { Label = "Safe Mode", Glyph = ((char)0xEA18).ToString(), Page = _safeMode });
         _diagnostics = new DiagnosticsViewModel
         {
             Title = "Diagnostics",
@@ -171,6 +184,14 @@ public sealed class MainViewModel : ObservableObject
             Main = this,
         };
         NavItems.Add(new NavItem { Label = "Diagnostics", Glyph = ((char)0xE9D9).ToString(), Page = _diagnostics });
+        _hardware = new HardwareViewModel
+        {
+            Title = "Hardware",
+            Subtitle = "A read-only look at what is inside this PC — processor, memory, graphics, drives and motherboard. "
+                     + "Read from the registry, so it needs no extra driver.",
+            Main = this,
+        };
+        NavItems.Add(new NavItem { Label = "Hardware", Glyph = ((char)0xE964).ToString(), Page = _hardware });
         _dns = new DnsViewModel(_engine)
         {
             Title = "DNS servers",
@@ -186,6 +207,22 @@ public sealed class MainViewModel : ObservableObject
             Main = this,
         };
         NavItems.Add(new NavItem { Label = "Hosts", Glyph = ((char)0xE8A5).ToString(), Page = _hosts });
+        _path = new PathViewModel(_engine)
+        {
+            Title = "PATH editor",
+            Subtitle = "Review the folders on your PATH and remove the dead, duplicate or empty ones. WinPure backs up the "
+                     + "whole PATH first, so Restore can put it back. Entries on drives that are not connected are left alone.",
+            Main = this,
+        };
+        NavItems.Add(new NavItem { Label = "PATH", Glyph = ((char)0xE8FD).ToString(), Page = _path });
+        _fileLink = new FileLinkViewModel
+        {
+            Title = "Move folder",
+            Subtitle = "Move a big folder to another drive to free space on this one, leaving a junction behind so programs "
+                     + "still find it. The data is copied and verified before the original is removed, so nothing is lost.",
+            Main = this,
+        };
+        NavItems.Add(new NavItem { Label = "Move folder", Glyph = ((char)0xE71B).ToString(), Page = _fileLink });
         NavItems.Add(new NavItem { Label = "Restore", Glyph = "", Page = _restore });
 
         // The two pages whose changes Restore cannot undo sit together at the bottom, apart from everything else.
@@ -201,6 +238,13 @@ public sealed class MainViewModel : ObservableObject
             Main = this,
         };
         NavItems.Add(new NavItem { Label = "Install", Glyph = ((char)0xE896).ToString(), Page = _installer });
+        _uninstaller = new UninstallerViewModel
+        {
+            Title = "Uninstall Apps",
+            Subtitle = "Remove any installed program by running its own uninstaller. Like removing a preinstalled app, this is not undone by Restore.",
+            Main = this,
+        };
+        NavItems.Add(new NavItem { Label = "Uninstall", Glyph = ((char)0xECC9).ToString(), Page = _uninstaller });
 
         foreach (var item in NavItems) item.Owner = this;
         _currentNav = NavItems[0];
@@ -266,11 +310,15 @@ public sealed class MainViewModel : ObservableObject
             value.SetCurrentSilently(true);
             if (value.Page == _restore) LoadBackups();
             if (value.Page == _installer && !_installer.HasChecked) _ = _installer.RefreshAsync();
+            if (value.Page == _uninstaller && !_uninstaller.HasChecked) _ = _uninstaller.RefreshAsync();
             if (value.Page == _cleanup && !_cleanup.HasMeasured) _ = _cleanup.MeasureAllAsync();
             if (value.Page == _dns && !_dns.HasLoaded) _ = _dns.LoadAsync();
             if (value.Page == _hosts && !_hosts.HasLoaded) _hosts.Load();
             if (value.Page == _memory) _memory.Load();   // re-read RAM each time the page opens
             if (value.Page == _diagnostics && !_diagnostics.HasLoaded) _diagnostics.Load();
+            if (value.Page == _hardware && !_hardware.HasLoaded) _hardware.Load();
+            if (value.Page == _path && !_path.HasLoaded) _path.Load();
+            if (value.Page == _safeMode && !_safeMode.HasLoaded) _safeMode.Load();
             SyncLiveTimer();
             OnPropertyChanged();
             OnPropertyChanged(nameof(CurrentPage));
@@ -715,6 +763,8 @@ public sealed class MainViewModel : ObservableObject
             var results = await Task.Run(() => _engine.ApplyChanges(changes, progress, futureUsers));
             if (results.Any(r => r.Success && r.Tweak.NotifiesThemeChange))
                 NativeMethods.BroadcastThemeChange();
+            if (results.Any(r => r.Success && r.Tweak.NotifiesMouseChange))
+                NativeMethods.ApplyMouseSettings();
             int failed = results.Count(r => !r.Success);
             bool needsExplorer = results.Any(r => r.Success && r.Tweak.RequiresExplorerRestart);
             bool needsReboot = results.Any(r => r.Success && r.Tweak.RequiresRestart);
@@ -800,8 +850,9 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             int failures = await Task.Run(() => _backupManager.RestoreSession(vm.Session));
-            // a snapshot may include theme values — make open apps repaint
+            // a snapshot may include theme or mouse values — make open apps repaint and re-read the pointer
             NativeMethods.BroadcastThemeChange();
+            NativeMethods.ApplyMouseSettings();
             StatusText = failures == 0 ? Loc.T("Backup restored.")
                 : failures == 1 ? Loc.T("Backup restored with 1 error (see log).")
                 : Loc.F("Backup restored with {0} errors (see log).", failures);

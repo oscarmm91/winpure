@@ -809,5 +809,7 @@
   "Enter the delay in whole minutes, from 0 (right now) up to 10080 (one week).": "Escribe la espera en minutos enteros, de 0 (ahora mismo) hasta 10080 (una semana).",
   "restart the PC": "reiniciar la PC",
   "shut down the PC": "apagar la PC",
-  "Windows would not do that — the action may be turned off on this PC.": "Windows no hizo eso — la acción puede estar desactivada en esta PC."
+  "Windows would not do that — the action may be turned off on this PC.": "Windows no hizo eso — la acción puede estar desactivada en esta PC.",
+  "Game launcher caches": "Cachés de los lanzadores de juegos",
+  "The web/UI cache of game launchers (Steam, Epic, Battle.net). Regenerated on demand — not your games, saves or settings.": "La caché web/de interfaz de los lanzadores de juegos (Steam, Epic, Battle.net). Se regenera al momento — no son tus juegos, partidas ni ajustes."
 }

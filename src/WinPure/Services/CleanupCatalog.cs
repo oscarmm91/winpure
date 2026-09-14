@@ -106,6 +106,20 @@ public static class CleanupCatalog
                 @"%LOCALAPPDATA%\NVIDIA\GLCache",
                 @"%LOCALAPPDATA%\AMD\DxCache",
                 @"%LOCALAPPDATA%\Intel\ShaderCache",
+                @"%LOCALAPPDATA%\D3DSCache",
+            },
+        },
+        new CleanupTarget
+        {
+            Id = "clean-game-launcher-cache",
+            Name = "Game launcher caches",
+            Description = "The web/UI cache of game launchers (Steam, Epic, Battle.net). Regenerated on demand — not your games, saves or settings.",
+            Icon = Glyph(0xE7FC),
+            Roots = new[]
+            {
+                @"%LOCALAPPDATA%\Steam\htmlcache",
+                @"%LOCALAPPDATA%\EpicGamesLauncher\Saved\webcache*",
+                @"%LOCALAPPDATA%\Battle.net\Cache",
             },
         },
         new CleanupTarget

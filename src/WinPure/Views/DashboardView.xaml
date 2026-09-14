@@ -165,6 +165,18 @@
                 </Border>
             </UniformGrid>
 
+            <!-- Live preview of what the chosen profile will change on this PC, so the scope is clear before applying. -->
+            <Border Margin="0,16,0,0" Padding="16,13" CornerRadius="8"
+                    Background="{StaticResource Brush.Card}" BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}"
+                    Visibility="{Binding Main.HasActivePreset, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="{Binding Main.PresetPreview}" FontSize="12.5" TextWrapping="Wrap"
+                               Foreground="{StaticResource Brush.TextPrimary}"/>
+                    <TextBlock Margin="0,7,0,0" FontSize="11.5" TextWrapping="Wrap" Foreground="{StaticResource Brush.TextTertiary}"
+                               Text="{l:Tr 'It never touches Remove Apps, Edge or the tools (Clean up, Memory and the rest). Everything is reversible from Restore.'}"/>
+                </StackPanel>
+            </Border>
+
             <TextBlock Margin="0,18,0,0" FontSize="12" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap"
                        Text="{l:Tr 'Presets never remove apps. Selecting one only marks the toggles — nothing changes until you click Apply Changes. A registry snapshot is saved automatically before every apply; use the Restore page to roll back.'}"/>
 

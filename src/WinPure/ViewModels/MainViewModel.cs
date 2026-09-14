@@ -498,7 +498,21 @@ public sealed class MainViewModel : ObservableObject
             : Loc.F("{0} pending changes — a backup is created before applying.", PendingCount);
 
     private PresetLevel? _activePreset;
-    public PresetLevel? ActivePreset { get => _activePreset; set => Set(ref _activePreset, value); }
+    public PresetLevel? ActivePreset
+    {
+        get => _activePreset;
+        set { if (Set(ref _activePreset, value)) OnPropertyChanged(nameof(HasActivePreset)); }
+    }
+    public bool HasActivePreset => _activePreset is not null;
+
+    // A plain-language preview of what the chosen profile will change on THIS PC, so the user sees the
+    // scope before applying instead of guessing. Rebuilt by SelectPreset; empty until a profile is picked.
+    private string _presetPreview = "";
+    public string PresetPreview { get => _presetPreview; set => Set(ref _presetPreview, value); }
+
+    /// <summary>The short sidebar label for a category, reused so the preview matches what the user sees in the nav.</summary>
+    private string CategoryLabel(TweakCategory c) =>
+        NavItems.FirstOrDefault(n => n.Page is CategoryPageViewModel p && p.Category == c)?.Label ?? c.ToString();
 
     public RelayCommand ApplyCommand { get; }
     public RelayCommand RescanCommand { get; }
@@ -545,6 +559,7 @@ public sealed class MainViewModel : ObservableObject
                 tweak.RefreshStatus(_engine, ctx);
             _startup.Load(ctx);
             UpdatePendingCount();
+            UpdatePresetPreview();
             UpdateDashboard();
             int undetected = AllTweaks.Count(t => t.Status == TweakStatus.Unknown);
             string systemWarnings = guards.Count == 1 ? Loc.T("1 system warning") : Loc.F("{0} system warnings", guards.Count);
@@ -609,6 +624,37 @@ public sealed class MainViewModel : ObservableObject
             : keptManual == 1
             ? Loc.F("{0} preset selected, keeping 1 manual selection — review and click Apply Changes.", preset)
             : Loc.F("{0} preset selected, keeping {1} manual selections — review and click Apply Changes.", preset, keptManual);
+
+        UpdatePresetPreview();
+    }
+
+    // Counts only the pending, reversible tweaks the profile actually turns on here — a tweak already in the
+    // wanted state changes nothing, so it is not promised. Grouped by category so the scope reads at a glance.
+    // Self-contained (reads ActivePreset) so a rescan after applying can refresh the numbers, not leave them stale.
+    private void UpdatePresetPreview()
+    {
+        if (_activePreset is not { } level) { PresetPreview = ""; return; }
+        string presetName = level switch
+        {
+            PresetLevel.Safe => Loc.T("Safe"),
+            PresetLevel.Balanced => Loc.T("Balanced"),
+            PresetLevel.Aggressive => Loc.T("Aggressive"),
+            _ => level.ToString(),
+        };
+        var pending = AllTweaks.Where(t => t.IsDirty && t.IsSelected).ToList();
+        if (pending.Count == 0)
+        {
+            PresetPreview = Loc.F("The {0} profile — everything it covers is already applied on this PC.", presetName);
+            return;
+        }
+        // Each piece is a number plus an already-localized category label, so no English reaches the screen here.
+        string breakdown = string.Join("  ·  ", pending
+            .GroupBy(t => t.Tweak.Category)
+            .OrderByDescending(g => g.Count())
+            .Select(g => $"{g.Count()} {CategoryLabel(g.Key)}"));
+        PresetPreview = pending.Count == 1
+            ? Loc.F("The {0} profile will change 1 setting on this PC:  {1}", presetName, breakdown)
+            : Loc.F("The {0} profile will change {1} settings on this PC:  {2}", presetName, pending.Count, breakdown);
     }
 
     // ---------------------------------------------------------------- configuration files

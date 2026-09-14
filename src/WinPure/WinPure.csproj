@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>WinPure</AssemblyName>
     <RootNamespace>WinPure</RootNamespace>
-    <Version>2.1.0</Version>
+    <Version>2.1.1</Version>
     <Authors>Oscar Medina (@oscaremeh)</Authors>
     <Product>WinPure</Product>
     <Description>Windows 11 debloater and optimizer with always-available restore.</Description>

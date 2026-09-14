@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1
+
+- The app version now shows in the sidebar footer, under "About", so you can tell at a glance which version you are running.
+
 ## 2.1.0 — more of the toolbox
 
 More of the utility toolbox, each page reversible where it can be and clearly "no undo" where it cannot:

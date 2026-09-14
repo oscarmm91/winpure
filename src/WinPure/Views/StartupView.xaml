@@ -75,11 +75,12 @@
         </StackPanel>
 
         <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" Padding="0,0,6,0">
-            <ItemsControl ItemsSource="{Binding ItemsView}">
+            <ItemsControl ItemsSource="{Binding Items}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Border Background="{StaticResource Brush.Card}" CornerRadius="8" Margin="0,0,0,8"
-                                Padding="16,12" BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}">
+                                Padding="16,12" BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}"
+                                Visibility="{Binding IsVisibleUnderFilter, Converter={StaticResource BoolToVisibility}}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>

@@ -1,6 +1,4 @@
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Windows.Data;
 using WinPure.Models;
 using WinPure.Services;
 
@@ -21,6 +19,17 @@ public sealed class StartupItemViewModel : ObservableObject
     public string SourceLabel => Loc.T(Entry.SourceLabel);
     public string Scope => Loc.T(Entry.Scope);
     public bool IsOrphan => Entry.IsOrphan;
+
+    private bool _visibleUnderFilter = true;
+    /// <summary>Whether the current On/Off filter shows this row. The row is hidden, never removed from the
+    /// list, so WPF's automation layer never queries a removed row's peer.</summary>
+    public bool IsVisibleUnderFilter
+    {
+        get => _visibleUnderFilter;
+        private set { if (_visibleUnderFilter != value) { _visibleUnderFilter = value; OnPropertyChanged(); } }
+    }
+
+    internal void SetVisible(bool value) => IsVisibleUnderFilter = value;
 
     public string Glyph => Entry.Source switch
     {
@@ -86,11 +95,6 @@ public sealed class StartupViewModel : PageViewModel
 {
     public ObservableCollection<StartupItemViewModel> Items { get; } = new();
 
-    /// <summary>The filtered, list-bound view over <see cref="Items"/>. The filter groups rows by the state
-    /// the machine actually has (OriginalEnabled), NOT the live toggle, so toggling a row does not make it
-    /// jump out of the list mid-edit — it recategorizes only after Apply (or a rescan) commits the new state.</summary>
-    public ICollectionView ItemsView { get; }
-
     private string _summary = "";
     public string Summary { get => _summary; set => Set(ref _summary, value); }
 
@@ -102,8 +106,6 @@ public sealed class StartupViewModel : PageViewModel
     public StartupViewModel(TweakEngine engine)
     {
         _engine = engine;
-        ItemsView = CollectionViewSource.GetDefaultView(Items);
-        ItemsView.Filter = o => Shows((StartupItemViewModel)o);
         SetFilterCommand = new RelayCommand(p => SetFilter((StartupFilter)p!));
     }
 
@@ -112,18 +114,26 @@ public sealed class StartupViewModel : PageViewModel
     private StartupFilter _filter = StartupFilter.All;
     public RelayCommand SetFilterCommand { get; }
 
-    private bool Shows(StartupItemViewModel i) => _filter switch
+    // Hide non-matching rows via each row's IsVisibleUnderFilter rather than removing them from the
+    // collection. Removing items made WPF's automation layer ask a removed row's peer for its name and crash
+    // (NullReferenceException in ItemAutomationPeer.GetNameCore during fireAutomationEvents); hiding never
+    // removes a row, so the peer always has its item.
+    private void ApplyFilterVisibility()
     {
-        StartupFilter.Enabled => i.OriginalEnabled,
-        StartupFilter.Disabled => !i.OriginalEnabled,
-        _ => true,
-    };
+        foreach (var i in Items)
+            i.SetVisible(_filter switch
+            {
+                StartupFilter.Enabled => i.OriginalEnabled,
+                StartupFilter.Disabled => !i.OriginalEnabled,
+                _ => true,
+            });
+    }
 
     private void SetFilter(StartupFilter f)
     {
         if (_filter == f) return;
         _filter = f;
-        ItemsView.Refresh();
+        ApplyFilterVisibility();
         OnPropertyChanged(nameof(IsFilterAll));
         OnPropertyChanged(nameof(IsFilterEnabled));
         OnPropertyChanged(nameof(IsFilterDisabled));
@@ -142,7 +152,7 @@ public sealed class StartupViewModel : PageViewModel
 
     private void RefreshCountsAndView()
     {
-        ItemsView.Refresh();
+        ApplyFilterVisibility();
         OnPropertyChanged(nameof(EnabledCount));
         OnPropertyChanged(nameof(DisabledCount));
         OnPropertyChanged(nameof(AllChipText));

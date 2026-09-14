@@ -262,6 +262,11 @@ public sealed class MainViewModel : ObservableObject
         SelectPresetCommand = new RelayCommand(p => SelectPreset((PresetLevel)p!), _ => !IsBusy);
         ExportConfigCommand = new RelayCommand(_ => ExportConfigToFile(), _ => !IsBusy);
         ImportConfigCommand = new RelayCommand(_ => ImportConfigFromFile(), _ => !IsBusy);
+        UndoLastCommand = new RelayCommand(_ => _ = UndoLastAsync(), _ => !IsBusy && _lastBackupSession is not null);
+        DismissUndoCommand = new RelayCommand(_ => HideUndo());
+
+        _undoTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(45) };
+        _undoTimer.Tick += (_, _) => HideUndo();
     }
 
     private void AddCategory(string label, string glyph, TweakCategory category, string title, string subtitle,
@@ -519,6 +524,42 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand SelectPresetCommand { get; }
     public RelayCommand ExportConfigCommand { get; }
     public RelayCommand ImportConfigCommand { get; }
+    public RelayCommand UndoLastCommand { get; }
+    public RelayCommand DismissUndoCommand { get; }
+
+    // ---------------------------------------------------------------- undo banner
+    // After a successful apply, a banner near the top offers a one-click Undo of exactly that batch — so the
+    // user does not have to hunt for it in Restore. It knows the session it just made; Undo restores that one.
+
+    private BackupSession? _lastBackupSession;
+    private int _lastAppliedCount;
+
+    private bool _showUndoBanner;
+    public bool ShowUndoBanner { get => _showUndoBanner; private set => Set(ref _showUndoBanner, value); }
+
+    public string UndoBannerText => _lastAppliedCount == 1
+        ? Loc.T("Applied 1 change.")
+        : Loc.F("Applied {0} changes.", _lastAppliedCount);
+
+    // The banner is a convenience, not a permanent fixture: it fades on its own after a while, and also when the
+    // user dismisses it, applies again, or clicks Undo. Restore still holds every backup for later.
+    private readonly DispatcherTimer _undoTimer;
+
+    private void ShowUndo(BackupSession session, int appliedCount)
+    {
+        _lastBackupSession = session;
+        _lastAppliedCount = appliedCount;
+        OnPropertyChanged(nameof(UndoBannerText));
+        ShowUndoBanner = true;
+        _undoTimer.Stop();
+        _undoTimer.Start();
+    }
+
+    private void HideUndo()
+    {
+        _undoTimer.Stop();
+        ShowUndoBanner = false;
+    }
 
     private void UpdatePendingCount()
     {
@@ -805,6 +846,7 @@ public sealed class MainViewModel : ObservableObject
             if (answer != MessageBoxResult.Yes) return;
         }
 
+        HideUndo();
         IsBusy = true;
         var progress = new Progress<string>(msg => StatusText = msg);
         try
@@ -815,6 +857,7 @@ public sealed class MainViewModel : ObservableObject
             if (results.Any(r => r.Success && r.Tweak.NotifiesMouseChange))
                 NativeMethods.ApplyMouseSettings();
             int failed = results.Count(r => !r.Success);
+            int applied = results.Count(r => r.Success);
             bool needsExplorer = results.Any(r => r.Success && r.Tweak.RequiresExplorerRestart);
             bool needsReboot = results.Any(r => r.Success && r.Tweak.RequiresRestart);
 
@@ -823,6 +866,12 @@ public sealed class MainViewModel : ObservableObject
                 : failed == 1
                 ? Loc.T("Finished with 1 error — see the log in %AppData%\\WinPure\\Logs.")
                 : Loc.F("Finished with {0} errors — see the log in %AppData%\\WinPure\\Logs.", failed);
+
+            // The apply just made one backup session (newest on disk). If it captured anything reversible, offer a
+            // one-click Undo of exactly that batch. A removal-only batch captures nothing, so no false promise.
+            var justMade = _backupManager.ListSessions().FirstOrDefault();
+            if (applied > 0 && justMade is { Entries.Count: > 0 })
+                ShowUndo(justMade, applied);
 
             if (needsExplorer)
             {
@@ -894,12 +943,38 @@ public sealed class MainViewModel : ObservableObject
             Loc.T("WinPure — Restore backup"), MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (answer != MessageBoxResult.Yes) return;
 
+        await DoRestore(vm.Session);
+    }
+
+    // The one-click Undo of the batch just applied. It knows the exact session, so it skips the "pick which
+    // backup" step — but keeps the same guard (restoring as the wrong user misplaces per-user values) and a
+    // confirmation. Underneath it is the very same restore Restore uses, so it is reversible in turn from there.
+    private async Task UndoLastAsync()
+    {
+        var session = _lastBackupSession;
+        if (session is null) return;
+        if (!ConfirmDespiteGuards(Loc.T("undo the changes you just applied"), SystemGuards.ForRestore)) return;
+
+        var answer = MessageBox.Show(
+            _lastAppliedCount == 1
+                ? Loc.T("Undo the change you just applied? Its backed-up value is written back.")
+                : Loc.F("Undo the {0} changes you just applied? Their backed-up values are written back.", _lastAppliedCount),
+            Loc.T("WinPure — Undo"), MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (answer != MessageBoxResult.Yes) return;
+
+        HideUndo();
+        await DoRestore(session);
+    }
+
+    // Shared by Restore and the Undo banner: writes a whole session back, repaints for theme/mouse values, and
+    // rescans. A snapshot may include theme or mouse values — make open apps repaint and re-read the pointer.
+    private async Task DoRestore(BackupSession session)
+    {
         IsBusy = true;
         StatusText = Loc.T("Restoring backup…");
         try
         {
-            int failures = await Task.Run(() => _backupManager.RestoreSession(vm.Session));
-            // a snapshot may include theme or mouse values — make open apps repaint and re-read the pointer
+            int failures = await Task.Run(() => _backupManager.RestoreSession(session));
             NativeMethods.BroadcastThemeChange();
             NativeMethods.ApplyMouseSettings();
             StatusText = failures == 0 ? Loc.T("Backup restored.")

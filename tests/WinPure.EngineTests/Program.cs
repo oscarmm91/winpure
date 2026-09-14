@@ -107,6 +107,7 @@ failures += EveryVisibleTextHasASpanishTranslation() ? 0 : 1;
 failures += SpanishIsShownAndABrokenTranslationFallsBackToEnglish() ? 0 : 1;
 failures += NoPresetEverTicksAnAppRemoval() ? 0 : 1;
 failures += TheThreeProfilesSelectTheIntendedTweaks() ? 0 : 1;
+failures += TheRestoreDetailListsEverythingABackupChanged() ? 0 : 1;
 failures += AnAppRemovalAlreadyDoneCannotBeSwitchedOff() ? 0 : 1;
 failures += RestoreSaysWhichChangesDoNotComeBack() ? 0 : 1;
 failures += EdgeTweaksAreManualPoliciesThatUndoByRemoving() ? 0 : 1;
@@ -3012,6 +3013,42 @@ bool TheThreeProfilesSelectTheIntendedTweaks()
     return Report("the three profiles select the intended tweaks", problems.Count == 0,
         problems.Count == 0
             ? $"Safe {expectedSafe.Count}, Balanced {expectedBalanced.Count}, Aggressive-own {expectedAggressive.Count}; Aggressive spans {total} reversible tweaks"
+            : string.Join(" | ", problems));
+}
+
+// The Restore "What changed" detail (v2.2) must list EVERY tweak a backup touched — not just the first few the
+// summary shows — mark app removals as not-reinstalled and sort them first, and fall back to a readable line for a
+// DNS/PATH session that carries no tweak names. Checked on BackupSessionViewModel.Details, which the expander binds.
+bool TheRestoreDetailListsEverythingABackupChanged()
+{
+    Loc.Use("en");
+    var problems = new List<string>();
+    string removalName = TweakCatalog.Build().First(t => !t.FullyReversible).Name;
+
+    var named = new WinPure.ViewModels.BackupSessionViewModel
+    {
+        Session = new BackupSession { Id = "b1", CreatedUtc = DateTime.UtcNow, TweakNames = new() { "Enable Dark Mode", removalName } },
+    };
+    var details = named.Details;
+    if (details.Count != 2) problems.Add($"detail listed {details.Count} items, expected 2 (nothing truncated)");
+    if (!details.Any(d => d.Contains("Enable Dark Mode", StringComparison.Ordinal))) problems.Add("a reversible tweak name is missing from the detail");
+    if (!details.Any(d => d.Contains(removalName, StringComparison.Ordinal) && d.Contains("not reinstalled", StringComparison.Ordinal)))
+        problems.Add("the app removal is not marked as not reinstalled");
+    if (details.Count > 0 && !details[0].Contains(removalName, StringComparison.Ordinal)) problems.Add("the app removal is not listed first");
+    if (!named.HasDetails) problems.Add("HasDetails is false for a session that has names");
+
+    // A DNS/PATH session has entries but no tweak names; it must still say what it holds.
+    var dns = new WinPure.ViewModels.BackupSessionViewModel
+    {
+        Session = new BackupSession { Id = "b2", CreatedUtc = DateTime.UtcNow, Entries = new() { new BackupEntry { Type = "dns", TweakId = "" } } },
+    };
+    if (!dns.Details.Any(d => d.Contains("DNS", StringComparison.Ordinal))) problems.Add("a DNS-only session did not describe its entry");
+
+    var empty = new WinPure.ViewModels.BackupSessionViewModel { Session = new BackupSession { Id = "b3", CreatedUtc = DateTime.UtcNow } };
+    if (empty.HasDetails) problems.Add("an empty session claims to have details");
+
+    return Report("the restore detail lists everything a backup changed", problems.Count == 0,
+        problems.Count == 0 ? "full name list, removals marked and first, DNS/PATH described, empty stays empty"
             : string.Join(" | ", problems));
 }
 

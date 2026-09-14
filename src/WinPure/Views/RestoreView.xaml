@@ -34,6 +34,7 @@
                     <DataTemplate>
                         <Border Background="{StaticResource Brush.Card}" CornerRadius="8" Margin="0,0,0,10"
                                 Padding="18,14" BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}">
+                            <StackPanel>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -77,6 +78,21 @@
                                     </Button>
                                 </StackPanel>
                             </Grid>
+
+                            <!-- Full list of what this backup changed (Summary shows only the first few). -->
+                            <Expander Margin="54,10,0,0" Foreground="{StaticResource Brush.TextSecondary}"
+                                      Header="{l:Tr 'What changed'}"
+                                      Visibility="{Binding HasDetails, Converter={StaticResource BoolToVisibility}}">
+                                <ItemsControl ItemsSource="{Binding Details}" Margin="0,6,0,4">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" FontSize="11.5" Margin="0,2,0,0" TextWrapping="Wrap"
+                                                       Foreground="{StaticResource Brush.TextTertiary}"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Expander>
+                            </StackPanel>
                         </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

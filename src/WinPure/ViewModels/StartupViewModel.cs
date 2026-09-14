@@ -1,8 +1,13 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Windows.Data;
 using WinPure.Models;
 using WinPure.Services;
 
 namespace WinPure.ViewModels;
+
+/// <summary>Which startup rows the list shows.</summary>
+public enum StartupFilter { All, Enabled, Disabled }
 
 /// <summary>One row of the Startup Apps page.</summary>
 public sealed class StartupItemViewModel : ObservableObject
@@ -81,6 +86,11 @@ public sealed class StartupViewModel : PageViewModel
 {
     public ObservableCollection<StartupItemViewModel> Items { get; } = new();
 
+    /// <summary>The filtered, list-bound view over <see cref="Items"/>. The filter groups rows by the state
+    /// the machine actually has (OriginalEnabled), NOT the live toggle, so toggling a row does not make it
+    /// jump out of the list mid-edit — it recategorizes only after Apply (or a rescan) commits the new state.</summary>
+    public ICollectionView ItemsView { get; }
+
     private string _summary = "";
     public string Summary { get => _summary; set => Set(ref _summary, value); }
 
@@ -89,7 +99,56 @@ public sealed class StartupViewModel : PageViewModel
 
     private readonly TweakEngine _engine;
 
-    public StartupViewModel(TweakEngine engine) => _engine = engine;
+    public StartupViewModel(TweakEngine engine)
+    {
+        _engine = engine;
+        ItemsView = CollectionViewSource.GetDefaultView(Items);
+        ItemsView.Filter = o => Shows((StartupItemViewModel)o);
+        SetFilterCommand = new RelayCommand(p => SetFilter((StartupFilter)p!));
+    }
+
+    // ---- filter (All / Enabled / Disabled) ----
+
+    private StartupFilter _filter = StartupFilter.All;
+    public RelayCommand SetFilterCommand { get; }
+
+    private bool Shows(StartupItemViewModel i) => _filter switch
+    {
+        StartupFilter.Enabled => i.OriginalEnabled,
+        StartupFilter.Disabled => !i.OriginalEnabled,
+        _ => true,
+    };
+
+    private void SetFilter(StartupFilter f)
+    {
+        if (_filter == f) return;
+        _filter = f;
+        ItemsView.Refresh();
+        OnPropertyChanged(nameof(IsFilterAll));
+        OnPropertyChanged(nameof(IsFilterEnabled));
+        OnPropertyChanged(nameof(IsFilterDisabled));
+    }
+
+    public bool IsFilterAll => _filter == StartupFilter.All;
+    public bool IsFilterEnabled => _filter == StartupFilter.Enabled;
+    public bool IsFilterDisabled => _filter == StartupFilter.Disabled;
+
+    // Counts (and the chip labels) reflect the machine's state, matching what each filter shows.
+    public int EnabledCount => Items.Count(i => i.OriginalEnabled);
+    public int DisabledCount => Items.Count(i => !i.OriginalEnabled);
+    public string AllChipText => Loc.F("All ({0})", Items.Count);
+    public string EnabledChipText => Loc.F("On ({0})", EnabledCount);
+    public string DisabledChipText => Loc.F("Off ({0})", DisabledCount);
+
+    private void RefreshCountsAndView()
+    {
+        ItemsView.Refresh();
+        OnPropertyChanged(nameof(EnabledCount));
+        OnPropertyChanged(nameof(DisabledCount));
+        OnPropertyChanged(nameof(AllChipText));
+        OnPropertyChanged(nameof(EnabledChipText));
+        OnPropertyChanged(nameof(DisabledChipText));
+    }
 
     /// <summary>How many rows are toggled away from what the machine has, waiting for Apply.</summary>
     public int PendingCount => Items.Count(i => i.IsDirty);
@@ -113,6 +172,7 @@ public sealed class StartupViewModel : PageViewModel
 
         UpdateSummary();
         IsEmpty = Items.Count == 0;
+        RefreshCountsAndView();
         PendingChanged?.Invoke();
     }
 
@@ -163,6 +223,7 @@ public sealed class StartupViewModel : PageViewModel
         }
 
         UpdateSummary();
+        RefreshCountsAndView();   // committed rows may now belong to the other filter group
         OnPropertyChanged(nameof(PendingCount));
         PendingChanged?.Invoke();
         return (dirty.Count - failed, failed);

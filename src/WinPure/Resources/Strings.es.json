@@ -753,5 +753,8 @@
   "Little was reclaimed — Windows was already managing memory efficiently.": "Se recuperó poco — Windows ya administraba la memoria de forma eficiente.",
   "System": "Sistema",
   "Disk": "Disco",
-  "{0} free of {1}": "{0} libres de {1}"
+  "{0} free of {1}": "{0} libres de {1}",
+  "All ({0})": "Todas ({0})",
+  "On ({0})": "Activadas ({0})",
+  "Off ({0})": "Desactivadas ({0})"
 }

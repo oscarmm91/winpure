@@ -61,6 +61,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly CleanupViewModel _cleanup;
     private readonly MemoryViewModel _memory;
     private readonly PowerViewModel _power;
+    private readonly SafeModeViewModel _safeMode;
     private readonly DiagnosticsViewModel _diagnostics;
     private readonly HardwareViewModel _hardware;
     private readonly DispatcherTimer _liveTimer;
@@ -167,6 +168,14 @@ public sealed class MainViewModel : ObservableObject
             Main = this,
         };
         NavItems.Add(new NavItem { Label = "Power", Glyph = ((char)0xE7E8).ToString(), Page = _power });
+        _safeMode = new SafeModeViewModel
+        {
+            Title = "Safe Mode",
+            Subtitle = "Restart Windows into Safe Mode for troubleshooting, and back to normal. Restoring normal boot is "
+                     + "always one click — WinPure never leaves you stuck in Safe Mode.",
+            Main = this,
+        };
+        NavItems.Add(new NavItem { Label = "Safe Mode", Glyph = ((char)0xEA18).ToString(), Page = _safeMode });
         _diagnostics = new DiagnosticsViewModel
         {
             Title = "Diagnostics",
@@ -300,6 +309,7 @@ public sealed class MainViewModel : ObservableObject
             if (value.Page == _diagnostics && !_diagnostics.HasLoaded) _diagnostics.Load();
             if (value.Page == _hardware && !_hardware.HasLoaded) _hardware.Load();
             if (value.Page == _path && !_path.HasLoaded) _path.Load();
+            if (value.Page == _safeMode && !_safeMode.HasLoaded) _safeMode.Load();
             SyncLiveTimer();
             OnPropertyChanged();
             OnPropertyChanged(nameof(CurrentPage));

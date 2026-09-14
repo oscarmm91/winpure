@@ -120,6 +120,14 @@ public sealed class UninstallerViewModel : PageViewModel
                 : Loc.F("{0} uninstalled.", vm.Name);
             LogService.Log($"Uninstall finished: {vm.Program.Name}, gone afterwards={!present}");
         }
+        catch (Exception ex)
+        {
+            // A malformed uninstall command can fail to launch — report it instead of leaving the row stuck on
+            // "Uninstalling…" with an unobserved task exception.
+            vm.StatusText = Loc.T("Could not run the uninstaller — see the log.");
+            Main.StatusText = Loc.F("{0} could not be uninstalled — see the log.", vm.Name);
+            LogService.Log($"Uninstall error for {vm.Program.Name}: {ex.Message}");
+        }
         finally
         {
             vm.IsRunning = false;

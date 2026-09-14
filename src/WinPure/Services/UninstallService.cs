@@ -78,7 +78,7 @@ internal sealed class UninstallRegistry : IUninstallBackend
                         if (k.GetValue("ParentKeyName") is not null) continue;
                         var releaseType = k.GetValue("ReleaseType") as string;
                         if (releaseType is "Security Update" or "Update" or "Hotfix") continue;
-                        if (name.StartsWith("KB") && name.Length > 2 && char.IsDigit(name[2])) continue;
+                        if (name.StartsWith("KB", StringComparison.OrdinalIgnoreCase) && name.Length > 2 && char.IsDigit(name[2])) continue;
 
                         var quiet = (k.GetValue("QuietUninstallString") as string)?.Trim();
                         var normal = (k.GetValue("UninstallString") as string)?.Trim();
@@ -105,6 +105,9 @@ internal sealed class UninstallRegistry : IUninstallBackend
         // Split the command into an executable and its arguments and launch it WITHOUT a shell — no cmd/powershell
         // re-parsing, so nothing in the registry string can be re-interpreted. UseShellExecute lets the uninstaller
         // elevate and show its own UI. Wait for it to finish so the caller can re-read the list.
+        // NOTE: WinPure runs elevated, so a per-user (HKCU) UninstallString — which a non-elevated program can write —
+        // is launched elevated here. The mitigation is the same as everywhere else: this only happens when the user
+        // deliberately clicks Uninstall on a named row and confirms (default No), never automatically.
         var (exe, args) = SplitCommand(program.Command);
         if (exe.Length == 0) throw new InvalidOperationException("The uninstall command is empty.");
         var psi = new ProcessStartInfo { FileName = exe, Arguments = args, UseShellExecute = true };
@@ -120,6 +123,15 @@ internal sealed class UninstallRegistry : IUninstallBackend
         {
             int end = command.IndexOf('"', 1);
             if (end > 0) return (command[1..end], command[(end + 1)..].Trim());
+            command = command[1..].Trim(); // an unbalanced leading quote — drop it and fall through
+        }
+        // Unquoted: split just AFTER the ".exe" so a path with spaces ("C:\Program Files\App\uninstall.exe /S")
+        // is not cut at the first space (UseShellExecute=true does not do CreateProcess's prefix-probing).
+        int exe = command.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+        if (exe >= 0)
+        {
+            int cut = exe + 4;
+            return (command[..cut], command[cut..].TrimStart());
         }
         int space = command.IndexOf(' ');
         return space < 0 ? (command, "") : (command[..space], command[(space + 1)..].Trim());

@@ -115,6 +115,10 @@ internal static class Program
             vm.CurrentNav = vm.NavItems.First(n => n.Page is UninstallerViewModel);
             System.Threading.Thread.Sleep(400); // give the async read a moment
             Render(root, Path.Combine(outDir, "17-uninstall.png"));
+
+            // Safe Mode reads the current safeboot state when opened (best-effort; unelevated it reads Off).
+            vm.CurrentNav = vm.NavItems.First(n => n.Page is SafeModeViewModel);
+            Render(root, Path.Combine(outDir, "18-safemode.png"));
             return 0;
         }
         catch (Exception ex)

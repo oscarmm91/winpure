@@ -124,6 +124,7 @@ failures += DiagnosticsExportsASystemBundleWithoutTouchingTheSystem() ? 0 : 1;
 failures += HardwareInfoIsReadOnlyAndLabelled() ? 0 : 1;
 failures += PathEditorFlagsEntriesBacksUpBeforeWritingAndRestores() ? 0 : 1;
 failures += UninstallerJudgesByEffectAndParsesCommands() ? 0 : 1;
+failures += SafeModeBuildsCorrectArgsAndAlwaysRestoresNormal() ? 0 : 1;
 failures += DnsCapturesCurrentServersAndRestorePutsThemBack() ? 0 : 1;
 failures += AServiceCanBeSetToManualNotJustDisabled() ? 0 : 1;
 failures += CreatingAContextMenuKeyIsUndoneByDeletingIt() ? 0 : 1;
@@ -1685,6 +1686,9 @@ bool UninstallerJudgesByEffectAndParsesCommands()
         if (e1 != "C:\\Program Files\\App\\unins.exe" || a1 != "/SILENT /X") problems.Add($"quoted split wrong: '{e1}' | '{a1}'");
         var (e2, a2) = WinPure.Services.UninstallRegistry.SplitCommand("MsiExec.exe /X{ABC}");
         if (e2 != "MsiExec.exe" || a2 != "/X{ABC}") problems.Add($"bare split wrong: '{e2}' | '{a2}'");
+        // An UNQUOTED path with spaces must not be cut at the first space (the .exe-aware split keeps it whole).
+        var (e3, a3) = WinPure.Services.UninstallRegistry.SplitCommand("C:\\Program Files\\App\\uninstall.exe /S");
+        if (e3 != "C:\\Program Files\\App\\uninstall.exe" || a3 != "/S") problems.Add($"unquoted-with-spaces split wrong: '{e3}' | '{a3}'");
     }
     catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
     finally { WinPure.Services.UninstallService.Swap(prev); }
@@ -1692,6 +1696,51 @@ bool UninstallerJudgesByEffectAndParsesCommands()
     return Report("the uninstaller judges success by the list, not by running",
         problems.Count == 0,
         problems.Count == 0 ? "IsGone reads the list after running; a survived uninstall is not called gone; commands split without a shell" : string.Join(" | ", problems));
+}
+
+// Safe Mode builds bcdedit's arguments from constants (never user input), passes {current} verbatim, reads the
+// invariant "safeboot" element without parsing localized text, and — critically — can always restore normal boot
+// from any state. Runs against a fake backend so a test never touches the real BCD.
+bool SafeModeBuildsCorrectArgsAndAlwaysRestoresNormal()
+{
+    var problems = new List<string>();
+    try
+    {
+        var min = WinPure.Services.BcdCli.ArgsFor(WinPure.Services.SafeBoot.Minimal);
+        if (!(min.Length == 4 && min[0] == "/set" && min[1] == "{current}" && min[2] == "safeboot" && min[3] == "minimal"))
+            problems.Add("minimal args wrong: " + string.Join(" ", min));
+        var net = WinPure.Services.BcdCli.ArgsFor(WinPure.Services.SafeBoot.Network);
+        if (net.Length != 4 || net[3] != "network") problems.Add("network args wrong: " + string.Join(" ", net));
+        var off = WinPure.Services.BcdCli.ArgsFor(WinPure.Services.SafeBoot.Off);
+        if (!(off.Length == 3 && off[0] == "/deletevalue" && off[1] == "{current}" && off[2] == "safeboot"))
+            problems.Add("off args wrong: " + string.Join(" ", off));
+
+        // Parsing keys only on the invariant element name; a localized value token still reads as "on".
+        if (WinPure.Services.BcdCli.ParseState("identifier {current}\r\ndevice partition=C:\r\nsafeboot Minimal\r\n") != WinPure.Services.SafeBoot.Minimal)
+            problems.Add("parse Minimal failed");
+        if (WinPure.Services.BcdCli.ParseState("safeboot Network") != WinPure.Services.SafeBoot.Network)
+            problems.Add("parse Network failed");
+        if (WinPure.Services.BcdCli.ParseState("safeboot Red") != WinPure.Services.SafeBoot.Minimal)
+            problems.Add("a localized value should still read as on (default Minimal)");
+        if (WinPure.Services.BcdCli.ParseState("device partition=C:\r\ndescription Windows") != WinPure.Services.SafeBoot.Off)
+            problems.Add("no safeboot line should read Off");
+
+        // Never strands: from any state, restoring normal returns to Off.
+        var fake = new FakeSafeModeBackend { State = WinPure.Services.SafeBoot.Network };
+        var prev = WinPure.Services.SafeModeService.Swap(fake);
+        try
+        {
+            WinPure.Services.SafeModeService.Set(WinPure.Services.SafeBoot.Off);
+            if (WinPure.Services.SafeModeService.Read() != WinPure.Services.SafeBoot.Off)
+                problems.Add("restoring normal boot did not clear safeboot");
+        }
+        finally { WinPure.Services.SafeModeService.Swap(prev); }
+    }
+    catch (Exception ex) { problems.Add($"threw: {ex.GetType().Name}: {ex.Message}"); }
+
+    return Report("safe mode builds the right bcdedit args and can always restore normal boot",
+        problems.Count == 0,
+        problems.Count == 0 ? "constant args, {current} verbatim, invariant safeboot parse, and normal boot always restorable" : string.Join(" | ", problems));
 }
 
 // Power actions route to the swappable backend with the right arguments, and only Shutdown/Restart carry a
@@ -3450,6 +3499,15 @@ sealed class FakeMemoryBackend : IMemoryBackend
     public bool Purged;
     public MemoryInfo Query() => new(Total, Avail);
     public void Purge() { Purged = true; Avail += 2_000; }   // pretend the trim freed some
+}
+
+/// <summary>A safe-boot state held in a field, so a test never touches the real BCD.</summary>
+sealed class FakeSafeModeBackend : ISafeModeBackend
+{
+    public SafeBoot State = SafeBoot.Off;
+    public List<SafeBoot> Sets { get; } = new();
+    public SafeBoot Read() => State;
+    public void Set(SafeBoot mode) { Sets.Add(mode); State = mode; }
 }
 
 /// <summary>An installed-program list held in a field, so a test never runs a real uninstaller.</summary>

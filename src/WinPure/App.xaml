@@ -64,6 +64,10 @@
             <DataTemplate DataType="{x:Type vm:UninstallerViewModel}">
                 <views:UninstallerView/>
             </DataTemplate>
+
+            <DataTemplate DataType="{x:Type vm:SafeModeViewModel}">
+                <views:SafeModeView/>
+            </DataTemplate>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

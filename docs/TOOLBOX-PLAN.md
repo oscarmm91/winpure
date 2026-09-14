@@ -1,4 +1,4 @@
-<!-- Digest de minería (workflow wf_8053a493-941, 8 repos, 9 Sonnets) del 2026-09-13. PROPUESTA, sin aprobar por Oscar todavía. -->
+<!-- Digest de minería (workflow wf_8053a493-941, 8 repos, 9 Sonnets) del 2026-09-13. ESTADO: las Fases A-E ya se construyeron y publicaron en v2.0.0 (ver CHANGELOG); lo que queda pendiente de decisión de Oscar es el bundling (~10%) y los ítems con puerta que se listan más abajo. -->
 
 # Plan de integración — WinPure "todo en uno"
 

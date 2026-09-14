@@ -1,9 +1,16 @@
 # WinPure — Plan "todo en uno" (all-in-one)
 
+> ⚠️ **SUPERADO (13-sep-2026, misma fecha).** Este fue el plan ORIGINAL. **YA se construyó y se
+> publicó como `v2.0.0`** (mergeado a `main`, PR #1). Los "EN CURSO", "111 → 130" y "sin merge a
+> main" de este archivo son **históricos**, no el estado actual. El estado real y qué falta viven en
+> el `CLAUDE.md` de la carpeta padre (sección *RUMBO NUEVO*) y en `docs/TOOLBOX-PLAN.md` (el segundo
+> plan, el de los 8 repos nuevos). Catálogo hoy: **137 tweaks**. Se conserva por su intención y
+> veredictos por repo.
+
 > Objetivo de Oscar (13-sep-2026): que WinPure sea **la** app definitiva de Windows —
 > velocidad, rendimiento, privacidad, limpieza, debloat, instalación— todo junto, en una sola app.
 > Este documento es el PLAN. El **mega-loop** (Opus orquesta, muchos Sonnets investigan/revisan/
-> implementan) lo dispara Oscar DESPUÉS de aprobar este plan. Nada de esto está construido aún.
+> implementan) lo dispara Oscar DESPUÉS de aprobar este plan. Nada de esto está construido aún. *(Frase de la fecha de redacción; hoy ya está en v2.0.0 — ver el banner "SUPERADO" de arriba.)*
 
 ## Cómo leerlo si llegas nuevo (o se fue la luz)
 
